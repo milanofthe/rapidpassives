@@ -1,4 +1,4 @@
-# RapidPassives - DRC-clean RFIC Inductor and Transformer Layout Generation
+# RapidPassives - DRC clean RFIC Inductors and Transformers
 
 RapidPassives is a tool for generating GDS files for RFIC inductors and transformers with arbitrary numbers of windings and winding ratios. In addition to the grometry generators, checker methods are implemented that ensure a valid geometry without clipping or overlap.
 
