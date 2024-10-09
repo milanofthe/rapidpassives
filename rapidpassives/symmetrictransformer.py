@@ -598,7 +598,7 @@ class SymmetricTransformer:
 
     def plot(self):
 
-        fig, ax = plt.subplots(tight_layout=True, dpi=120, figsize=(6, 6))
+        fig, ax = plt.subplots(tight_layout=True, dpi=120, figsize=(4, 4))
 
         ax.set_aspect(1)
 
