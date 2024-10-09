@@ -291,8 +291,8 @@ class SymmetricInductor:
             y_port = [-self.Dout/2+self.width, -self.Dout/2+self.width, -self.Dout/2-self.width, 
                       -self.Dout/2-self.width, -self.Dout/2, -self.Dout/2]
         
-        polys_top_windings.append( ( x_port, y_port ) )
-        polys_top_windings.append( ( [-x for x in x_port], y_port ) )
+        polys_top_windings.append(( x_port, y_port ))
+        polys_top_windings.append(( [-x for x in x_port], y_port ))
         
         #vias
         for x, y in via_centers_t_ct:
@@ -358,7 +358,6 @@ class SymmetricInductor:
             n_p += 1
             cell.add(gdstk.Label(f"P{n_p}", (x_label, y_label), "n", layer=1))
 
-
         if not path.endswith(".gds"): path += ".gds"
         lib.write_gds(path)
 
@@ -370,17 +369,16 @@ class SymmetricInductor:
         ax.set_aspect(1)
 
         for xx, yy in self.layers["windings"]:
-            ax.fill(xx, yy, c="gold", alpha=0.4, ec=None)
+            ax.fill(xx, yy, c="gold", alpha=0.6, ec=None)
 
         for xx, yy in self.layers["crossings"]:
-            ax.fill(xx, yy, c="tab:red", alpha=0.4, ec=None)
+            ax.fill(xx, yy, c="tab:red", alpha=0.6, ec=None)
 
         for xx, yy in self.layers["centertap"]:
-            ax.fill(xx, yy, c="tab:blue", alpha=0.4, ec=None)
+            ax.fill(xx, yy, c="tab:blue", alpha=0.6, ec=None)
 
         for xx, yy in self.layers["vias1"] + self.layers["vias2"]:
             ax.fill(xx, yy, c="k", ec=None)
 
         ax.set_xlabel("x")
         ax.set_ylabel("y")
-

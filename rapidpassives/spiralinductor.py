@@ -216,10 +216,10 @@ class SpiralInductor:
         ax.set_aspect(1)
 
         for xx, yy in self.layers["windings"]:
-            ax.fill(xx, yy, c="gold", alpha=0.4, ec=None)
+            ax.fill(xx, yy, c="gold", alpha=0.6, ec=None)
 
         for xx, yy in self.layers["crossings"]:
-            ax.fill(xx, yy, c="tab:red", alpha=0.4, ec=None)
+            ax.fill(xx, yy, c="tab:red", alpha=0.6, ec=None)
 
         for xx, yy in self.layers["vias"]:
             ax.fill(xx, yy, c="k", ec=None)
