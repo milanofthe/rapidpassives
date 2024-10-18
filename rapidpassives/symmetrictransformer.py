@@ -3,7 +3,9 @@ import numpy as np
 
 import gdstk
 
-from .utils.shapes import via_grid, routing_geometric_45
+from .utils.vias import via_grid
+from .utils.routings import routing_geometric_45
+from .utils.pgs import pgs4
 
 
 class SymmetricTransformer:
@@ -18,6 +20,7 @@ class SymmetricTransformer:
         spacing              : spacing between conductors
         center_tap_primary   : include center tap for primary side?
         center_tap_secondary : include center tap for secondary side?
+        via_extent           : extent of via array for transitions
         via_spacing          : spacing of vias
         via_width            : width of vias (in via array)
         via_in_metal         : disctance of vias to metal edge
@@ -33,6 +36,7 @@ class SymmetricTransformer:
                  spacing=2.4,
                  center_tap_primary=False, 
                  center_tap_secondary=False,
+                 via_extent=7, 
                  via_spacing=0.8, 
                  via_width=1,
                  via_in_metal=0.45, 
@@ -46,19 +50,17 @@ class SymmetricTransformer:
         self.spacing = spacing 
         self.center_tap_primary = center_tap_primary 
         self.center_tap_secondary = center_tap_secondary 
+        self.via_extent = via_extent
         self.via_spacing = via_spacing
         self.via_width = via_width
         self.via_in_metal = via_in_metal
         self.via_merge = via_merge
 
-        #verify geometry
-        self._check()
-
         #build polygons
         self._build()
 
 
-    def _check(self):
+    def is_valid(self):
         """
         check if geometry of interleaved trafo is valid
         """
@@ -67,18 +69,30 @@ class SymmetricTransformer:
 
         h = self.width + self.spacing + (np.sqrt(2) - 1) * (2*self.spacing + self.width)
         q = 2 * self.width + self.spacing # spacing for ports
-        e = 2 * (self.via_width + self.via_in_metal) + self.via_spacing
+        e = self.via_extent
 
-        topbridge_ok    = (h + 2*e <= ( self.Dout/2 - (N - 1) * (self.width + self.spacing)) * np.cos(np.pi / self.sides))
+        topbridge_ok = (h + 2*e <= ( self.Dout/2 - (N - 1) * (self.width + self.spacing)) * np.cos(np.pi / self.sides))
+        if not topbridge_ok:
+            return False
+
         bottombridge_ok = (h <= (self.Dout/2 - (N - 1) * self.spacing - N * self.width ) * np.cos(np.pi / self.sides))
-        port_ok         = (q <= self.Dout/2 * np.cos(np.pi / self.sides))
+        if not bottombridge_ok:
+            return False
 
-        if not (topbridge_ok and bottombridge_ok and port_ok):
-            raise ValueError("Invalid geometry, choose larger 'Dout'!")
+        port_ok = (q <= self.Dout/2 / np.cos(np.pi / self.sides))
+        if not port_ok:
+            return False
 
         #some error checking
         if self.center_tap_secondary and self.center_tap_primary and N % 2 != 0:
-            raise ValueError("For primary and secondary centertaps, N1+N2 must be even!")
+            return False
+
+
+    def add_pgs(self, D, width, spacing):
+        """
+        add patterned ground shield to the geometry
+        """
+        self.layers["pgs"] = pgs4(D, width, spacing)
 
 
     def _build(self):
@@ -113,7 +127,7 @@ class SymmetricTransformer:
         lower_right_angles = [np.pi * ( 1.5 + (i + 0.5) * 2 / self.sides) for i in range(self.sides//4)]
         
         #crossover calculations
-        extend = 2 * (self.via_width + self.via_in_metal) + self.via_spacing
+        extend = self.via_extent
         sep_total = self.width + self.spacing + (np.sqrt(2) - 1) * (2*self.spacing + self.width)
 
         #via center collection
@@ -136,18 +150,18 @@ class SymmetricTransformer:
                 if self.N1  >= self.N2 :
                     top_crossing_windings += [w for w in range(N) if w%2!=0 and 0 < w < Nmin*2-1]
                     top_crossing_windings += [w for w in range(N) if w%2==0 and  N > w > Nmin*2-1]
-                    bottom_crossing_windings += [w for w in range(N) if w%2!=0 and w < N-1 ]
+                    bottom_crossing_windings += [w for w in range(N) if w%2!=0 and w < N-1]
                 else:
                     bottom_crossing_windings += [w for w in range(N) if w%2!=0 and 0 < w < Nmin*2-1]
                     bottom_crossing_windings += [w for w in range(N) if w%2==0 and  N > w > Nmin*2-1]
-                    top_crossing_windings += [w for w in range(N) if w%2!=0 and w < N-1 ]
+                    top_crossing_windings += [w for w in range(N) if w%2!=0 and w < N-1]
             else:
                 #N1 ends top
                 top_bridge_windings.append(N1_end)
                 
                 top_crossing_windings += [w for w in range(N) if w%2!=0 and 0 < w < Nmin*2-1]
-                top_crossing_windings += [w for w in range(N) if w%2==0 and N-1 > w > Nmin*2-1 ]
-                bottom_crossing_windings += [w for w in range(N) if w%2!=0 and w < N ]
+                top_crossing_windings += [w for w in range(N) if w%2==0 and N-1 > w > Nmin*2-1]
+                bottom_crossing_windings += [w for w in range(N) if w%2!=0 and w < N]
                 
         else:
             #N2 ends bottom
@@ -158,8 +172,8 @@ class SymmetricTransformer:
                 bottom_bridge_windings.append(N1_end)
                 
                 top_crossing_windings += [w for w in range(N) if w%2!=0 and 0 < w < N-1]
-                bottom_crossing_windings += [w for w in range(N) if w%2==0 and N-1 > w > Nmin*2-1 ]
-                bottom_crossing_windings += [w for w in range(N) if w%2!=0 and w < Nmin*2-1 ]
+                bottom_crossing_windings += [w for w in range(N) if w%2==0 and N-1 > w > Nmin*2-1]
+                bottom_crossing_windings += [w for w in range(N) if w%2!=0 and w < Nmin*2-1]
                 
             else:
                 #N1 ends top
@@ -348,31 +362,33 @@ class SymmetricTransformer:
 
         if self.center_tap_primary:
             
+            _extend = min(self.width, extend)
+
             if self.N1  % 2 == 0:
                 #primary ends bottom
                 
                 x_center_tap = [-self.width/2, -self.width/2, self.width/2, self.width/2]
-                y_center_tap = [-self.Dout/2 + self.width - extend, -self.Dout/2 + (self.spacing + self.width) * N1_end, 
-                                -self.Dout/2 + (self.spacing + self.width) * N1_end , -self.Dout/2 + self.width - extend ]
+                y_center_tap = [-self.Dout/2 + self.width - _extend, -self.Dout/2 + (self.spacing + self.width) * N1_end, 
+                                -self.Dout/2 + (self.spacing + self.width) * N1_end , -self.Dout/2 + self.width - _extend ]
                 
                 x_ct_1 = 0
-                y_ct_1 = -self.Dout/2 + self.spacing * N1_end + self.width * (N1_end + 1) - self.width + extend/2
+                y_ct_1 = -self.Dout/2 + self.spacing * N1_end + self.width * (N1_end + 1) - self.width + _extend/2
                 
                 x_ct_2 = 0
-                y_ct_2 = -self.Dout/2 + self.width/2 + (self.width-extend)/2
+                y_ct_2 = -self.Dout/2 + self.width/2 + (self.width-_extend)/2
                 
             else:
                 #primary ends top
                 
                 x_center_tap = [self.width/2, self.width/2, -self.width/2, -self.width/2]
-                y_center_tap = [self.Dout/2 - self.width + extend, self.Dout/2 - (self.spacing + self.width) * N1_end, 
-                                self.Dout/2 - (self.spacing + self.width) * N1_end , self.Dout/2 - self.width + extend ]
+                y_center_tap = [self.Dout/2 - self.width + _extend, self.Dout/2 - (self.spacing + self.width) * N1_end, 
+                                self.Dout/2 - (self.spacing + self.width) * N1_end , self.Dout/2 - self.width + _extend ]
                 
                 x_ct_1 = 0
-                y_ct_1 = self.Dout/2 - self.spacing * N1_end - self.width * (N1_end + 1) + self.width - extend/2
+                y_ct_1 = self.Dout/2 - self.spacing * N1_end - self.width * (N1_end + 1) + self.width - _extend/2
                 
                 x_ct_2 = 0
-                y_ct_2 = self.Dout/2 - self.width/2 - (self.width-extend)/2
+                y_ct_2 = self.Dout/2 - self.width/2 - (self.width-_extend)/2
                 
             #geo
             if N1_end > 1:
@@ -380,10 +396,10 @@ class SymmetricTransformer:
                 via_centers_t_ct.append( ( x_ct_2, y_ct_2 ) )
                 
                 x_via_plane_ct_1 = [x_ct_1-self.width/2, x_ct_1-self.width/2, x_ct_1+self.width/2, x_ct_1+self.width/2]
-                y_via_plane_ct_1 = [y_ct_1-extend/2, y_ct_1+extend/2, y_ct_1+extend/2, y_ct_1-extend/2]
+                y_via_plane_ct_1 = [y_ct_1-_extend/2, y_ct_1+_extend/2, y_ct_1+_extend/2, y_ct_1-_extend/2]
                 
                 x_via_plane_ct_2 = [x_ct_2-self.width/2, x_ct_2-self.width/2, x_ct_2+self.width/2, x_ct_2+self.width/2]
-                y_via_plane_ct_2 = [y_ct_2-extend/2, y_ct_2+extend/2, y_ct_2+extend/2, y_ct_2-extend/2]
+                y_via_plane_ct_2 = [y_ct_2-_extend/2, y_ct_2+_extend/2, y_ct_2+_extend/2, y_ct_2-_extend/2]
             
                 polys_top_windings.append( ( x_via_plane_ct_1, y_via_plane_ct_1 ) )
                 polys_bottom_crossings.append( ( x_via_plane_ct_1, y_via_plane_ct_1 ) )
@@ -403,31 +419,33 @@ class SymmetricTransformer:
 
         if self.center_tap_secondary:
             
+            _extend = min(self.width, extend)
+
             if self.N2  % 2 != 0:
                 #secondary ends bottom
                 
                 x_center_tap = [-self.width/2, -self.width/2, self.width/2, self.width/2]
-                y_center_tap = [-self.Dout/2 + self.width - extend, -self.Dout/2 + (self.spacing + self.width) * N2_end, 
-                                -self.Dout/2 + (self.spacing + self.width) * N2_end, -self.Dout/2 + self.width - extend ]
+                y_center_tap = [-self.Dout/2 + self.width - _extend, -self.Dout/2 + (self.spacing + self.width) * N2_end, 
+                                -self.Dout/2 + (self.spacing + self.width) * N2_end, -self.Dout/2 + self.width - _extend ]
                 
                 x_ct_1 = 0
-                y_ct_1 = -self.Dout/2 + self.spacing * N2_end + self.width * (N2_end + 1) - self.width + extend/2
+                y_ct_1 = -self.Dout/2 + self.spacing * N2_end + self.width * (N2_end + 1) - self.width + _extend/2
                 
                 x_ct_2 = 0
-                y_ct_2 = -self.Dout/2 + self.width/2 + (self.width-extend)/2
+                y_ct_2 = -self.Dout/2 + self.width/2 + (self.width-_extend)/2
                 
             else:
                 #secondary ends top
                 
                 x_center_tap = [self.width/2, self.width/2, -self.width/2, -self.width/2]
-                y_center_tap = [self.Dout/2 - self.width + extend, self.Dout/2 - (self.spacing + self.width) * N2_end, 
-                                self.Dout/2 - (self.spacing + self.width) * N2_end , self.Dout/2 - self.width + extend ]
+                y_center_tap = [self.Dout/2 - self.width + _extend, self.Dout/2 - (self.spacing + self.width) * N2_end, 
+                                self.Dout/2 - (self.spacing + self.width) * N2_end , self.Dout/2 - self.width + _extend ]
                 
                 x_ct_1 = 0
-                y_ct_1 = self.Dout/2 - self.spacing * N2_end - self.width * (N2_end + 1) + self.width - extend/2
+                y_ct_1 = self.Dout/2 - self.spacing * N2_end - self.width * (N2_end + 1) + self.width - _extend/2
                 
                 x_ct_2 = 0
-                y_ct_2 = self.Dout/2 - self.width/2 - (self.width-extend)/2
+                y_ct_2 = self.Dout/2 - self.width/2 - (self.width-_extend)/2
                 
             #geo
             if N2_end > 1:
@@ -435,10 +453,10 @@ class SymmetricTransformer:
                 via_centers_t_ct.append( ( x_ct_2, y_ct_2 ) )
                     
                 x_via_plane_ct_1 = [x_ct_1-self.width/2, x_ct_1-self.width/2, x_ct_1+self.width/2, x_ct_1+self.width/2]
-                y_via_plane_ct_1 = [y_ct_1-extend/2, y_ct_1+extend/2, y_ct_1+extend/2, y_ct_1-extend/2]
+                y_via_plane_ct_1 = [y_ct_1-_extend/2, y_ct_1+_extend/2, y_ct_1+_extend/2, y_ct_1-_extend/2]
                     
                 x_via_plane_ct_2 = [x_ct_2-self.width/2, x_ct_2-self.width/2, x_ct_2+self.width/2, x_ct_2+self.width/2]
-                y_via_plane_ct_2 = [y_ct_2-extend/2, y_ct_2+extend/2, y_ct_2+extend/2, y_ct_2-extend/2]
+                y_via_plane_ct_2 = [y_ct_2-_extend/2, y_ct_2+_extend/2, y_ct_2+_extend/2, y_ct_2-_extend/2]
                 
                 polys_top_windings.append( ( x_via_plane_ct_1, y_via_plane_ct_1 ) )
                 polys_bottom_crossings.append( ( x_via_plane_ct_1, y_via_plane_ct_1 ) )
@@ -500,11 +518,13 @@ class SymmetricTransformer:
         
         #vias
         for x, y in via_centers_t_ct:
+
+            _extend = min(self.width, extend)
             
             if N > 3:
-                polys_vias_t_ct += via_grid(x, y, self.width-2*self.via_in_metal, extend-2*self.via_in_metal, 
+                polys_vias_t_ct += via_grid(x, y, self.width-2*self.via_in_metal, _extend-2*self.via_in_metal, 
                                             self.via_spacing, self.via_width, self.via_merge)
-            polys_vias_t_b  += via_grid(x, y, self.width-2*self.via_in_metal, extend-2*self.via_in_metal, 
+            polys_vias_t_b  += via_grid(x, y, self.width-2*self.via_in_metal, _extend-2*self.via_in_metal, 
                                         self.via_spacing, self.via_width, self.via_merge)
         
         for x, y in via_centers_t_b:
@@ -524,7 +544,8 @@ class SymmetricTransformer:
                        "crossings" : polys_bottom_crossings, 
                        "vias1"     : polys_vias_t_b, 
                        "centertap" : polys_center_tap,
-                       "vias2"     : polys_vias_t_ct}
+                       "vias2"     : polys_vias_t_ct, 
+                       "pgs"       : []}
 
 
     def to_gds(self, path, unit=1e-6, add_port_labels=True):
@@ -553,6 +574,10 @@ class SymmetricTransformer:
         for xx, yy in self.layers["vias2"]:
             points = list(zip(xx, yy))
             cell.add(gdstk.Polygon(points, layer=5, datatype=0))
+
+        for xx, yy in self.layers["pgs"]:
+            points = list(zip(xx, yy))
+            cell.add(gdstk.Polygon(points, layer=10, datatype=0))
 
         if add_port_labels:
 
@@ -602,14 +627,17 @@ class SymmetricTransformer:
 
         ax.set_aspect(1)
 
+        for xx, yy in self.layers["pgs"]:
+            ax.fill(xx, yy, c="tab:blue", ec=None)
+
         for xx, yy in self.layers["windings"]:
-            ax.fill(xx, yy, c="gold", alpha=0.6, ec=None)
+            ax.fill(xx, yy, c="gold", ec=None)
 
         for xx, yy in self.layers["crossings"]:
-            ax.fill(xx, yy, c="tab:red", alpha=0.6, ec=None)
+            ax.fill(xx, yy, c="tab:red", ec=None)
 
         for xx, yy in self.layers["centertap"]:
-            ax.fill(xx, yy, c="tab:blue", alpha=0.6, ec=None)
+            ax.fill(xx, yy, c="tab:blue", ec=None)
 
         for xx, yy in self.layers["vias1"] + self.layers["vias2"]:
             ax.fill(xx, yy, c="k", ec=None)

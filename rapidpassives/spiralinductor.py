@@ -13,7 +13,8 @@ import numpy as np
 
 import gdstk
 
-from .utils.shapes import via_grid
+from .utils.vias import via_grid
+from .utils.pgs import pgs4
 
 
 # generation class ----------------------------------------------------------------------
@@ -54,15 +55,23 @@ class SpiralInductor:
         self.via_in_metal = via_in_metal
         self.via_merge = via_merge
 
-        #verify geometry
-        self._check()
-
         #build polygons
         self._build()
 
 
-    def _check(self):
-        pass
+    def is_valid(self):
+
+        #extend of crossing due to via grid
+        extend = 2 * (self.via_width + self.via_in_metal) + self.via_spacing 
+        if extend > self.width:
+            return False
+
+        #inner diameter
+        Din = self.Dout - (self.N + 1) * (self.width + self.spacing)
+        if abs(Din / 2 * np.arctan(np.pi/self.sides)) < self.width + self.spacing/2:
+            return False
+
+        return True
 
 
     def _build(self):
@@ -85,7 +94,7 @@ class SpiralInductor:
         angles = np.pi * np.linspace(1/(2*n_pts), 1-1/(2*n_pts) , n_pts)
         
         #extend of crossing due to via grid
-        extend = extend = 2 * (self.via_width + self.via_in_metal) + self.via_spacing 
+        extend = 2 * (self.via_width + self.via_in_metal) + self.via_spacing 
 
         #shift of center for lower section
         x_shift = - s / 2 * np.cos(np.pi / self.sides)
@@ -103,7 +112,7 @@ class SpiralInductor:
         y_in = []
         
         #build sections
-        for section in range(2 * self.N + 1):
+        for section in range(2 * self.N):
             
             #upper section
             if section % 2 == 0:
@@ -131,31 +140,41 @@ class SpiralInductor:
         x_out_start = [self.Dout/2 + self.width, x_out[0]] 
         x_in_start = [self.Dout/2 + self.width, x_in[0]] 
         
-        y_out_start = [self.width/2, self.width/2]
-        y_in_start = [-self.width/2, -self.width/2]
+        # y_out_start = [self.width/2, self.width/2]
+        # y_in_start = [-self.width/2, -self.width/2]
+        y_out_start = [self.width+self.spacing/2, self.width+self.spacing/2]
+        y_in_start = [self.spacing/2, self.spacing/2]
         
         #end connector
         x_out_end = [x_out[-1]] 
         x_in_end = [x_in[-1]] 
         
-        y_out_end = [-self.width/2]
-        y_in_end = [-self.width/2]
+        # y_out_end = [-self.width/2]
+        # y_in_end = [-self.width/2]
+        y_out_end = [-self.spacing/2]
+        y_in_end = [-self.spacing/2]
         
         #under
-        if extend > self.width:
-            x_under = [x_in[-1], x_in[-1], -(self.Dout/2 + self.width), 
-                       -(self.Dout/2 + self.width), x_in[-1]-self.width, x_in[-1]-self.width]
-            y_under = [extend-self.width/2, -self.width/2, -self.width/2, 
-                       self.width/2, self.width/2, extend-self.width/2]
-        else:
-            x_under = [ x_in[-1], -(self.Dout/2 + self.width), -(self.Dout/2 + self.width), x_in[-1] ]
-            y_under = [ -self.width/2, -self.width/2         , self.width/2          , self.width/2  ]
+        # if extend > self.width:
+        #     x_under = [x_in[-1], x_in[-1], -(self.Dout/2 + self.width), 
+        #                -(self.Dout/2 + self.width), x_in[-1]-self.width, x_in[-1]-self.width]
+        #     y_under = [extend-self.width/2, -self.width/2, -self.width/2, 
+        #                self.width/2, self.width/2, extend-self.width/2]
+        # else:
+        #     x_under = [ x_in[-1], -(self.Dout/2 + self.width), -(self.Dout/2 + self.width), x_in[-1] ]
+        #     y_under = [ -self.width/2, -self.width/2         , self.width/2          , self.width/2  ]
             
+
+        x_under = [ x_in[-1], self.Dout/2 + self.width, self.Dout/2 + self.width, x_in[-1] ]
+        y_under = [ -self.width-self.spacing/2, -self.width-self.spacing/2, -self.spacing/2, -self.spacing/2 ]
+            
+
         polys_crossings_bottom.append( (x_under, y_under) )
         
         #vias
         via_center_x = x_out[-1] + (x_in[-1] - x_out[-1])/2
-        via_center_y = 0
+        # via_center_y = 0
+        via_center_y = -self.width/2 - self.spacing/2
         
         if extend > self.width:
             polys_vias_t_b = via_grid(via_center_x, via_center_y+(extend-self.width)/2, 
@@ -175,7 +194,15 @@ class SpiralInductor:
         #assign polygons to layers
         self.layers = {"windings"  : polys_windings_top, 
                        "crossings" : polys_crossings_bottom, 
-                       "vias"      : polys_vias_t_b}
+                       "vias"      : polys_vias_t_b, 
+                       "pgs"       : []}
+
+
+    def add_pgs(self, D, width, spacing):
+        """
+        add patterned ground shield to the geometry
+        """
+        self.layers["pgs"] = pgs4(D, width, spacing)
 
 
     def to_gds(self, path, add_port_labels=True, unit=1e-6):
@@ -197,12 +224,17 @@ class SpiralInductor:
             points = list(zip(xx, yy))
             cell.add(gdstk.Polygon(points, layer=3, datatype=0))
 
+        for xx, yy in self.layers["pgs"]:
+            points = list(zip(xx, yy))
+            cell.add(gdstk.Polygon(points, layer=10, datatype=0))
+
 
         if add_port_labels:
 
             x_label = self.Dout/2 + self.width 
-            cell.add(gdstk.Label("P1", (x_label, 0.0), "w", layer=1))
-            cell.add(gdstk.Label("P2", (-x_label, 0.0), "e", layer=2))
+            y_label = self.width/2 + self.spacing/2 
+            cell.add(gdstk.Label("P1", (x_label, y_label), "w", layer=1))
+            cell.add(gdstk.Label("P2", (x_label, -y_label), "w", layer=2))
 
 
         if not path.endswith(".gds"): path += ".gds"
@@ -215,14 +247,17 @@ class SpiralInductor:
 
         ax.set_aspect(1)
 
+        for xx, yy in self.layers["pgs"]:
+            ax.fill(xx, yy, c="tab:blue", ec=None)
+
         for xx, yy in self.layers["windings"]:
-            ax.fill(xx, yy, c="gold", alpha=0.6, ec=None)
+            ax.fill(xx, yy, c="gold", ec=None)
 
         for xx, yy in self.layers["crossings"]:
-            ax.fill(xx, yy, c="tab:red", alpha=0.6, ec=None)
+            ax.fill(xx, yy, c="tab:red", ec=None)
 
         for xx, yy in self.layers["vias"]:
-            ax.fill(xx, yy, c="k", ec=None)
+            ax.fill(xx, yy, c="k", ec=None)        
 
         ax.set_xlabel("x")
         ax.set_ylabel("y")
