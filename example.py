@@ -39,6 +39,9 @@ Ind = SymmetricInductor(
     via_width=1,        # width of vias
     via_in_metal=0.45)  # distance of vias to metal edge
 
+if not Ind.is_valid():
+    print("invalid geometry parameters")
+
 #add a patterned ground shield
 Ind.add_pgs(D=270,      # outer diameter of pgs
             width=4,    # pgs conductor width
