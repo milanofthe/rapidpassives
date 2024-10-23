@@ -378,9 +378,10 @@ class SymmetricInductor:
         lib.write_gds(path)
 
 
-    def plot(self):
+    def plot(self, ax=None):
 
-        fig, ax = plt.subplots(tight_layout=True, dpi=120, figsize=(4, 4))
+        if ax is None:
+            fig, ax = plt.subplots(tight_layout=True, dpi=120, figsize=(4, 4))
 
         ax.set_aspect(1)
 
@@ -394,7 +395,7 @@ class SymmetricInductor:
             ax.fill(xx, yy, c="tab:red", ec=None)
 
         for xx, yy in self.layers["centertap"]:
-            ax.fill(xx, yy, c="tab:blue", ec=None)
+            ax.fill(xx, yy, c="tab:green", ec=None)
 
         for xx, yy in self.layers["vias1"] + self.layers["vias2"]:
             ax.fill(xx, yy, c="k", ec=None)

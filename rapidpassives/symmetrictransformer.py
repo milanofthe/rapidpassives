@@ -65,27 +65,24 @@ class SymmetricTransformer:
         check if geometry of interleaved trafo is valid
         """
 
+        #checking the geometry
         N = self.N1 + self.N2
+
+        #some error checking
+        if self.center_tap_secondary and self.center_tap_primary and N % 2 != 0:
+            return False
 
         h = self.width + self.spacing + (np.sqrt(2) - 1) * (2*self.spacing + self.width)
         q = 2 * self.width + self.spacing # spacing for ports
         e = self.via_extent
 
-        topbridge_ok = (h + 2*e <= ( self.Dout/2 - (N - 1) * (self.width + self.spacing)) * np.cos(np.pi / self.sides))
-        if not topbridge_ok:
-            return False
+        topbridge_ok    = (h + 2*e <= (self.Dout/2 - (N - 1) * (self.width + self.spacing)) * np.cos(np.pi / self.sides))
+        bottombridge_ok = (h <= (self.Dout/2 - (N - 1) * self.spacing - N * self.width) * np.cos(np.pi / self.sides))
+        port_ok         = (q <= self.Dout/2 * np.cos(np.pi / self.sides))
 
-        bottombridge_ok = (h <= (self.Dout/2 - (N - 1) * self.spacing - N * self.width ) * np.cos(np.pi / self.sides))
-        if not bottombridge_ok:
-            return False
+        return (topbridge_ok and bottombridge_ok and port_ok)
 
-        port_ok = (q <= self.Dout/2 / np.cos(np.pi / self.sides))
-        if not port_ok:
-            return False
-
-        #some error checking
-        if self.center_tap_secondary and self.center_tap_primary and N % 2 != 0:
-            return False
+        
 
 
     def add_pgs(self, D, width, spacing):
@@ -621,9 +618,10 @@ class SymmetricTransformer:
         lib.write_gds(path)
 
 
-    def plot(self):
+    def plot(self, ax=None):
 
-        fig, ax = plt.subplots(tight_layout=True, dpi=120, figsize=(4, 4))
+        if ax is None:
+            fig, ax = plt.subplots(tight_layout=True, dpi=120, figsize=(4, 4))
 
         ax.set_aspect(1)
 
@@ -637,7 +635,7 @@ class SymmetricTransformer:
             ax.fill(xx, yy, c="tab:red", ec=None)
 
         for xx, yy in self.layers["centertap"]:
-            ax.fill(xx, yy, c="tab:blue", ec=None)
+            ax.fill(xx, yy, c="tab:green", ec=None)
 
         for xx, yy in self.layers["vias1"] + self.layers["vias2"]:
             ax.fill(xx, yy, c="k", ec=None)

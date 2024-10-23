@@ -39,6 +39,7 @@ Ind = SymmetricInductor(
     via_width=1,        # width of vias
     via_in_metal=0.45)  # distance of vias to metal edge
 
+#this is how geometry validity is checked
 if not Ind.is_valid():
     print("invalid geometry parameters")
 
