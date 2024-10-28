@@ -75,14 +75,14 @@ class SymmetricTransformer:
         h = self.width + self.spacing + (np.sqrt(2) - 1) * (2*self.spacing + self.width)
         q = 2 * self.width + self.spacing # spacing for ports
         e = self.via_extent
+        d1 = self.Dout/2 - (N - 1) *(self.spacing + self.width)
+        d2 = self.Dout/2 - (N - 1) * self.spacing - N * self.width
 
-        topbridge_ok    = (h + 2*e <= (self.Dout/2 - (N - 1) * (self.width + self.spacing)) * np.cos(np.pi / self.sides))
-        bottombridge_ok = (h <= (self.Dout/2 - (N - 1) * self.spacing - N * self.width) * np.cos(np.pi / self.sides))
-        port_ok         = (q <= self.Dout/2 * np.cos(np.pi / self.sides))
+        topbridge_ok    = (h + 2*e <= d2 * np.tan(np.pi / self.sides))
+        bottombridge_ok = (h       <= d1 * np.tan(np.pi / self.sides))
+        port_ok         = (q       <= self.Dout/2 * np.tan(np.pi / self.sides))
 
         return (topbridge_ok and bottombridge_ok and port_ok)
-
-        
 
 
     def add_pgs(self, D, width, spacing):
