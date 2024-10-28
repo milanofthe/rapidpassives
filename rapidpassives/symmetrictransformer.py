@@ -73,14 +73,16 @@ class SymmetricTransformer:
             return False
 
         h = self.width + self.spacing + (np.sqrt(2) - 1) * (2*self.spacing + self.width)
-        q = 2 * self.width + self.spacing # spacing for ports
+        q = 2 * self.width + self.spacing
+        if self.center_tap_secondary or self.center_tap_primary:
+            q += self.width + self.spacing
         e = self.via_extent
-        d1 = self.Dout/2 - (N - 1) *(self.spacing + self.width)
-        d2 = self.Dout/2 - (N - 1) * self.spacing - N * self.width
+        d2 = self.Dout/2 - (N - 1) * (self.spacing + self.width) #outside inner bridge
+        d1 = self.Dout/2 - (N - 1) * self.spacing - N * self.width #inside inner bridge
 
-        topbridge_ok    = (h + 2*e <= d2 * np.tan(np.pi / self.sides))
-        bottombridge_ok = (h       <= d1 * np.tan(np.pi / self.sides))
-        port_ok         = (q       <= self.Dout/2 * np.tan(np.pi / self.sides))
+        topbridge_ok    = (h/2 + e <= d2 * np.tan(np.pi / self.sides))
+        bottombridge_ok = (h/2     <= d1 * np.tan(np.pi / self.sides))
+        port_ok         = (q/2     <= self.Dout/2 * np.tan(np.pi / self.sides))
 
         return (topbridge_ok and bottombridge_ok and port_ok)
 
