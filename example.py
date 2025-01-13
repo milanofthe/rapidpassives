@@ -1,4 +1,3 @@
-
 import matplotlib.pyplot as plt
 
 from rapidpassives import SpiralInductor, SymmetricInductor, SymmetricTransformer
