@@ -8,6 +8,12 @@
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackView from '$lib/components/StackView.svelte';
 	import { nudgeValue, parseInput } from '$lib/components/fields';
+	import { exportGds, downloadGds } from '$lib/gds/writer';
+
+	function doExport() {
+		const data = exportGds(layers, { cellName: 'SymmetricTransformer' });
+		downloadGds(data, 'symmetric_transformer.gds');
+	}
 
 	let p = $state<SymmetricTransformerParams>({
 		Dout: 250, N1: 2, N2: 3, sides: 8, width: 12, spacing: 2,
@@ -39,7 +45,7 @@
 
 <GeometryEditor {layers} {valid} {renderOpts}>
 	{#snippet sidebar()}
-		<ParamSidebar>
+		<ParamSidebar onexport={doExport}>
 			<div class="param-section"><h4>Geometry</h4>
 				<div class="f"><span>Dout</span><div class="fi"><button onclick={() => nud('Dout',-1,1)}>-</button><input type="number" value={p.Dout} oninput={e => inp('Dout',e)}/><button onclick={() => nud('Dout',1,1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>Sides</span><div class="fi"><button onclick={() => nud('sides',-2,4,64)}>-</button><input type="number" value={p.sides} oninput={e => inp('sides',e)}/><button onclick={() => nud('sides',2,4,64)}>+</button><em></em></div></div>
