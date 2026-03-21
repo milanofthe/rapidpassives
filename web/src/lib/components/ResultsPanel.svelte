@@ -149,8 +149,8 @@
 			});
 		}
 
-		// Coupling coefficient for transformer (if available)
-		if (r.freqs[0]?.k !== undefined) {
+		// Coupling coefficient for transformer (4+ ports only)
+		if (r.freqs[0]?.k !== undefined && r.nPorts >= 4) {
 			const kData = r.freqs.map(p => p.k ?? 0);
 			plots.push({ id: 'p-k', data: [tr(kData, 3)], yaxis: yax('k', kData), legend: false });
 		}

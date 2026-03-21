@@ -316,7 +316,7 @@ export function solvePEEC(
 		const Q = sp.Zeff[0] > 0 ? sp.Zeff[1] / sp.Zeff[0] : 0;
 
 		const portResults = extractPortResults(Zmp, omega, portNames);
-		const k = nPorts >= 2 ? extractCoupling(Zmp, omega) : undefined;
+		const k = nPorts >= 4 ? extractCoupling(Zmp, omega) : undefined;
 
 		freqs.push({ freq, Z: Zmp, S, L: Leff, Q, R: sp.Zeff[0], ports: portResults, k });
 	}

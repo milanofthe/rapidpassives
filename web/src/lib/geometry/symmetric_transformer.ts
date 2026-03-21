@@ -442,10 +442,13 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 	const botPortX = hasBotCTPort ? spacing + width : (spacing + width) / 2;
 	const topPortX = hasTopCTPort ? spacing + width : (spacing + width) / 2;
 
-	const p1Plus = findNearest(-botPortX, -Dout / 2);
-	const p1Minus = findNearest(botPortX, -Dout / 2);
-	const p2Plus = findNearest(-topPortX, Dout / 2);
-	const p2Minus = findNearest(topPortX, Dout / 2);
+	// Place port nodes at the outer edge of port polygons (for display)
+	// These may not be connected to winding segments yet — the transformer
+	// network connectivity is still being developed
+	const p1Plus = _addNode(-botPortX, -Dout / 2 - width, 'm3');
+	const p1Minus = _addNode(botPortX, -Dout / 2 - width, 'm3');
+	const p2Plus = _addNode(-topPortX, Dout / 2 + width, 'm3');
+	const p2Minus = _addNode(topPortX, Dout / 2 + width, 'm3');
 
 	const netPorts: Port[] = [
 		{ name: 'P1+', node: p1Plus.id },
@@ -454,11 +457,11 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 		{ name: 'P2-', node: p2Minus.id },
 	];
 	if (hasBotCTPort) {
-		const ctBot = findNearest(0, -Dout / 2);
+		const ctBot = _addNode(0, -Dout / 2 - width, 'm3');
 		netPorts.push({ name: 'CT1', node: ctBot.id });
 	}
 	if (hasTopCTPort) {
-		const ctTop = findNearest(0, Dout / 2);
+		const ctTop = _addNode(0, Dout / 2 + width, 'm3');
 		netPorts.push({ name: 'CT2', node: ctTop.id });
 	}
 
