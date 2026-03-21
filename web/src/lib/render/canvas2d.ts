@@ -144,7 +144,7 @@ export function renderLayers(
 	// Port markers
 	if (opts?.ports) {
 		for (const port of opts.ports) {
-			drawPort(ctx, port, view, opts.ports);
+			drawPort(ctx, port, view);
 		}
 	}
 }
@@ -222,51 +222,25 @@ function drawCrosshair(ctx: CanvasRenderingContext2D, view: ViewState, width: nu
 	ctx.setLineDash([]);
 }
 
-function drawPort(
-	ctx: CanvasRenderingContext2D, port: PortMarker, view: ViewState,
-	allPorts: PortMarker[]
-): void {
+function drawPort(ctx: CanvasRenderingContext2D, port: PortMarker, view: ViewState): void {
 	const sx = port.x * view.scale + view.offsetX;
 	const sy = -port.y * view.scale + view.offsetY;
 
-	// Compute center of all ports to determine label direction
-	let cx = 0, cy = 0;
-	for (const p of allPorts) { cx += p.x; cy += p.y; }
-	cx /= allPorts.length; cy /= allPorts.length;
+	// Place label outward from origin (0,0) — the geometry center
+	const dist = Math.sqrt(port.x * port.x + port.y * port.y);
+	let dirX = dist > 0.1 ? port.x / dist : 1;
+	let dirY = dist > 0.1 ? -port.y / dist : 0; // flip Y for screen
 
-	// Direction from center to this port (in world coords)
-	const dx = port.x - cx;
-	const dy = port.y - cy;
-	const dist = Math.sqrt(dx * dx + dy * dy);
+	const offDist = 12;
+	const tx = sx + dirX * offDist;
+	const ty = sy + dirY * offDist;
 
-	// Label offset: push label outward from center
-	const offDist = 10;
-	let offX = offDist, offY = 0;
-	if (dist > 0.1) {
-		offX = (dx / dist) * offDist;
-		offY = -(dy / dist) * offDist; // flip Y for screen coords
-	}
-
-	// Choose text alignment based on direction
 	let align: CanvasTextAlign = 'left';
-	if (offX < -3) align = 'right';
-	else if (Math.abs(offX) <= 3) align = 'center';
+	if (dirX < -0.3) align = 'right';
+	else if (Math.abs(dirX) <= 0.3) align = 'center';
 
 	const label = port.name;
 	ctx.font = `600 10px ${fonts.mono}`;
-	const tm = ctx.measureText(label);
-	const pw = tm.width + 8;
-	const ph = 14;
-	const tx = sx + offX;
-	const ty = sy + offY;
-
-	// Background — semi-transparent
-	let bgX = tx - 4;
-	if (align === 'right') bgX = tx - pw + 4;
-	else if (align === 'center') bgX = tx - pw / 2;
-
-	ctx.fillStyle = `${canvasTheme.bg}cc`;
-	ctx.fillRect(bgX, ty - ph / 2, pw, ph);
 
 	// Text
 	ctx.fillStyle = canvasTheme.highlightOutline;
@@ -276,7 +250,7 @@ function drawPort(
 
 	// Dot
 	ctx.beginPath();
-	ctx.arc(sx, sy, 3, 0, 2 * Math.PI);
+	ctx.arc(sx, sy, 2.5, 0, 2 * Math.PI);
 	ctx.fillStyle = canvasTheme.highlightOutline;
 	ctx.fill();
 }
