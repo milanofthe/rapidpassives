@@ -38,7 +38,7 @@ export interface FrequencyPoint {
 	Q: number;
 	R: number;
 	ports: PortFreqResult[];
-	windings: WindingResult[];  // primary/secondary level results
+	windings?: WindingResult[];
 	k?: number;
 }
 
@@ -239,7 +239,7 @@ export function solvePEEC(
 
 		if (!Yb) {
 			// Singular — skip this frequency
-			freqs.push({ freq, Z: [], S: [], L: 0, Q: 0, R: 0, ports: [], windings: [], k: undefined });
+			freqs.push({ freq, Z: [], S: [], L: 0, Q: 0, R: 0, ports: [], k: undefined });
 			continue;
 		}
 
@@ -300,7 +300,7 @@ export function solvePEEC(
 		// Solve Y_nodal · V = RHS for all ports at once
 		const V = cxMatSolve(YnR, RHS);
 		if (!V) {
-			freqs.push({ freq, Z: [], S: [], L: 0, Q: 0, R: 0, ports: [], windings: [], k: undefined });
+			freqs.push({ freq, Z: [], S: [], L: 0, Q: 0, R: 0, ports: [], k: undefined });
 			continue;
 		}
 
