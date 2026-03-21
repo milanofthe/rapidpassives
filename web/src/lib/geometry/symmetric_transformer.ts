@@ -112,6 +112,14 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 	// Track last nodes of each quadrant for inter-winding connections
 	let prevWindingQuadLast: ConductorNode[][] = [];
 
+	// Track winding entry/exit points for port assignment
+	// Winding 0 bottom-left is the first port entry
+	// The interleaving determines which windings are primary/secondary
+	const windingBottomLeft: ConductorNode[] = [];  // LL.last per winding
+	const windingBottomRight: ConductorNode[] = []; // LR.first per winding
+	const windingTopLeft: ConductorNode[] = [];     // UL.first per winding
+	const windingTopRight: ConductorNode[] = [];    // UR.last per winding
+
 	for (let winding = 0; winding < N; winding++) {
 		const rc = (R1 + R2) / 2;
 		const quadAngles = [upperLeftAngles, lowerLeftAngles, upperRightAngles, lowerRightAngles];
@@ -210,8 +218,15 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 		}
 
 		// Track for next winding's inter-connection
-		// Store the "exit" nodes: where this winding ends that the next winding picks up
 		prevWindingQuadLast = [qFirst[0], qLast[1], qLast[2], qFirst[3]];
+
+		// Track port connection points per winding
+		// Bottom: LL.last (left) and LR.first (right) — these are the bottom-most nodes
+		windingBottomLeft.push(qLast[1]);
+		windingBottomRight.push(qFirst[3]);
+		// Top: UL.first (left) and UR.last (right) — these are the top-most nodes
+		windingTopLeft.push(qFirst[0]);
+		windingTopRight.push(qLast[2]);
 
 		R1 -= s;
 		R2 -= s;
@@ -228,30 +243,13 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 	const p2Plus = addN(-topPortX, Dout / 2 + width, 'm3');
 	const p2Minus = addN(topPortX, Dout / 2 + width, 'm3');
 
-	// Connect port nodes to nearest winding endpoint
-	const segNodeIds = new Set<string>();
-	for (const seg of netSegments) { segNodeIds.add(seg.fromNode); segNodeIds.add(seg.toNode); }
-	for (const via of netVias) { segNodeIds.add(via.topNode); segNodeIds.add(via.bottomNode); }
-
-	function nearest(tx: number, ty: number): ConductorNode {
-		let best: ConductorNode | null = null, bestD = Infinity;
-		for (const n of netNodes) {
-			if (!segNodeIds.has(n.id)) continue;
-			const d = (n.x - tx) ** 2 + (n.y - ty) ** 2;
-			if (d < bestD) { bestD = d; best = n; }
-		}
-		return best ?? addN(tx, ty, 'm3');
-	}
-
-	const nearP1P = nearest(p1Plus.x, p1Plus.y);
-	const nearP1M = nearest(p1Minus.x, p1Minus.y);
-	const nearP2P = nearest(p2Plus.x, p2Plus.y);
-	const nearP2M = nearest(p2Minus.x, p2Minus.y);
-
-	if (nearP1P.id !== p1Plus.id) addS(p1Plus, nearP1P, width, 'm3', 'port', 'windings');
-	if (nearP1M.id !== p1Minus.id) addS(p1Minus, nearP1M, width, 'm3', 'port', 'windings');
-	if (nearP2P.id !== p2Plus.id) addS(p2Plus, nearP2P, width, 'm3', 'port', 'windings');
-	if (nearP2M.id !== p2Minus.id) addS(p2Minus, nearP2M, width, 'm3', 'port', 'windings');
+	// Connect ports to outermost winding (0) quadrant endpoints
+	// P1+ → LL bottom-left (winding 0), P1- → LR bottom-right (winding 0)
+	// P2+ → UL top-left (winding 0), P2- → UR top-right (winding 0)
+	addS(p1Plus, windingBottomLeft[0], width, 'm3', 'port_p1p', 'windings');
+	addS(p1Minus, windingBottomRight[0], width, 'm3', 'port_p1m', 'windings');
+	addS(p2Plus, windingTopLeft[0], width, 'm3', 'port_p2p', 'windings');
+	addS(p2Minus, windingTopRight[0], width, 'm3', 'port_p2m', 'windings');
 
 	const netPorts: Port[] = [
 		{ name: 'P1+', node: p1Plus.id },
@@ -261,14 +259,15 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 	];
 	if (hasBotCTPort) {
 		const ct = addN(0, -Dout / 2 - width, 'm3');
-		const nearCT = nearest(ct.x, ct.y);
-		if (nearCT.id !== ct.id) addS(ct, nearCT, width, 'm3', 'ct', 'windings');
+		// Connect CT to the bottom of the innermost winding
+		const innerBot = windingBottomLeft.length > 0 ? windingBottomLeft[windingBottomLeft.length - 1] : null;
+		if (innerBot) addS(ct, innerBot, width, 'm3', 'ct', 'windings');
 		netPorts.push({ name: 'CT1', node: ct.id });
 	}
 	if (hasTopCTPort) {
 		const ct = addN(0, Dout / 2 + width, 'm3');
-		const nearCT = nearest(ct.x, ct.y);
-		if (nearCT.id !== ct.id) addS(ct, nearCT, width, 'm3', 'ct', 'windings');
+		const innerTop = windingTopLeft.length > 0 ? windingTopLeft[windingTopLeft.length - 1] : null;
+		if (innerTop) addS(ct, innerTop, width, 'm3', 'ct', 'windings');
 		netPorts.push({ name: 'CT2', node: ct.id });
 	}
 
