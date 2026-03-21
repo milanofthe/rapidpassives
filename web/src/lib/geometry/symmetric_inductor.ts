@@ -53,9 +53,10 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 		});
 	}
 
-	// Port nodes
-	const portLeftNode = addNode(-sepTotal / 2, -Dout / 2, 'm3');
-	const portRightNode = addNode(sepTotal / 2, -Dout / 2, 'm3');
+	// Port nodes — positioned at the outer edge of port polygons
+	const portXOffset = center_tap ? spacing + width : (spacing + width) / 2;
+	const portLeftNode = addNode(-portXOffset, -Dout / 2 - width, 'm3');
+	const portRightNode = addNode(portXOffset, -Dout / 2 - width, 'm3');
 
 	let r1 = R1, r2 = R2;
 
@@ -258,6 +259,10 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 		{ name: 'P1', plusNode: portLeftNode.id, minusNode: portRightNode.id },
 		{ name: 'P2', plusNode: portRightNode.id, minusNode: portLeftNode.id },
 	];
+	if (center_tap) {
+		const ctNode = addNode(0, -Dout / 2 - width, 'm3');
+		ports.push({ name: 'CT', plusNode: ctNode.id, minusNode: portLeftNode.id });
+	}
 
 	const network: ConductorNetwork = { nodes, segments, vias, ports };
 

@@ -334,16 +334,31 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 		netVias.push({ id: `via_tb${netVias.length}`, topNode: topNode.id, bottomNode: botNode.id, resistance: 0.1, polygons: vPolys, renderLayer: 'vias1' });
 	}
 
-	// Port nodes
-	const p1Plus = _addNode(-sepTotal / 2, -Dout / 2, 'm3');
-	const p1Minus = _addNode(sepTotal / 2, -Dout / 2, 'm3');
-	const p2Plus = _addNode(-sepTotal / 2, Dout / 2, 'm3');
-	const p2Minus = _addNode(sepTotal / 2, Dout / 2, 'm3');
+	// Port nodes — at outer edge of port polygons
+	const hasBotCTPort = (center_tap_primary && N1 % 2 === 0) || (center_tap_secondary && N2 % 2 !== 0);
+	const hasTopCTPort = (center_tap_primary && N1 % 2 !== 0) || (center_tap_secondary && N2 % 2 === 0);
+	const botPortX = hasBotCTPort ? spacing + width : (spacing + width) / 2;
+	const topPortX = hasTopCTPort ? spacing + width : (spacing + width) / 2;
+
+	const p1Plus = _addNode(-botPortX, -Dout / 2 - width, 'm3');
+	const p1Minus = _addNode(botPortX, -Dout / 2 - width, 'm3');
+	const p2Plus = _addNode(-topPortX, Dout / 2 + width, 'm3');
+	const p2Minus = _addNode(topPortX, Dout / 2 + width, 'm3');
 
 	const netPorts: Port[] = [
-		{ name: 'P1', plusNode: p1Plus.id, minusNode: p1Minus.id },
-		{ name: 'P2', plusNode: p2Plus.id, minusNode: p2Minus.id },
+		{ name: 'P1+', plusNode: p1Plus.id, minusNode: p1Minus.id },
+		{ name: 'P1-', plusNode: p1Minus.id, minusNode: p1Plus.id },
+		{ name: 'P2+', plusNode: p2Plus.id, minusNode: p2Minus.id },
+		{ name: 'P2-', plusNode: p2Minus.id, minusNode: p2Plus.id },
 	];
+	if (hasBotCTPort) {
+		const ctBot = _addNode(0, -Dout / 2 - width, 'm3');
+		netPorts.push({ name: 'CT1', plusNode: ctBot.id, minusNode: p1Plus.id });
+	}
+	if (hasTopCTPort) {
+		const ctTop = _addNode(0, Dout / 2 + width, 'm3');
+		netPorts.push({ name: 'CT2', plusNode: ctTop.id, minusNode: p2Plus.id });
+	}
 
 	const network: ConductorNetwork = { nodes: netNodes, segments: netSegments, vias: netVias, ports: netPorts };
 

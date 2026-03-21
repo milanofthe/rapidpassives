@@ -10,6 +10,19 @@
 	import { nudgeValue, parseInput } from '$lib/components/fields';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
+	import { solvePEEC, type SimulationResult } from '$lib/solver/peec';
+
+	let simResult = $state<SimulationResult | null>(null);
+	let simulating = $state(false);
+	let simSettings = $state({ fMin: 1e8, fMax: 50e9, nPoints: 100, z0: 50, logScale: true });
+
+	async function doSimulate() {
+		if (!result || simulating) return;
+		simulating = true;
+		await new Promise(r => setTimeout(r, 10));
+		simResult = solvePEEC(result.network, stack, { ...simSettings, conductorSpacing: p.spacing, hasPgs: pgsP.enabled });
+		simulating = false;
+	}
 
 	function doExport() {
 		const data = exportGds(layers, { cellName: 'SymmetricInductor' });
@@ -54,7 +67,7 @@
 	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack), ports: portMarkers });
 </script>
 
-<GeometryEditor {layers} {valid} {renderOpts}>
+<GeometryEditor {layers} {valid} {renderOpts} {simResult}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
 			<div class="param-section"><h4>Geometry</h4>
@@ -86,4 +99,22 @@
 			<StackView bind:stack />
 		</div>
 	{/snippet}
+	{#snippet simPanel()}
+		<div class="sim-panel">
+			<div class="param-section"><h4>Frequency Sweep</h4>
+				<div class="f"><span>f_min</span><div class="fi"><input type="number" value={simSettings.fMin / 1e6} step="100" min="1" oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) simSettings = { ...simSettings, fMin: v * 1e6 }; }} /><em>MHz</em></div></div>
+				<div class="f"><span>f_max</span><div class="fi"><input type="number" value={simSettings.fMax / 1e6} step="1000" min="1" oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) simSettings = { ...simSettings, fMax: v * 1e6 }; }} /><em>MHz</em></div></div>
+				<div class="f"><span>Points</span><div class="fi"><input type="number" value={simSettings.nPoints} step="10" min="10" max="500" oninput={(e) => { const v = parseInt((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) simSettings = { ...simSettings, nPoints: v }; }} /><em></em></div></div>
+				<div class="f"><span>Z0</span><div class="fi"><input type="number" value={simSettings.z0} step="5" min="1" oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) simSettings = { ...simSettings, z0: v }; }} /><em>Ω</em></div></div>
+				<div class="f"><span>Scale</span><div class="fi"><button class="toggle-btn" class:active={simSettings.logScale} onclick={() => simSettings = { ...simSettings, logScale: !simSettings.logScale }}>{simSettings.logScale ? 'LOG' : 'LIN'}</button><em></em></div></div>
+			</div>
+			<div class="sim-actions"><button onclick={doSimulate}>{simulating ? 'Simulating...' : 'Simulate'}</button></div>
+		</div>
+	{/snippet}
 </GeometryEditor>
+
+<style>
+	.sim-panel { padding: 10px; display: flex; flex-direction: column; gap: 10px; height: 100%; }
+	.sim-actions { margin-top: auto; display: flex; }
+	.sim-actions button { flex: 1; }
+</style>
