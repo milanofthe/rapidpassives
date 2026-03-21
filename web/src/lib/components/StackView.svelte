@@ -123,7 +123,7 @@
 		);
 	}
 	.cs-substrate span {
-		font-size: 9px;
+		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
 		color: var(--text-dim);
 	}
@@ -135,7 +135,7 @@
 		justify-content: center;
 	}
 	.cs-oxide span {
-		font-size: 7px;
+		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
 		color: var(--text-dim);
 		opacity: 0.5;
@@ -157,7 +157,7 @@
 		justify-content: center;
 	}
 	.cs-metal span {
-		font-size: 9px;
+		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
 		color: #000;
 		font-weight: 600;

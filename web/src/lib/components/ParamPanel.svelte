@@ -150,7 +150,7 @@
 		padding: 10px;
 	}
 	.section-header {
-		font-size: 10px;
+		font-size: var(--fs-xs);
 		text-transform: uppercase;
 		letter-spacing: 1.5px;
 		color: var(--accent);
@@ -166,7 +166,7 @@
 		margin: 0 -6px;
 	}
 	.field-label {
-		font-size: 12px;
+		font-size: var(--fs-sm);
 		color: var(--text-muted);
 		min-width: 70px;
 		font-family: var(--font-mono);
@@ -184,7 +184,7 @@
 		min-width: 0;
 	}
 	.field-unit {
-		font-size: 10px;
+		font-size: var(--fs-xs);
 		color: var(--text-dim);
 		min-width: 32px;
 		padding-left: 6px;
@@ -197,7 +197,7 @@
 		padding: 0;
 		width: 22px;
 		height: 26px;
-		font-size: 14px;
+		font-size: var(--fs-md);
 		font-weight: 400;
 		font-family: var(--font-mono);
 		text-transform: none;
@@ -219,7 +219,7 @@
 		color: var(--text-dim);
 		border: 1px solid var(--input-border);
 		padding: 4px 8px;
-		font-size: 11px;
+		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
 		text-transform: none;
 		letter-spacing: 0.5px;
@@ -237,7 +237,7 @@
 		color: var(--text);
 		padding: 6px 8px;
 		border-radius: 0;
-		font-size: 12px;
+		font-size: var(--fs-sm);
 		width: 100%;
 	}
 	.actions {

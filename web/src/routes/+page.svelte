@@ -81,7 +81,7 @@
 		text-align: center;
 	}
 	.hero h2 {
-		font-size: 20px;
+		font-size: var(--fs-lg);
 		font-weight: 700;
 		color: var(--accent);
 		font-family: var(--font-mono);
@@ -89,7 +89,7 @@
 		margin-bottom: 8px;
 	}
 	.hero p {
-		font-size: 13px;
+		font-size: var(--fs-sm);
 		color: var(--text-muted);
 		max-width: 500px;
 		font-family: var(--font-mono);
@@ -132,14 +132,14 @@
 		border-top: 1px solid var(--border-subtle);
 	}
 	.card-info h3 {
-		font-size: 13px;
+		font-size: var(--fs-sm);
 		font-weight: 600;
 		color: var(--accent);
 		font-family: var(--font-mono);
 		margin-bottom: 4px;
 	}
 	.card-info p {
-		font-size: 11px;
+		font-size: var(--fs-xs);
 		color: var(--text-dim);
 		line-height: 1.4;
 		font-family: var(--font-mono);

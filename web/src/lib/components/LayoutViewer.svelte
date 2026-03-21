@@ -176,7 +176,7 @@
 		left: 8px;
 		display: flex;
 		gap: 10px;
-		font-size: 11px;
+		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
 		color: var(--text-dim);
 		background: var(--canvas-bg);

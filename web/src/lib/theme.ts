@@ -82,6 +82,16 @@ export const fonts = {
 	mono: "'JetBrains Mono', monospace",
 } as const;
 
+// --- Type scale ---
+// 4 sizes only: xs (detail), sm (body), md (emphasis), lg (headings)
+
+export const typeScale = {
+	xs: '10px',
+	sm: '12px',
+	md: '14px',
+	lg: '20px',
+} as const;
+
 // --- Helpers ---
 
 /** Generate CSS custom property declarations from palette */

@@ -26,6 +26,10 @@
 	--canvas-bg: #131316;
 	--font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 	--font-mono: 'JetBrains Mono', monospace;
+	--fs-xs: 10px;
+	--fs-sm: 12px;
+	--fs-md: 14px;
+	--fs-lg: 20px;
 }
 
 * {
@@ -39,7 +43,7 @@ html, body {
 	font-family: var(--font-body);
 	background: var(--bg);
 	color: var(--text);
-	font-size: 13px;
+	font-size: var(--fs-sm);
 	-webkit-font-smoothing: antialiased;
 }
 
@@ -49,7 +53,7 @@ input[type="number"], input[type="text"], select {
 	color: var(--text);
 	padding: 5px 8px;
 	border-radius: 0;
-	font-size: 12px;
+	font-size: var(--fs-sm);
 	font-family: var(--font-mono);
 	width: 100%;
 	transition: border-color 0.15s;
@@ -82,7 +86,7 @@ button {
 	padding: 6px 14px;
 	border-radius: 0;
 	cursor: pointer;
-	font-size: 12px;
+	font-size: var(--fs-sm);
 	font-weight: 600;
 	font-family: var(--font-body);
 	text-transform: uppercase;
@@ -95,7 +99,7 @@ button:hover {
 }
 
 label {
-	font-size: 11px;
+	font-size: var(--fs-xs);
 	color: var(--text-muted);
 	display: block;
 	font-weight: 500;

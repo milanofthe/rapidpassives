@@ -56,7 +56,7 @@
 		text-decoration: none;
 	}
 	.brand h1 {
-		font-size: 12px;
+		font-size: var(--fs-sm);
 		font-weight: 700;
 		color: var(--accent);
 		letter-spacing: 2px;
@@ -76,7 +76,7 @@
 		display: flex;
 		align-items: center;
 		padding: 0 14px;
-		font-size: 11px;
+		font-size: var(--fs-xs);
 		font-weight: 600;
 		font-family: var(--font-mono);
 		letter-spacing: 0.5px;

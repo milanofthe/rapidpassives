@@ -82,10 +82,10 @@
 			margin: { t: 8, r: 12, b: 44, l: 60 },
 			xaxis: {
 				type: xType as any,
-				title: { text: 'Frequency (Hz)', font: { size: 9 }, standoff: 8 },
+				title: { text: 'Frequency (Hz)', font: { size: 10 }, standoff: 8 },
 				gridcolor: plotColors.grid,
 				linecolor: plotColors.axis,
-				tickfont: { size: 9 },
+				tickfont: { size: 10 },
 			},
 			autosize: true,
 			showlegend: false,
@@ -97,7 +97,7 @@
 			...(name ? { name, showlegend: true } : {}),
 		});
 		const yax = (title: string, ...datasets: number[][]) => {
-			const axis: any = { title: { text: title, font: { size: 10 }, standoff: 12 }, gridcolor: plotColors.grid, tickfont: { size: 9 } };
+			const axis: any = { title: { text: title, font: { size: 10 }, standoff: 12 }, gridcolor: plotColors.grid, tickfont: { size: 10 } };
 			if (datasets.length > 0) {
 				// Smart y-range: if variation is small relative to mean, zoom in
 				const all = datasets.flat().filter(v => isFinite(v));
@@ -176,7 +176,7 @@
 		padding: 24px;
 		text-align: center;
 		color: var(--text-dim);
-		font-size: 12px;
+		font-size: var(--fs-sm);
 		font-family: var(--font-mono);
 	}
 </style>

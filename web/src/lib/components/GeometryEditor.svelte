@@ -141,7 +141,7 @@
 	.stab {
 		flex: 1;
 		padding: 6px 0;
-		font-size: 10px;
+		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
 		font-weight: 600;
 		letter-spacing: 1px;
@@ -172,7 +172,7 @@
 	.invalid-bar {
 		background: var(--accent);
 		color: var(--bg);
-		font-size: 11px;
+		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
 		padding: 4px 16px;
 		flex-shrink: 0;
