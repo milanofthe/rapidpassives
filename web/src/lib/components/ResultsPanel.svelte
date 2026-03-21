@@ -90,8 +90,11 @@
 			showlegend: false,
 		};
 		const cfg = { responsive: true, displayModeBar: false };
-		const tr = (y: number[], color: string) => ({
-			x: f, y, type: 'scatter' as const, mode: 'lines' as const, line: { color, width: 2 },
+		const colors = ['#e8944a', '#d9513c', '#6bbf8a', '#7b5e8a', '#4a9ec2', '#c4c46b'];
+		const tr = (y: number[], ci: number, name?: string) => ({
+			x: f, y, type: 'scatter' as const, mode: 'lines' as const,
+			line: { color: colors[ci % colors.length], width: 2 },
+			...(name ? { name, showlegend: true } : {}),
 		});
 		const yax = (title: string, ...datasets: number[][]) => {
 			const axis: any = { title: { text: title, font: { size: 10 }, standoff: 12 }, gridcolor: '#2a2a32', tickfont: { size: 9 } };
@@ -114,21 +117,17 @@
 			return axis;
 		};
 
-		const trNamed = (y: number[], color: string, name: string) => ({
-			...tr(y, color), name, showlegend: true,
-		});
-
 		const plots = [
-			{ id: 'p-l', data: [tr(L, '#e8944a')], yaxis: yax('L (nH)', L), legend: false },
-			{ id: 'p-q', data: [tr(Q, '#d9513c')], yaxis: yax('Q', Q), legend: false },
-			{ id: 'p-r', data: [tr(R, '#6bbf8a')], yaxis: yax('R (Ω)', R), legend: false },
+			{ id: 'p-l', data: [tr(L, 0)], yaxis: yax('L (nH)', L), legend: false },
+			{ id: 'p-q', data: [tr(Q, 1)], yaxis: yax('Q', Q), legend: false },
+			{ id: 'p-r', data: [tr(R, 2)], yaxis: yax('R (Ω)', R), legend: false },
 			{ id: 'p-s', data: [
-				trNamed(s11Mag, '#7b5e8a', '|S11|'),
-				trNamed(s21Mag, '#e8944a', '|S21|'),
+				tr(s11Mag, 0, '|S11|'),
+				tr(s21Mag, 1, '|S21|'),
 			], yaxis: yax('dB', s11Mag, s21Mag), legend: true },
 			{ id: 'p-ph', data: [
-				trNamed(s11Phase, '#7b5e8a', '∠S11'),
-				trNamed(s21Phase, '#e8944a', '∠S21'),
+				tr(s11Phase, 0, '∠S11'),
+				tr(s21Phase, 1, '∠S21'),
 			], yaxis: yax('Phase (°)', s11Phase, s21Phase), legend: true },
 		];
 
