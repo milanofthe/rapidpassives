@@ -66,7 +66,7 @@
 	{/snippet}
 	{#snippet stackPanel()}
 		<div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
-			<div class="param-section"><StackView bind:stack /></div>
+			<StackView bind:stack />
 		</div>
 	{/snippet}
 </GeometryEditor>
