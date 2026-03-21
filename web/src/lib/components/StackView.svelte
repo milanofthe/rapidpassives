@@ -61,7 +61,7 @@
 
 	<!-- Layer cards — top to bottom -->
 	{#each [...sortedLayers].reverse() as layer}
-		<div class="layer-card" class:dimmed={!layer.visible} style="border-left-color: {layer.color};">
+		<div class="layer-card" class:dimmed={!layer.visible}>
 			<div class="layer-header">
 				<button
 					class="vis-toggle"
@@ -211,7 +211,6 @@
 	.layer-card {
 		background: var(--bg-surface);
 		border: 1px solid var(--border-subtle);
-		border-left: 3px solid;
 		padding: 8px 10px;
 		transition: opacity 0.15s;
 	}
@@ -219,7 +218,6 @@
 		opacity: 0.4;
 	}
 	.sub-card {
-		border-left-color: var(--text-dim);
 		margin-top: 4px;
 	}
 	.layer-header {
@@ -246,10 +244,12 @@
 		background: currentColor;
 	}
 	.layer-title {
-		font-size: 11px;
+		font-size: 10px;
 		font-family: var(--font-mono);
 		font-weight: 600;
-		color: var(--text);
+		color: var(--accent);
+		text-transform: uppercase;
+		letter-spacing: 1.5px;
 	}
 	.layer-badge {
 		font-size: 8px;
@@ -269,26 +269,28 @@
 	.lf {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		padding: 2px 0;
+		gap: 8px;
+		padding: 4px 6px;
+		margin: 0 -6px;
 	}
 	.lf > span {
-		font-size: 10px;
+		font-size: 12px;
 		font-family: var(--font-mono);
-		color: var(--text-dim);
-		min-width: 38px;
+		color: var(--text-muted);
+		min-width: 42px;
 	}
 	.lf input {
-		width: 72px;
-		font-size: 11px;
+		flex: 1;
+		font-size: 12px;
 		padding: 3px 6px;
-		text-align: right;
+		text-align: center;
+		min-width: 0;
 	}
 	.lf em {
 		font-style: normal;
-		font-size: 9px;
+		font-size: 10px;
 		font-family: var(--font-mono);
 		color: var(--text-dim);
-		min-width: 36px;
+		min-width: 32px;
 	}
 </style>
