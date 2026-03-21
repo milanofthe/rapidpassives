@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" stroke="#d9513c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M16 4 L28 10 L28 22 L16 28 L4 22 L4 10 Z" opacity="0.3"/>
-  <path d="M16 8 L24 12 L24 20 L16 24 L8 20 L8 12 Z" opacity="0.5"/>
-  <path d="M16 12 L20 14 L20 18 L16 20 L12 18 L12 14 Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Spiral winding (orange) -->
+  <path d="M22 9 L26 13 L26 19 L22 23 L10 23 L6 19 L6 13 L10 9 L20 9 L23 12 L23 17 L20 20 L12 20 L9 17 L9 13 L12 11 L18 11 L20 13 L20 16 L18 18 L14 18 L13 16 L13 14 L16 14" stroke="#e8944a" stroke-width="2" fill="none"/>
+  <!-- Underpass (red) -->
+  <line x1="16" y1="14" x2="22" y2="9" stroke="#d9513c" stroke-width="1.5"/>
 </svg>
