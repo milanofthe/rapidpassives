@@ -16,7 +16,7 @@ import { layerColors } from '$lib/theme';
 export const LAYER_COLORS: Record<LayerName, string> = layerColors;
 
 /** Draw order (back to front) */
-export const LAYER_ORDER: LayerName[] = ['pgs', 'crossings', 'centertap', 'windings', 'vias', 'vias1', 'vias2'];
+export const LAYER_ORDER: LayerName[] = ['pgs', 'centertap', 'crossings', 'windings', 'vias', 'vias1', 'vias2'];
 
 export interface SpiralInductorParams {
 	Dout: number;
