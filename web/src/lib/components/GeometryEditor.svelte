@@ -4,17 +4,32 @@
 	import LayoutViewer from './LayoutViewer.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, valid = true, renderOpts }: {
+	let { layers, sidebar, stackPanel, valid = true, renderOpts }: {
 		layers: LayerMap;
 		sidebar: Snippet;
+		stackPanel?: Snippet;
 		valid?: boolean;
 		renderOpts?: RenderOptions;
 	} = $props();
+
+	let activeTab = $state<'params' | 'stack'>('params');
 </script>
 
 <div class="workspace">
 	<aside class="sidebar">
-		{@render sidebar()}
+		{#if stackPanel}
+			<div class="sidebar-tabs">
+				<button class="stab" class:active={activeTab === 'params'} onclick={() => activeTab = 'params'}>Params</button>
+				<button class="stab" class:active={activeTab === 'stack'} onclick={() => activeTab = 'stack'}>Stack</button>
+			</div>
+		{/if}
+		<div class="sidebar-content">
+			{#if activeTab === 'params'}
+				{@render sidebar()}
+			{:else if stackPanel}
+				{@render stackPanel()}
+			{/if}
+		</div>
 	</aside>
 	<div class="main-area">
 		{#if !valid}
@@ -36,6 +51,40 @@
 		min-width: 280px;
 		border-right: 1px solid var(--border);
 		background: var(--bg);
+		display: flex;
+		flex-direction: column;
+	}
+	.sidebar-tabs {
+		display: flex;
+		flex-shrink: 0;
+		border-bottom: 1px solid var(--border);
+	}
+	.stab {
+		flex: 1;
+		padding: 6px 0;
+		font-size: 10px;
+		font-family: var(--font-mono);
+		font-weight: 600;
+		letter-spacing: 1px;
+		text-transform: uppercase;
+		background: var(--bg);
+		color: var(--text-dim);
+		border: none;
+		cursor: pointer;
+		transition: color 0.15s, background 0.15s;
+	}
+	.stab:hover {
+		color: var(--text-muted);
+		background: var(--bg-surface);
+	}
+	.stab.active {
+		color: var(--accent);
+		background: var(--bg-surface);
+	}
+	.sidebar-content {
+		flex: 1;
+		overflow-y: auto;
+		min-height: 0;
 	}
 	.main-area {
 		flex: 1;

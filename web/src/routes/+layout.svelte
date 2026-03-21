@@ -82,15 +82,13 @@
 		letter-spacing: 0.5px;
 		color: var(--text-dim);
 		text-decoration: none;
-		border-bottom: 2px solid transparent;
-		transition: color 0.15s, border-color 0.15s;
+		transition: color 0.15s;
 	}
 	.tab:hover {
 		color: var(--text-muted);
 	}
 	.tab.active {
 		color: var(--accent);
-		border-bottom-color: var(--accent);
 	}
 	main {
 		flex: 1;

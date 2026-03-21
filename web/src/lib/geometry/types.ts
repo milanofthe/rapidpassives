@@ -57,6 +57,13 @@ export interface SymmetricTransformerParams {
 	via_in_metal: number;
 }
 
+export interface PgsParams {
+	enabled: boolean;
+	D: number;
+	width: number;
+	spacing: number;
+}
+
 export type GeometryParams = SpiralInductorParams | SymmetricInductorParams | SymmetricTransformerParams;
 
 export type GeometryType = 'spiral' | 'symmetric_inductor' | 'symmetric_transformer';
