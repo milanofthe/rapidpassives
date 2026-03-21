@@ -169,8 +169,8 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 
 	// Ports — use outermost winding nodes near the bottom
 	const portXOffset = center_tap ? spacing + width : (spacing + width) / 2;
-	const portLeft = addNode(-portXOffset, -Dout / 2, 'm3');
-	const portRight = addNode(portXOffset, -Dout / 2, 'm3');
+	const portLeft = addNode(-portXOffset, -Dout / 2 - width, 'm3');
+	const portRight = addNode(portXOffset, -Dout / 2 - width, 'm3');
 
 	// Connect port nodes to nearest winding endpoint
 	// Find the bottommost left and right winding nodes
@@ -187,8 +187,8 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 		return best ?? portLeft;
 	}
 
-	const nearLeft = findNearestSeg(-portXOffset, -Dout / 2);
-	const nearRight = findNearestSeg(portXOffset, -Dout / 2);
+	const nearLeft = findNearestSeg(-portXOffset, -Dout / 2 - width);
+	const nearRight = findNearestSeg(portXOffset, -Dout / 2 - width);
 
 	if (nearLeft.id !== portLeft.id) addSeg(portLeft, nearLeft, width, 'm3', 'port', 'windings');
 	if (nearRight.id !== portRight.id) addSeg(portRight, nearRight, width, 'm3', 'port', 'windings');
@@ -198,8 +198,8 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 	];
 
 	if (center_tap) {
-		const ctNode = addNode(0, -Dout / 2, 'm3');
-		const nearCT = findNearestSeg(0, -Dout / 2);
+		const ctNode = addNode(0, -Dout / 2 - width, 'm3');
+		const nearCT = findNearestSeg(0, -Dout / 2 - width);
 		if (nearCT.id !== ctNode.id) addSeg(ctNode, nearCT, width, 'm3', 'ct', 'centertap');
 		ports.push({ name: 'CT', plusNode: ctNode.id, minusNode: portLeft.id });
 	}
