@@ -312,8 +312,39 @@ function generateLegacyPolygons(params: SymmetricInductorParams): LayerMap {
 			if (N <= 2) { yCT = [-Dout/2, -Dout/2 + spacing*(N-1) + width*(N-1), -Dout/2 + spacing*(N-1) + width*(N-1), -Dout/2]; }
 			else { yCT = [-Dout/2 + width - extend, -Dout/2 + spacing*(N-1) + width*(N-1), -Dout/2 + spacing*(N-1) + width*(N-1), -Dout/2 + width - extend]; }
 		}
-		if (N <= 2) { polysWindings.push({ x: xCT, y: yCT }); }
-		else { polysCenterTap.push({ x: xCT, y: yCT }); }
+		if (N <= 2) {
+			polysWindings.push({ x: xCT, y: yCT });
+		} else {
+			polysCenterTap.push({ x: xCT, y: yCT });
+
+			// Via centers for center tap
+			let xCt1: number, yCt1: number, xCt2: number, yCt2: number;
+			if (N % 2 !== 0) {
+				xCt1 = 0; yCt1 = Dout/2 - spacing*(N-1) - width*(N-1) - extend/2;
+				xCt2 = 0; yCt2 = -Dout/2 + width/2 + (width - extend)/2;
+			} else {
+				xCt1 = 0; yCt1 = -Dout/2 + spacing*(N-1) + width*N - width + extend/2;
+				xCt2 = 0; yCt2 = -Dout/2 + width - extend/2;
+			}
+
+			const xVP1 = [xCt1-width/2, xCt1-width/2, xCt1+width/2, xCt1+width/2];
+			const yVP1 = [yCt1-extend/2, yCt1+extend/2, yCt1+extend/2, yCt1-extend/2];
+			const xVP2 = [xCt2-width/2, xCt2-width/2, xCt2+width/2, xCt2+width/2];
+			const yVP2 = [yCt2-extend/2, yCt2+extend/2, yCt2+extend/2, yCt2-extend/2];
+
+			polysWindings.push({ x: xVP1, y: yVP1 });
+			polysCrossings.push({ x: xVP1, y: yVP1 });
+			polysCenterTap.push({ x: xVP1, y: yVP1 });
+			polysCrossings.push({ x: xVP2, y: yVP2 });
+			polysCenterTap.push({ x: xVP2, y: yVP2 });
+
+			// Via grids for center tap
+			for (const [cx, cy] of [[xCt1, yCt1], [xCt2, yCt2]]) {
+				const vp = viaGrid(cx, cy, width - 2*via_in_metal, extend - 2*via_in_metal, via_spacing, via_width);
+				polysVias2 = polysVias2.concat(vp);
+				polysVias1 = polysVias1.concat(vp);
+			}
+		}
 	}
 
 	// Ports
