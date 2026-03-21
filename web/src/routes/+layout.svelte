@@ -41,7 +41,7 @@
 		font-weight: 700;
 		color: var(--accent);
 		letter-spacing: 2px;
-		font-family: 'JetBrains Mono', monospace;
+		font-family: var(--font-mono);
 	}
 	.divider {
 		width: 1px;

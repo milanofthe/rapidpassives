@@ -157,9 +157,9 @@
 		display: flex;
 		gap: 10px;
 		font-size: 11px;
-		font-family: 'JetBrains Mono', monospace;
+		font-family: var(--font-mono);
 		color: var(--text-dim);
-		background: rgba(19, 19, 22, 0.8);
+		background: var(--canvas-bg);
 		padding: 3px 8px;
 	}
 	.layer-tag {

@@ -104,7 +104,7 @@
 		color: var(--accent);
 		font-weight: 600;
 		margin-bottom: 10px;
-		font-family: 'JetBrains Mono', monospace;
+		font-family: var(--font-mono);
 	}
 	.field {
 		display: flex;
@@ -121,7 +121,7 @@
 		font-size: 12px;
 		color: var(--text-muted);
 		min-width: 70px;
-		font-family: 'JetBrains Mono', monospace;
+		font-family: var(--font-mono);
 	}
 	.field:hover .field-label {
 		color: var(--text);
@@ -143,7 +143,7 @@
 		color: var(--text-dim);
 		min-width: 32px;
 		padding-left: 6px;
-		font-family: 'JetBrains Mono', monospace;
+		font-family: var(--font-mono);
 	}
 	.spin-btn {
 		background: var(--bg-panel);
@@ -154,7 +154,7 @@
 		height: 26px;
 		font-size: 14px;
 		font-weight: 400;
-		font-family: 'JetBrains Mono', monospace;
+		font-family: var(--font-mono);
 		text-transform: none;
 		letter-spacing: 0;
 		display: flex;

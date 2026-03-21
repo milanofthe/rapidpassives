@@ -1,5 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
 
+/*
+ * CSS custom properties — kept in sync with src/lib/theme.ts
+ * Canvas code and JS logic import from theme.ts directly.
+ * Component <style> blocks use these vars.
+ */
 :root {
 	--bg: #1c1c21;
 	--bg-surface: #232329;
@@ -16,8 +21,11 @@
 	--border-subtle: #2d2d34;
 	--input-bg: #18181d;
 	--input-border: #3a3a42;
+	--input-hover: #4a4a52;
 	--input-focus: #d9513c;
 	--canvas-bg: #131316;
+	--font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+	--font-mono: 'JetBrains Mono', monospace;
 }
 
 * {
@@ -28,7 +36,7 @@
 
 html, body {
 	height: 100%;
-	font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+	font-family: var(--font-body);
 	background: var(--bg);
 	color: var(--text);
 	font-size: 13px;
@@ -42,7 +50,7 @@ input[type="number"], input[type="text"], select {
 	padding: 5px 8px;
 	border-radius: 0;
 	font-size: 12px;
-	font-family: 'JetBrains Mono', monospace;
+	font-family: var(--font-mono);
 	width: 100%;
 	transition: border-color 0.15s;
 }
@@ -53,10 +61,9 @@ input[type="number"]:focus, select:focus {
 }
 
 input[type="number"]:hover, select:hover {
-	border-color: #4a4a52;
+	border-color: var(--input-hover);
 }
 
-/* Number input spinner arrows */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
 	-webkit-appearance: none;
@@ -77,7 +84,7 @@ button {
 	cursor: pointer;
 	font-size: 12px;
 	font-weight: 600;
-	font-family: 'Inter', sans-serif;
+	font-family: var(--font-body);
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
 	transition: background 0.15s;

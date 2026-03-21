@@ -10,16 +10,10 @@ export type LayerName = 'windings' | 'crossings' | 'vias' | 'vias1' | 'vias2' | 
 /** A collection of polygons organized by layer */
 export type LayerMap = Partial<Record<LayerName, Polygon[]>>;
 
-/** Colors for each layer — warm pastel tones on dark background */
-export const LAYER_COLORS: Record<LayerName, string> = {
-	windings: '#e8944a',
-	crossings: '#d9513c',
-	vias: '#5a5a62',
-	vias1: '#5a5a62',
-	vias2: '#6e6e78',
-	centertap: '#6bbf8a',
-	pgs: '#4a7fb5',
-};
+import { layerColors } from '$lib/theme';
+
+/** Colors for each layer — sourced from theme.ts */
+export const LAYER_COLORS: Record<LayerName, string> = layerColors;
 
 /** Draw order (back to front) */
 export const LAYER_ORDER: LayerName[] = ['pgs', 'crossings', 'centertap', 'windings', 'vias', 'vias1', 'vias2'];

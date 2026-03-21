@@ -1,5 +1,6 @@
 import type { LayerMap, Polygon, LayerName } from '$lib/geometry/types';
 import { LAYER_COLORS, LAYER_ORDER } from '$lib/geometry/types';
+import { canvas as canvasTheme } from '$lib/theme';
 
 export interface ViewState {
 	offsetX: number;
@@ -87,7 +88,7 @@ export function renderLayers(
 	ctx.clearRect(0, 0, width, height);
 
 	// Background
-	ctx.fillStyle = '#131316';
+	ctx.fillStyle = canvasTheme.bg;
 	ctx.fillRect(0, 0, width, height);
 
 	drawGrid(ctx, view);
@@ -101,7 +102,7 @@ export function renderLayers(
 		for (let pi = 0; pi < polys.length; pi++) {
 			const isHighlighted = highlight && highlight.layer === layerName && highlight.index === pi;
 			if (isHighlighted) {
-				ctx.fillStyle = brighten(LAYER_COLORS[layerName] || '#888', 0.4);
+				ctx.fillStyle = brighten(LAYER_COLORS[layerName] || '#888', canvasTheme.highlightBrighten);
 			} else {
 				ctx.fillStyle = LAYER_COLORS[layerName] || '#888';
 			}
@@ -113,8 +114,8 @@ export function renderLayers(
 	if (highlight) {
 		const polys = layers[highlight.layer];
 		if (polys && polys[highlight.index]) {
-			ctx.strokeStyle = '#fff';
-			ctx.lineWidth = 1.5;
+			ctx.strokeStyle = canvasTheme.highlightOutline;
+			ctx.lineWidth = canvasTheme.highlightOutlineWeight;
 			drawPolygonOutline(ctx, polys[highlight.index], view);
 		}
 	}
@@ -162,8 +163,8 @@ function drawGrid(ctx: CanvasRenderingContext2D, view: ViewState): void {
 	else if (residual < 5) gridStep = 2 * magnitude;
 	else gridStep = 5 * magnitude;
 
-	ctx.strokeStyle = '#2a2a32';
-	ctx.lineWidth = 0.5;
+	ctx.strokeStyle = canvasTheme.grid;
+	ctx.lineWidth = canvasTheme.gridWeight;
 
 	const worldLeft = -view.offsetX / view.scale;
 	const worldRight = (width - view.offsetX) / view.scale;
@@ -185,9 +186,9 @@ function drawGrid(ctx: CanvasRenderingContext2D, view: ViewState): void {
 function drawCrosshair(ctx: CanvasRenderingContext2D, view: ViewState): void {
 	const cx = view.offsetX;
 	const cy = view.offsetY;
-	ctx.strokeStyle = '#2a2a31';
-	ctx.lineWidth = 1;
-	ctx.setLineDash([4, 4]);
+	ctx.strokeStyle = canvasTheme.crosshair;
+	ctx.lineWidth = canvasTheme.crosshairWeight;
+	ctx.setLineDash(canvasTheme.crosshairDash);
 	ctx.beginPath();
 	ctx.moveTo(cx, 0); ctx.lineTo(cx, ctx.canvas.height);
 	ctx.moveTo(0, cy); ctx.lineTo(ctx.canvas.width, cy);
