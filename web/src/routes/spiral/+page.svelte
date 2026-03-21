@@ -25,7 +25,7 @@
 		simulating = true;
 		// Yield to let UI update with "Simulating..." text
 		await new Promise(r => setTimeout(r, 10));
-		simResult = solvePEEC(result.network, stack, { ...simSettings });
+		simResult = solvePEEC(result.network, stack, { ...simSettings, conductorSpacing: p.spacing, hasPgs: pgs.enabled });
 		simulating = false;
 	}
 

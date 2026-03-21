@@ -29,6 +29,8 @@ export interface ProcessStack {
 	oxideEr: number;
 	/** Substrate resistivity in ohm*cm */
 	substrateRho: number;
+	/** Substrate permittivity (default 11.7 for Si) */
+	substrateEr: number;
 }
 
 /** Default 3-metal RFIC stack */
@@ -114,6 +116,7 @@ export function createDefaultStack(): ProcessStack {
 		substrateThickness: 300,
 		oxideEr: 4.0,
 		substrateRho: 10,
+		substrateEr: 11.7,
 	};
 }
 

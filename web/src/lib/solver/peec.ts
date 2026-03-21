@@ -13,6 +13,7 @@ import type { ConductorNetwork, ConductorSegment, ConductorNode } from '$lib/geo
 import type { ProcessStack } from '$lib/stack/types';
 import { getStackLayer } from '$lib/stack/types';
 import { selfInductance, mutualInductance, type Filament } from './inductance';
+import { computeParasitics, applyPiModel } from './parasitics';
 
 const PI = Math.PI;
 const MU0 = 4 * PI * 1e-7;
@@ -46,6 +47,8 @@ export interface SimOptions {
 	nPoints: number;
 	z0?: number;         // reference impedance for S-params (default 50Ω)
 	logScale?: boolean;  // true = log-spaced (default), false = linear
+	conductorSpacing?: number; // spacing between turns in um (for Cs calculation)
+	hasPgs?: boolean;    // whether PGS is enabled
 }
 
 /**
@@ -56,7 +59,7 @@ export function solvePEEC(
 	stack: ProcessStack,
 	options: SimOptions
 ): SimulationResult {
-	const { fMin, fMax, nPoints, z0 = 50, logScale = true } = options;
+	const { fMin, fMax, nPoints, z0 = 50, logScale = true, conductorSpacing = 2, hasPgs = false } = options;
 
 	// Build node map
 	const nodeMap = new Map<string, ConductorNode>();
@@ -95,9 +98,8 @@ export function solvePEEC(
 	// For a single-port series path: M = identity (each segment carries the same current)
 	// For multi-port networks: need proper mesh analysis
 
-	// Simplified: treat the network as a single series path from port+ to port-
-	// through all segments. The impedance is the sum of all segment impedances.
-	const nPorts = network.ports.length;
+	// Compute pi-model parasitic elements
+	const parasitics = computeParasitics(filaments, stack, conductorSpacing * 1e-6, hasPgs);
 
 	// Generate frequency points
 	const freqs: FrequencyPoint[] = [];
@@ -147,6 +149,11 @@ export function solvePEEC(
 		for (const via of network.vias) {
 			Zre += via.resistance;
 		}
+
+		// Apply pi-model parasitics (Cox, Csub, Rsub, Cs)
+		const [ZpiRe, ZpiIm] = applyPiModel(Zre, Zim, omega, parasitics);
+		Zre = ZpiRe;
+		Zim = ZpiIm;
 
 		// 2-port S-parameters for a series impedance Z
 		// ABCD matrix: A=1, B=Z, C=0, D=1

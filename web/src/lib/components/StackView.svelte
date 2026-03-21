@@ -102,6 +102,11 @@
 			oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) stack = { ...stack, oxideEr: v }; }} />
 		<em></em>
 	</div></div>
+	<div class="f"><span>ε_sub</span><div class="fi">
+		<input type="number" value={stack.substrateEr} step="0.1" min="1"
+			oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) stack = { ...stack, substrateEr: v }; }} />
+		<em></em>
+	</div></div>
 </div>
 
 <style>
