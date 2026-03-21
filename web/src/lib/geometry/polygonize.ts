@@ -28,9 +28,11 @@ export function networkToLayers(network: ConductorNetwork): LayerMap {
 		const overrides = segs.filter(s => s.polygonOverride);
 		const normal = segs.filter(s => !s.polygonOverride);
 
-		// Add override polygons directly
+		// Add override polygons directly (skip empty overrides)
 		for (const seg of overrides) {
-			pushPoly(layers, seg.renderLayer, seg.polygonOverride!);
+			if (seg.polygonOverride!.x.length >= 3) {
+				pushPoly(layers, seg.renderLayer, seg.polygonOverride!);
+			}
 		}
 
 		if (normal.length === 0) continue;
