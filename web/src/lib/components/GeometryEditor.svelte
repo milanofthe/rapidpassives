@@ -28,7 +28,7 @@
 	}
 	function onSidebarDrag(e: PointerEvent) {
 		if (!draggingSidebar) return;
-		sidebarWidth = Math.max(200, Math.min(500, e.clientX));
+		sidebarWidth = Math.max(250, Math.min(500, e.clientX));
 	}
 	function onSidebarDragEnd() {
 		draggingSidebar = false;
@@ -114,7 +114,7 @@
 		flex-shrink: 0;
 	}
 	.resize-handle-v {
-		width: 4px;
+		width: 2px;
 		cursor: col-resize;
 		background: var(--border);
 		flex-shrink: 0;
@@ -124,7 +124,7 @@
 		background: var(--accent);
 	}
 	.resize-handle-h {
-		height: 4px;
+		height: 2px;
 		cursor: row-resize;
 		background: var(--border);
 		flex-shrink: 0;
