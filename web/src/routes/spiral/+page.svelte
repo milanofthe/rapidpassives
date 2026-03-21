@@ -119,7 +119,6 @@
 
 <style>
 	.sim-btn {
-		padding: 10px;
-		font-size: 13px;
+		width: 100%;
 	}
 </style>
