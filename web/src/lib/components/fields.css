@@ -67,7 +67,7 @@
 }
 .fi button:hover {
 	background: var(--accent);
-	color: #fff;
+	color: var(--bg);
 }
 .toggle-btn {
 	flex: 1;
