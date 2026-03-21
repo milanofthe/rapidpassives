@@ -10,7 +10,8 @@
 	import { nudgeValue, parseInput } from '$lib/components/fields';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
-	import { solvePEEC, type SimulationResult } from '$lib/solver/peec';
+	import type { SimulationResult } from '$lib/solver/peec';
+	import { solveFastHenry } from '$lib/solver/fasthenry_wasm';
 
 	let simResult = $state<SimulationResult | null>(null);
 	let simulating = $state(false);
@@ -20,7 +21,7 @@
 		if (!result || simulating) return;
 		simulating = true;
 		await new Promise(r => setTimeout(r, 10));
-		simResult = solvePEEC(result.network, stack, { ...simSettings, conductorSpacing: p.spacing, hasPgs: pgsP.enabled });
+		simResult = await solveFastHenry(result.network, stack, simSettings);
 		simulating = false;
 	}
 

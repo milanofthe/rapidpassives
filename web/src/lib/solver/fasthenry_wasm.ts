@@ -8,6 +8,8 @@
 import type { ConductorNetwork } from '$lib/geometry/network';
 import type { ProcessStack } from '$lib/stack/types';
 import { generateFastHenryInput } from './fasthenry_export';
+import type { SimulationResult, FrequencyPoint } from './peec';
+import { zToS, extractPortResults, extractCoupling, type PortFreqResult } from './multiport';
 
 export interface FHResult {
 	/** Frequency points */
@@ -26,8 +28,23 @@ let modulePromise: Promise<any> | null = null;
 async function loadModule(): Promise<any> {
 	if (!modulePromise) {
 		modulePromise = (async () => {
-			const { default: FastHenryModule } = await import('/wasm/fasthenry.js');
-			return await FastHenryModule();
+			// Load the Emscripten module via script injection
+			// (it's a UMD module, not ES module)
+			if (typeof (globalThis as any).FastHenryModule === 'undefined') {
+				await new Promise<void>((resolve, reject) => {
+					const script = document.createElement('script');
+					script.src = '/wasm/fasthenry.js';
+					script.onload = () => resolve();
+					script.onerror = () => reject(new Error('Failed to load FastHenry WASM'));
+					document.head.appendChild(script);
+				});
+			}
+			const factory = (globalThis as any).FastHenryModule;
+			if (!factory) throw new Error('FastHenryModule not found');
+			return await factory({
+				print: () => {},      // suppress stdout
+				printErr: () => {},   // suppress stderr
+			});
 		})();
 	}
 	return modulePromise;
@@ -87,6 +104,89 @@ export async function runFastHenry(
 		console.error('FastHenry WASM error:', e);
 		return null;
 	}
+}
+
+/**
+ * High-level solver: run FastHenry and return SimulationResult
+ * compatible with the existing ResultsPanel.
+ */
+export async function solveFastHenry(
+	network: ConductorNetwork,
+	stack: ProcessStack,
+	options: { fMin: number; fMax: number; nPoints: number; z0?: number; logScale?: boolean },
+): Promise<SimulationResult | null> {
+	const { fMin, fMax, nPoints, z0 = 50, logScale = true } = options;
+
+	// Compute nDec from nPoints and frequency range
+	const decades = Math.log10(fMax / Math.max(fMin, 1));
+	const nDec = Math.max(1, Math.round(nPoints / Math.max(decades, 1)));
+
+	const fhResult = await runFastHenry(network, stack, fMin, fMax, nDec);
+	if (!fhResult || fhResult.frequencies.length === 0) return null;
+
+	const nPorts = fhResult.nPorts;
+	const portNames = fhResult.portNames.map((p, i) => `Port${i + 1}`);
+
+	const freqs: FrequencyPoint[] = fhResult.frequencies.map((freq, fi) => {
+		const omega = 2 * Math.PI * freq;
+		const Zraw = fhResult.Z[fi] ?? [];
+
+		// Convert to Cx[][] format
+		const Z: [number, number][][] = Zraw.map(row => row.map(([re, im]) => [re, im] as [number, number]));
+
+		// S-parameters
+		const S = Z.length > 0 ? zToS(Z, z0) : [];
+
+		// Per-port L/Q/R
+		const ports: PortFreqResult[] = extractPortResults(Z, omega, portNames);
+
+		// Primary L/Q/R from Z[0][0]
+		const Z00re = Z[0]?.[0]?.[0] ?? 0;
+		const Z00im = Z[0]?.[0]?.[1] ?? 0;
+		const L = omega > 0 ? Z00im / omega : 0;
+		const R = Z00re;
+		const Q = R > 0 ? Z00im / R : 0;
+
+		// Winding results for transformer (4+ ports)
+		let windings: { name: string; L: number; R: number; Q: number }[] | undefined;
+		let k: number | undefined;
+
+		if (nPorts === 2) {
+			// 2-port: differential L
+			const zdr = (Z[0]?.[0]?.[0] ?? 0) - (Z[0]?.[1]?.[0] ?? 0) - (Z[1]?.[0]?.[0] ?? 0) + (Z[1]?.[1]?.[0] ?? 0);
+			const zdi = (Z[0]?.[0]?.[1] ?? 0) - (Z[0]?.[1]?.[1] ?? 0) - (Z[1]?.[0]?.[1] ?? 0) + (Z[1]?.[1]?.[1] ?? 0);
+			const wL = omega > 0 ? zdi / omega : 0;
+			windings = [{ name: 'L', L: wL, R: zdr, Q: zdr > 0 ? zdi / zdr : 0 }];
+		} else if (nPorts >= 4) {
+			// 4-port: primary = 0,1; secondary = 2,3
+			const zd1r = (Z[0]?.[0]?.[0]??0)-(Z[0]?.[1]?.[0]??0)-(Z[1]?.[0]?.[0]??0)+(Z[1]?.[1]?.[0]??0);
+			const zd1i = (Z[0]?.[0]?.[1]??0)-(Z[0]?.[1]?.[1]??0)-(Z[1]?.[0]?.[1]??0)+(Z[1]?.[1]?.[1]??0);
+			const zd2r = (Z[2]?.[2]?.[0]??0)-(Z[2]?.[3]?.[0]??0)-(Z[3]?.[2]?.[0]??0)+(Z[3]?.[3]?.[0]??0);
+			const zd2i = (Z[2]?.[2]?.[1]??0)-(Z[2]?.[3]?.[1]??0)-(Z[3]?.[2]?.[1]??0)+(Z[3]?.[3]?.[1]??0);
+			const wL1 = omega > 0 ? zd1i / omega : 0;
+			const wL2 = omega > 0 ? zd2i / omega : 0;
+			windings = [
+				{ name: 'Primary', L: wL1, R: zd1r, Q: zd1r > 0 ? zd1i / zd1r : 0 },
+				{ name: 'Secondary', L: wL2, R: zd2r, Q: zd2r > 0 ? zd2i / zd2r : 0 },
+			];
+			// Coupling
+			const zmr = (Z[0]?.[2]?.[0]??0)-(Z[0]?.[3]?.[0]??0)-(Z[1]?.[2]?.[0]??0)+(Z[1]?.[3]?.[0]??0);
+			const zmi = (Z[0]?.[2]?.[1]??0)-(Z[0]?.[3]?.[1]??0)-(Z[1]?.[2]?.[1]??0)+(Z[1]?.[3]?.[1]??0);
+			const M = omega > 0 ? zmi / omega : 0;
+			if (wL1 > 0 && wL2 > 0) k = Math.abs(M) / Math.sqrt(wL1 * wL2);
+		}
+
+		return { freq, Z, S, L, Q, R, ports, windings, k };
+	});
+
+	return {
+		freqs,
+		filaments: [],
+		network,
+		logScale,
+		portNames,
+		nPorts,
+	};
 }
 
 /**
