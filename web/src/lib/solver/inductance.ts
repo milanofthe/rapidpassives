@@ -74,7 +74,7 @@ export function selfInductance(W: number, L: number, T: number): number {
 	z *= (2 / Math.PI);
 	z *= L;
 
-	return MU_OVER_4PI * z;
+	return MU0 * z;  // FastHenry uses MU0, not MU_OVER_4PI
 }
 
 /**
@@ -140,9 +140,10 @@ export function brickToBrick(
 	P: number, b: number, c: number,
 	l3: number, l1: number, l2: number
 ): number {
-	const q = [E, E + a, E + a + d, E + d];
-	const r = [P, P + b, P + b + c, P + c];
-	const s = [l3, l3 + l1, l3 + l1 + l2, l3 + l2];
+	// fill_4 from FastHenry: vec = [E-a, E+d-a, E+d, E]
+	const q = [E - a, E + d - a, E + d, E];
+	const r = [P - b, P + c - b, P + c, P];
+	const s = [l3 - l1, l3 + l2 - l1, l3 + l2, l3];
 
 	let totalM = 0;
 	for (let i = 0; i < 4; i++) {

@@ -13,7 +13,7 @@ import type { ConductorNetwork, ConductorSegment, ConductorNode } from '$lib/geo
 import type { ProcessStack } from '$lib/stack/types';
 import { getStackLayer } from '$lib/stack/types';
 import { selfInductance, mutualInductance, type Filament } from './inductance';
-import { computeParasitics, applyPiModel } from './parasitics';
+import { computeParasitics, applyPiModelSparams } from './parasitics';
 
 const PI = Math.PI;
 const MU0 = 4 * PI * 1e-7;
@@ -150,34 +150,18 @@ export function solvePEEC(
 			Zre += via.resistance;
 		}
 
-		// Apply pi-model parasitics (Cox, Csub, Rsub, Cs)
-		const [ZpiRe, ZpiIm] = applyPiModel(Zre, Zim, omega, parasitics);
-		Zre = ZpiRe;
-		Zim = ZpiIm;
+		// Apply pi-model parasitics and compute S-params via ABCD
+		const sp = applyPiModelSparams(Zre, Zim, omega, parasitics, z0);
 
-		// 2-port S-parameters for a series impedance Z
-		// ABCD matrix: A=1, B=Z, C=0, D=1
-		// S11 = S22 = Z / (2*Z0 + Z)
-		// S21 = S12 = 2*Z0 / (2*Z0 + Z)
-		const dRe = 2 * z0 + Zre;
-		const dIm = Zim;
-		const dMag2 = dRe * dRe + dIm * dIm;
+		const S11: Cx = sp.S11;
+		const S21: Cx = sp.S21;
+		const S: Cx[][] = [[S11, S21], [S21, S11]];
+		const Z: Cx[][] = [[[sp.Zeff[0], sp.Zeff[1]], [sp.Zeff[0], sp.Zeff[1]]], [[sp.Zeff[0], sp.Zeff[1]], [sp.Zeff[0], sp.Zeff[1]]]];
+		const Y: Cx[][] = [];
 
-		const S11: Cx = [
-			(Zre * dRe + Zim * dIm) / dMag2,
-			(Zim * dRe - Zre * dIm) / dMag2,
-		];
-		const S21: Cx = [
-			(2 * z0 * dRe) / dMag2,
-			(-2 * z0 * dIm) / dMag2,
-		];
-
-		const Z: Cx[][] = [[[Zre, Zim], [Zre, Zim]], [[Zre, Zim], [Zre, Zim]]];
-		const Y: Cx[][] = []; // not needed for now
-		const S: Cx[][] = [[S11, S21], [S21, S11]]; // symmetric
-
-		const Leff = Zim / omega;
-		const Q = Zim / Zre;
+		// L and Q from effective impedance (Z_eff = B/D from ABCD)
+		const Leff = sp.Zeff[1] / omega;
+		const Q = sp.Zeff[1] / sp.Zeff[0];
 
 		freqs.push({ freq, Z, Y, S, L: Leff, Q, R: Zre });
 	}
