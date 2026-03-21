@@ -9,10 +9,22 @@
 	import { nudgeValue, parseInput } from '$lib/components/fields';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
+	import { solvePEEC, type SimulationResult } from '$lib/solver/peec';
+
+	let simResult = $state<SimulationResult | null>(null);
 
 	function doExport() {
 		const data = exportGds(layers, { cellName: 'SpiralInductor' });
 		downloadGds(data, 'spiral_inductor.gds');
+	}
+
+	function doSimulate() {
+		if (!result) return;
+		simResult = solvePEEC(result.network, stack, {
+			fMin: 1e8,
+			fMax: 50e9,
+			nPoints: 100,
+		});
 	}
 
 	let p = $state<SpiralInductorParams>({
@@ -44,9 +56,9 @@
 	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack) });
 </script>
 
-<GeometryEditor {layers} {valid} {renderOpts}>
+<GeometryEditor {layers} {valid} {renderOpts} {simResult}>
 	{#snippet sidebar()}
-		<ParamSidebar onexport={doExport}>
+		<ParamSidebar onexport={doExport} onsimulate={doSimulate}>
 			<div class="param-section"><h4>Geometry</h4>
 				<div class="f"><span>Dout</span><div class="fi"><button onclick={() => nud('Dout',-1,1)}>-</button><input type="number" value={p.Dout} oninput={e => inp('Dout',e)}/><button onclick={() => nud('Dout',1,1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>N</span><div class="fi"><button onclick={() => nud('N',-1,1,20)}>-</button><input type="number" value={p.N} oninput={e => inp('N',e)}/><button onclick={() => nud('N',1,1,20)}>+</button><em>turns</em></div></div>

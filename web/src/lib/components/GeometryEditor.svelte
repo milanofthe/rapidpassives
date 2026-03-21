@@ -1,15 +1,18 @@
 <script lang="ts">
 	import type { LayerMap } from '$lib/geometry/types';
 	import type { RenderOptions } from '$lib/render/canvas2d';
+	import type { SimulationResult } from '$lib/solver/peec';
 	import LayoutViewer from './LayoutViewer.svelte';
+	import ResultsPanel from './ResultsPanel.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, stackPanel, valid = true, renderOpts }: {
+	let { layers, sidebar, stackPanel, valid = true, renderOpts, simResult }: {
 		layers: LayerMap;
 		sidebar: Snippet;
 		stackPanel?: Snippet;
 		valid?: boolean;
 		renderOpts?: RenderOptions;
+		simResult?: SimulationResult | null;
 	} = $props();
 
 	let activeTab = $state<'params' | 'stack'>('params');
@@ -38,6 +41,11 @@
 		<div class="viewer-pane">
 			<LayoutViewer {layers} {renderOpts} />
 		</div>
+		{#if simResult}
+			<div class="results-pane">
+				<ResultsPanel result={simResult} />
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -102,5 +110,12 @@
 		flex: 1;
 		position: relative;
 		min-height: 0;
+	}
+	.results-pane {
+		height: 300px;
+		min-height: 200px;
+		border-top: 1px solid var(--border);
+		flex-shrink: 0;
+		overflow: hidden;
 	}
 </style>
