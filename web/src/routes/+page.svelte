@@ -92,6 +92,7 @@
 		font-size: 13px;
 		color: var(--text-muted);
 		max-width: 500px;
+		font-family: var(--font-mono);
 	}
 	.cards {
 		display: flex;
@@ -141,5 +142,6 @@
 		font-size: 11px;
 		color: var(--text-dim);
 		line-height: 1.4;
+		font-family: var(--font-mono);
 	}
 </style>
