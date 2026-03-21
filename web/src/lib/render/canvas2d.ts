@@ -1,6 +1,6 @@
 import type { LayerMap, Polygon, LayerName } from '$lib/geometry/types';
 import { LAYER_COLORS, LAYER_ORDER } from '$lib/geometry/types';
-import { canvas as canvasTheme } from '$lib/theme';
+import { canvas as canvasTheme, fonts } from '$lib/theme';
 
 export interface ViewState {
 	offsetX: number;
@@ -228,7 +228,7 @@ function drawPort(ctx: CanvasRenderingContext2D, port: PortMarker, view: ViewSta
 
 	// Label with background
 	const label = port.name;
-	ctx.font = '600 10px JetBrains Mono, monospace';
+	ctx.font = `600 10px ${fonts.mono}`;
 	const tm = ctx.measureText(label);
 	const pw = tm.width + 8;
 	const ph = 16;
