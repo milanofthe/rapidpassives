@@ -24,9 +24,15 @@
 		let v = (params[field] as number) + step;
 		if (min !== undefined) v = Math.max(min, v);
 		if (max !== undefined) v = Math.min(max, v);
-		// Round to avoid floating point drift
 		v = Math.round(v * 1000) / 1000;
-		(params as any)[field] = v;
+		params = { ...params, [field]: v };
+	}
+
+	function setField(field: keyof SpiralInductorParams, e: Event) {
+		const v = parseFloat((e.target as HTMLInputElement).value);
+		if (!isNaN(v)) {
+			params = { ...params, [field]: v };
+		}
 	}
 </script>
 
@@ -35,7 +41,7 @@
 		<span class="field-label">{label}</span>
 		<div class="field-input">
 			<button class="spin-btn" onclick={() => nudge(field, -step, min, max)}>-</button>
-			<input type="number" bind:value={params[field]} {step} {min} {max} />
+			<input type="number" value={params[field]} {step} {min} {max} oninput={(e) => setField(field, e)} />
 			<button class="spin-btn" onclick={() => nudge(field, step, min, max)}>+</button>
 			<span class="field-unit">{unit ?? ''}</span>
 		</div>
