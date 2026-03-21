@@ -14,6 +14,7 @@ import type { ProcessStack } from '$lib/stack/types';
 import { getStackLayer } from '$lib/stack/types';
 import { selfInductance, mutualInductance, type Filament } from './inductance';
 import { computeParasitics, applyPiModelSparams } from './parasitics';
+import { computeMultiPortZ, zToS, extractPortResults, extractCoupling, type PortPath } from './multiport';
 
 const PI = Math.PI;
 const MU0 = 4 * PI * 1e-7;
@@ -21,15 +22,25 @@ const MU0 = 4 * PI * 1e-7;
 /** Complex number as [real, imag] */
 type Cx = [number, number];
 
+/** Per-port result at a single frequency */
+export interface PortFreqResult {
+	name: string;
+	L: number;   // H
+	R: number;   // Ω
+	Q: number;
+}
+
 /** Result for a single frequency point */
 export interface FrequencyPoint {
 	freq: number;        // Hz
 	Z: Cx[][];           // impedance matrix (n_ports × n_ports)
 	Y: Cx[][];           // admittance matrix
 	S: Cx[][];           // S-parameter matrix
-	L: number;           // effective inductance (H) — from imag(Z11)/ω
-	Q: number;           // quality factor — imag(Z11)/real(Z11)
-	R: number;           // effective resistance (Ω) — real(Z11)
+	L: number;           // effective inductance (H) — from Z[0][0]
+	Q: number;           // quality factor
+	R: number;           // effective resistance (Ω)
+	ports: PortFreqResult[];  // per-port results
+	k?: number;          // coupling coefficient (transformers)
 }
 
 /** Full simulation result */
@@ -38,6 +49,8 @@ export interface SimulationResult {
 	filaments: Filament[];
 	network: ConductorNetwork;
 	logScale: boolean;
+	portNames: string[];  // names of independent ports
+	nPorts: number;
 }
 
 /** Simulation options */
@@ -160,13 +173,24 @@ export function solvePEEC(
 		const Y: Cx[][] = [];
 
 		// L and Q from effective impedance (Z_eff = B/D from ABCD)
-		const Leff = sp.Zeff[1] / omega;
-		const Q = sp.Zeff[1] / sp.Zeff[0];
+		const Leff = omega > 0 ? sp.Zeff[1] / omega : 0;
+		const Q = sp.Zeff[0] > 0 ? sp.Zeff[1] / sp.Zeff[0] : 0;
 
-		freqs.push({ freq, Z, Y, S, L: Leff, Q, R: Zre });
+		// Per-port results (single-port for now, all segments in one path)
+		const ports: PortFreqResult[] = [{ name: 'Total', L: Leff, R: sp.Zeff[0], Q }];
+
+		freqs.push({ freq, Z, Y, S, L: Leff, Q, R: sp.Zeff[0], ports });
 	}
 
-	return { freqs, filaments, network, logScale };
+	// Determine unique port names (deduplicate reverse pairs)
+	const seenPorts = new Set<string>();
+	const portNames: string[] = [];
+	for (const p of network.ports) {
+		const key = [p.plusNode, p.minusNode].sort().join('-');
+		if (!seenPorts.has(key)) { seenPorts.add(key); portNames.push(p.name); }
+	}
+
+	return { freqs, filaments, network, logScale, portNames, nPorts: portNames.length };
 }
 
 /** Convert network segments to filaments with 3D coordinates from stack */

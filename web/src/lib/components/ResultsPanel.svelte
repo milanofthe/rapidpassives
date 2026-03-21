@@ -51,28 +51,32 @@
 		renderPlots(el, r, P);
 	});
 
+	function sMag(s: [number, number]): number {
+		return 20 * Math.log10(Math.max(1e-15, Math.sqrt(s[0] * s[0] + s[1] * s[1])));
+	}
+	function sPhase(s: [number, number]): number {
+		return Math.atan2(s[1], s[0]) * 180 / Math.PI;
+	}
+
 	function renderPlots(el: HTMLDivElement, r: SimulationResult, P: any) {
 		const f = r.freqs.map(p => p.freq);
 		const L = r.freqs.map(p => p.L * 1e9);
 		const Q = r.freqs.map(p => p.Q);
 		const R = r.freqs.map(p => p.R);
 
-		const s11Mag = r.freqs.map(p => {
-			const [re, im] = p.S[0][0];
-			return 20 * Math.log10(Math.sqrt(re * re + im * im));
-		});
-		const s21Mag = r.freqs.map(p => {
-			const [re, im] = p.S[1][0];
-			return 20 * Math.log10(Math.sqrt(re * re + im * im));
-		});
-		const s11Phase = r.freqs.map(p => {
-			const [re, im] = p.S[0][0];
-			return Math.atan2(im, re) * 180 / Math.PI;
-		});
-		const s21Phase = r.freqs.map(p => {
-			const [re, im] = p.S[1][0];
-			return Math.atan2(im, re) * 180 / Math.PI;
-		});
+		// S-parameter traces — adapt to matrix size
+		const nS = r.freqs[0]?.S?.length ?? 0;
+		const sTracesMag: { data: number[]; name: string; ci: number }[] = [];
+		const sTracesPhase: { data: number[]; name: string; ci: number }[] = [];
+		let ci = 0;
+		for (let i = 0; i < nS; i++) {
+			for (let j = 0; j < nS; j++) {
+				const name = `S${i + 1}${j + 1}`;
+				sTracesMag.push({ data: r.freqs.map(p => sMag(p.S[i][j])), name: `|${name}|`, ci });
+				sTracesPhase.push({ data: r.freqs.map(p => sPhase(p.S[i][j])), name: `∠${name}`, ci });
+				ci++;
+			}
+		}
 
 		const xType = r.logScale ? 'log' : 'linear';
 		const base = {
@@ -117,19 +121,39 @@
 			return axis;
 		};
 
-		const plots = [
+		const plots: { id: string; data: any[]; yaxis: any; legend: boolean }[] = [
 			{ id: 'p-l', data: [tr(L, 0)], yaxis: yax('L (nH)', L), legend: false },
 			{ id: 'p-q', data: [tr(Q, 0)], yaxis: yax('Q', Q), legend: false },
 			{ id: 'p-r', data: [tr(R, 0)], yaxis: yax('R (Ω)', R), legend: false },
-			{ id: 'p-s', data: [
-				tr(s11Mag, 0, '|S11|'),
-				tr(s21Mag, 1, '|S21|'),
-			], yaxis: yax('dB', s11Mag, s21Mag), legend: true },
-			{ id: 'p-ph', data: [
-				tr(s11Phase, 0, '∠S11'),
-				tr(s21Phase, 1, '∠S21'),
-			], yaxis: yax('Phase (°)', s11Phase, s21Phase), legend: true },
 		];
+
+		// S-param magnitude plot
+		if (sTracesMag.length > 0) {
+			const hasMultiple = sTracesMag.length > 1;
+			plots.push({
+				id: 'p-s',
+				data: sTracesMag.map(t => tr(t.data, t.ci % plotColors.cycle.length, hasMultiple ? t.name : undefined)),
+				yaxis: yax('|S| (dB)', ...sTracesMag.map(t => t.data)),
+				legend: hasMultiple,
+			});
+		}
+
+		// S-param phase plot
+		if (sTracesPhase.length > 0) {
+			const hasMultiple = sTracesPhase.length > 1;
+			plots.push({
+				id: 'p-ph',
+				data: sTracesPhase.map(t => tr(t.data, t.ci % plotColors.cycle.length, hasMultiple ? t.name : undefined)),
+				yaxis: yax('Phase (°)', ...sTracesPhase.map(t => t.data)),
+				legend: hasMultiple,
+			});
+		}
+
+		// Coupling coefficient for transformer (if available)
+		if (r.freqs[0]?.k !== undefined) {
+			const kData = r.freqs.map(p => p.k ?? 0);
+			plots.push({ id: 'p-k', data: [tr(kData, 3)], yaxis: yax('k', kData), legend: false });
+		}
 
 		const grid = el.querySelector('.plot-grid')!;
 		for (const p of plots) {
