@@ -12,6 +12,7 @@
 	import { solvePEEC, type SimulationResult } from '$lib/solver/peec';
 
 	let simResult = $state<SimulationResult | null>(null);
+	let simulating = $state(false);
 	let simSettings = $state({ fMin: 1e8, fMax: 50e9, nPoints: 100, z0: 50, logScale: true });
 
 	function doExport() {
@@ -19,9 +20,13 @@
 		downloadGds(data, 'spiral_inductor.gds');
 	}
 
-	function doSimulate() {
-		if (!result) return;
+	async function doSimulate() {
+		if (!result || simulating) return;
+		simulating = true;
+		// Yield to let UI update with "Simulating..." text
+		await new Promise(r => setTimeout(r, 10));
 		simResult = solvePEEC(result.network, stack, { ...simSettings });
+		simulating = false;
 	}
 
 	let p = $state<SpiralInductorParams>({
@@ -84,7 +89,7 @@
 		</div>
 	{/snippet}
 	{#snippet simPanel()}
-		<div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+		<div class="sim-panel">
 			<div class="param-section"><h4>Frequency Sweep</h4>
 				<div class="f"><span>f_min</span><div class="fi">
 					<input type="number" value={simSettings.fMin / 1e6} step="100" min="1"
@@ -112,13 +117,26 @@
 					</button><em></em>
 				</div></div>
 			</div>
-			<button class="sim-btn" onclick={doSimulate}>Simulate</button>
+			<div class="sim-actions">
+				<button onclick={doSimulate}>{simulating ? 'Simulating...' : 'Simulate'}</button>
+			</div>
 		</div>
 	{/snippet}
 </GeometryEditor>
 
 <style>
-	.sim-btn {
-		width: 100%;
+	.sim-panel {
+		padding: 10px;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		height: 100%;
+	}
+	.sim-actions {
+		margin-top: auto;
+		display: flex;
+	}
+	.sim-actions button {
+		flex: 1;
 	}
 </style>

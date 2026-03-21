@@ -148,17 +148,26 @@ export function solvePEEC(
 			Zre += via.resistance;
 		}
 
-		// Build Z matrix (single port for now)
-		const Z: Cx[][] = [[[ Zre, Zim ]]];
+		// 2-port S-parameters for a series impedance Z
+		// ABCD matrix: A=1, B=Z, C=0, D=1
+		// S11 = S22 = Z / (2*Z0 + Z)
+		// S21 = S12 = 2*Z0 / (2*Z0 + Z)
+		const dRe = 2 * z0 + Zre;
+		const dIm = Zim;
+		const dMag2 = dRe * dRe + dIm * dIm;
 
-		// Y = Z^-1 (for 1-port: Y = 1/Z)
-		const Zmag2 = Zre * Zre + Zim * Zim;
-		const Y: Cx[][] = [[[Zre / Zmag2, -Zim / Zmag2]]];
+		const S11: Cx = [
+			(Zre * dRe + Zim * dIm) / dMag2,
+			(Zim * dRe - Zre * dIm) / dMag2,
+		];
+		const S21: Cx = [
+			(2 * z0 * dRe) / dMag2,
+			(-2 * z0 * dIm) / dMag2,
+		];
 
-		// S = (Z - Z0) / (Z + Z0) for 1-port
-		const Sre = ((Zre - z0) * (Zre + z0) + Zim * Zim) / ((Zre + z0) * (Zre + z0) + Zim * Zim);
-		const Sim = (2 * z0 * Zim) / ((Zre + z0) * (Zre + z0) + Zim * Zim);
-		const S: Cx[][] = [[[Sre, Sim]]];
+		const Z: Cx[][] = [[[Zre, Zim], [Zre, Zim]], [[Zre, Zim], [Zre, Zim]]];
+		const Y: Cx[][] = []; // not needed for now
+		const S: Cx[][] = [[S11, S21], [S21, S11]]; // symmetric
 
 		const Leff = Zim / omega;
 		const Q = Zim / Zre;
