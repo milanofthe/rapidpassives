@@ -64,7 +64,7 @@ export const layerColors = {
 
 export const plotColors = {
 	/** Trace color cycle for simulation plots */
-	cycle: ['#e8944a', '#d9513c', '#6bbf8a', '#7b5e8a', '#4a9ec2', '#c4c46b'] as string[],
+	cycle: ['#d9513c', '#e8944a', '#6bbf8a', '#7b5e8a', '#4a9ec2', '#c4c46b'] as string[],
 	/** Plot area background */
 	bg: '#18181d',
 	/** Grid lines */

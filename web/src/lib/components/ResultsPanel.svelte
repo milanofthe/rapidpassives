@@ -119,8 +119,8 @@
 
 		const plots = [
 			{ id: 'p-l', data: [tr(L, 0)], yaxis: yax('L (nH)', L), legend: false },
-			{ id: 'p-q', data: [tr(Q, 1)], yaxis: yax('Q', Q), legend: false },
-			{ id: 'p-r', data: [tr(R, 2)], yaxis: yax('R (Ω)', R), legend: false },
+			{ id: 'p-q', data: [tr(Q, 0)], yaxis: yax('Q', Q), legend: false },
+			{ id: 'p-r', data: [tr(R, 0)], yaxis: yax('R (Ω)', R), legend: false },
 			{ id: 'p-s', data: [
 				tr(s11Mag, 0, '|S11|'),
 				tr(s21Mag, 1, '|S21|'),
