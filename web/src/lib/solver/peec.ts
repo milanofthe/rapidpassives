@@ -36,6 +36,7 @@ export interface SimulationResult {
 	freqs: FrequencyPoint[];
 	filaments: Filament[];
 	network: ConductorNetwork;
+	logScale: boolean;
 }
 
 /** Simulation options */
@@ -165,7 +166,7 @@ export function solvePEEC(
 		freqs.push({ freq, Z, Y, S, L: Leff, Q, R: Zre });
 	}
 
-	return { freqs, filaments, network };
+	return { freqs, filaments, network, logScale };
 }
 
 /** Convert network segments to filaments with 3D coordinates from stack */

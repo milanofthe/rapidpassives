@@ -33,12 +33,13 @@
 			return 10 * Math.log10(re * re + im * im);
 		});
 
+		const xType = r.logScale ? 'log' : 'linear';
 		const base = {
 			font: { family: 'JetBrains Mono, monospace', size: 10, color: '#7d7a85' },
 			paper_bgcolor: 'rgba(0,0,0,0)',
 			plot_bgcolor: '#18181d',
 			margin: { t: 24, r: 12, b: 32, l: 48 },
-			xaxis: { type: 'log' as const, gridcolor: '#2a2a32', linecolor: '#35353d', tickfont: { size: 9 } },
+			xaxis: { type: xType as any, gridcolor: '#2a2a32', linecolor: '#35353d', tickfont: { size: 9 } },
 			height: 180,
 			showlegend: false,
 		};
