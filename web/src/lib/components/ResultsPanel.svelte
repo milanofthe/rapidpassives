@@ -44,6 +44,10 @@
 			const [re, im] = p.S[0][0];
 			return Math.atan2(im, re) * 180 / Math.PI;
 		});
+		const s21Phase = r.freqs.map(p => {
+			const [re, im] = p.S[1][0];
+			return Math.atan2(im, re) * 180 / Math.PI;
+		});
 
 		const xType = r.logScale ? 'log' : 'linear';
 		const base = {
@@ -79,7 +83,10 @@
 				trNamed(s11Mag, '#7b5e8a', '|S11|'),
 				trNamed(s21Mag, '#e8944a', '|S21|'),
 			], yaxis: yax('dB'), legend: true },
-			{ id: 'p-ph', data: [tr(s11Phase, '#d9513c')], yaxis: yax('∠S11 (°)'), legend: false },
+			{ id: 'p-ph', data: [
+				trNamed(s11Phase, '#7b5e8a', '∠S11'),
+				trNamed(s21Phase, '#e8944a', '∠S21'),
+			], yaxis: yax('Phase (°)'), legend: true },
 		];
 
 		const grid = el.querySelector('.plot-grid')!;
