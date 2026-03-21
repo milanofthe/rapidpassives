@@ -191,7 +191,7 @@ function segmentsToFilaments(
 	nodeMap: Map<string, ConductorNode>,
 	stack: ProcessStack
 ): Filament[] {
-	return segments.filter(seg => !seg.polygonOverride || seg.polygonOverride.x.length >= 3).map(seg => {
+	return segments.map(seg => {
 		const from = nodeMap.get(seg.fromNode)!;
 		const to = nodeMap.get(seg.toNode)!;
 		const sl = getStackLayer(stack, seg.layerId);

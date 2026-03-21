@@ -63,10 +63,6 @@ export function generateFastHenryInput(
 		const to = nodeMap.get(seg.toNode);
 		if (!from || !to) continue;
 
-		// Skip topology-only segments (empty polygon override)
-		if (seg.polygonOverride && seg.polygonOverride.x.length < 3 &&
-			seg.pathId.includes('topology_only')) continue;
-
 		const fromName = nodeNames.get(seg.fromNode);
 		const toName = nodeNames.get(seg.toNode);
 		if (!fromName || !toName) continue;
