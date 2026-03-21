@@ -32,12 +32,14 @@
 	function nudPgs(k: keyof PgsParams, s: number, mn?: number, mx?: number) { setPgs(k, nudgeValue(pgsP[k] as number, s, mn, mx)); }
 	function inpPgs(k: keyof PgsParams, e: Event) { const v = parseInput(e); if (v !== null) setPgs(k, v); }
 
+	let result = $derived.by(() => {
+		try { return buildSymmetricInductor({ ...p }); } catch { return null; }
+	});
 	let layers = $derived.by<LayerMap>(() => {
-		try {
-			const l = buildSymmetricInductor({ ...p });
-			if (pgsP.enabled) l.pgs = pgs4(pgsP.D, pgsP.width, pgsP.spacing);
-			return l;
-		} catch { return {}; }
+		if (!result) return {};
+		const l = { ...result.layers };
+		if (pgsP.enabled) l.pgs = pgs4(pgsP.D, pgsP.width, pgsP.spacing);
+		return l;
 	});
 	let valid = $derived(isSymmetricInductorValid({ ...p }));
 	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack) });

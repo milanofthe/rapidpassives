@@ -1,7 +1,8 @@
 import type { Polygon, LayerMap, SymmetricInductorParams } from './types';
+import type { ConductorNetwork, ConductorNode, ConductorSegment, ViaConnection, Port, GeometryResult } from './network';
 import { viaGrid, routingGeometric45 } from './utils';
 
-export function buildSymmetricInductor(params: SymmetricInductorParams): LayerMap {
+export function buildSymmetricInductor(params: SymmetricInductorParams): GeometryResult {
 	const { Dout, N, sides, width, spacing, center_tap, via_extent, via_spacing, via_width, via_in_metal } = params;
 
 	const PI = Math.PI;
@@ -33,14 +34,39 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): LayerMa
 	let polysVias1: Polygon[] = [];
 	let polysVias2: Polygon[] = [];
 
+	// --- Network construction ---
+	const nodes: ConductorNode[] = [];
+	const segments: ConductorSegment[] = [];
+	const vias: ViaConnection[] = [];
+	let nid = 0, sid = 0;
+
+	function addNode(x: number, y: number, layerId: string): ConductorNode {
+		const node: ConductorNode = { id: `n${nid++}`, x, y, layerId };
+		nodes.push(node);
+		return node;
+	}
+
+	function addSeg(from: ConductorNode, to: ConductorNode, w: number, layerId: string, pathId: string, renderLayer: 'windings' | 'crossings' | 'centertap'): void {
+		segments.push({
+			id: `s${sid++}`, fromNode: from.id, toNode: to.id,
+			width: w, layerId, pathId, renderLayer,
+		});
+	}
+
+	// Port nodes
+	const portLeftNode = addNode(-sepTotal / 2, -Dout / 2, 'm3');
+	const portRightNode = addNode(sepTotal / 2, -Dout / 2, 'm3');
+
+	let r1 = R1, r2 = R2;
+
 	for (let winding = 0; winding < N; winding++) {
 		// Left section
 		let xOutL: number[] = [], yOutL: number[] = [], xInL: number[] = [], yInL: number[] = [];
 		for (const phi of leftAngles) {
-			xOutL.push(R1 * Math.cos(phi));
-			yOutL.push(R1 * Math.sin(phi));
-			xInL.push(R2 * Math.cos(phi));
-			yInL.push(R2 * Math.sin(phi));
+			xOutL.push(r1 * Math.cos(phi));
+			yOutL.push(r1 * Math.sin(phi));
+			xInL.push(r2 * Math.cos(phi));
+			yInL.push(r2 * Math.sin(phi));
 		}
 
 		if (winding === N - 1) {
@@ -60,13 +86,23 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): LayerMa
 
 		polysWindings.push({ x: [...xOutL, ...[...xInL].reverse()], y: [...yOutL, ...[...yInL].reverse()] });
 
+		// Network: left arc centerline nodes
+		let prevLeft: ConductorNode | null = null;
+		for (const phi of leftAngles) {
+			const cx = (r1 + r2) / 2 * Math.cos(phi);
+			const cy = (r1 + r2) / 2 * Math.sin(phi);
+			const node = addNode(cx, cy, 'm3');
+			if (prevLeft) addSeg(prevLeft, node, width, 'm3', `left_w${winding}`, 'windings');
+			prevLeft = node;
+		}
+
 		// Right section
 		let xOutR: number[] = [], yOutR: number[] = [], xInR: number[] = [], yInR: number[] = [];
 		for (const phi of rightAngles) {
-			xOutR.push(R1 * Math.cos(phi));
-			yOutR.push(R1 * Math.sin(phi));
-			xInR.push(R2 * Math.cos(phi));
-			yInR.push(R2 * Math.sin(phi));
+			xOutR.push(r1 * Math.cos(phi));
+			yOutR.push(r1 * Math.sin(phi));
+			xInR.push(r2 * Math.cos(phi));
+			yInR.push(r2 * Math.sin(phi));
 		}
 
 		if (winding === N - 1) {
@@ -86,13 +122,23 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): LayerMa
 
 		polysWindings.push({ x: [...xOutR, ...[...xInR].reverse()], y: [...yOutR, ...[...yInR].reverse()] });
 
+		// Network: right arc centerline nodes
+		let prevRight: ConductorNode | null = null;
+		for (const phi of rightAngles) {
+			const cx = (r1 + r2) / 2 * Math.cos(phi);
+			const cy = (r1 + r2) / 2 * Math.sin(phi);
+			const node = addNode(cx, cy, 'm3');
+			if (prevRight) addSeg(prevRight, node, width, 'm3', `right_w${winding}`, 'windings');
+			prevRight = node;
+		}
+
 		// Crossings
 		if (winding !== N - 1) {
 			let h: number;
 			if (winding % 2 === 0) {
-				h = R1 * Math.sin(PI * (0.5 - 1 / sides));
+				h = r1 * Math.sin(PI * (0.5 - 1 / sides));
 			} else {
-				h = (-R2 + s) * Math.sin(PI * (0.5 - 1 / sides));
+				h = (-r2 + s) * Math.sin(PI * (0.5 - 1 / sides));
 			}
 			const x0 = 0;
 			const y0 = h - width - spacing / 2;
@@ -105,10 +151,15 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): LayerMa
 
 			viaCentersTB.push([-sepTotal / 2 - width / 2, h - 3 * width / 2 - spacing]);
 			viaCentersTB.push([sepTotal / 2 + width / 2, h - width / 2]);
+
+			// Network: crossing segment on lower metal
+			const crossNodeL = addNode(-sepTotal / 2 - width / 2, h - 3 * width / 2 - spacing, 'm2');
+			const crossNodeR = addNode(sepTotal / 2 + width / 2, h - width / 2, 'm2');
+			addSeg(crossNodeL, crossNodeR, width, 'm2', `crossing_w${winding}`, 'crossings');
 		}
 
-		R1 -= s;
-		R2 -= s;
+		r1 -= s;
+		r2 -= s;
 	}
 
 	// Center tap
@@ -118,7 +169,6 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): LayerMa
 		let xCt1: number, yCt1: number, xCt2: number, yCt2: number;
 
 		if (N % 2 !== 0) {
-			// top
 			if (N <= 2) {
 				yCT = [-Dout / 2, Dout / 2 - spacing * (N - 1) - width * (N - 1),
 					Dout / 2 - spacing * (N - 1) - width * (N - 1), -Dout / 2];
@@ -126,12 +176,9 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): LayerMa
 				yCT = [-Dout / 2 + width - extend, Dout / 2 - spacing * (N - 1) - width * (N - 1) - extend,
 					Dout / 2 - spacing * (N - 1) - width * (N - 1) - extend, -Dout / 2 + width - extend];
 			}
-			xCt1 = 0;
-			yCt1 = Dout / 2 - spacing * (N - 1) - width * (N - 1) - extend / 2;
-			xCt2 = 0;
-			yCt2 = -Dout / 2 + width / 2 + (width - extend) / 2;
+			xCt1 = 0; yCt1 = Dout / 2 - spacing * (N - 1) - width * (N - 1) - extend / 2;
+			xCt2 = 0; yCt2 = -Dout / 2 + width / 2 + (width - extend) / 2;
 		} else {
-			// bottom
 			if (N <= 2) {
 				yCT = [-Dout / 2, -Dout / 2 + spacing * (N - 1) + width * (N - 1),
 					-Dout / 2 + spacing * (N - 1) + width * (N - 1), -Dout / 2];
@@ -139,10 +186,8 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): LayerMa
 				yCT = [-Dout / 2 + width - extend, -Dout / 2 + spacing * (N - 1) + width * (N - 1),
 					-Dout / 2 + spacing * (N - 1) + width * (N - 1), -Dout / 2 + width - extend];
 			}
-			xCt1 = 0;
-			yCt1 = -Dout / 2 + spacing * (N - 1) + width * N - width + extend / 2;
-			xCt2 = 0;
-			yCt2 = -Dout / 2 + width - extend / 2;
+			xCt1 = 0; yCt1 = -Dout / 2 + spacing * (N - 1) + width * N - width + extend / 2;
+			xCt2 = 0; yCt2 = -Dout / 2 + width - extend / 2;
 		}
 
 		if (N <= 2) {
@@ -187,16 +232,37 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): LayerMa
 
 	// Vias
 	for (const [cx, cy] of viaCentersTCT) {
-		polysVias2 = polysVias2.concat(viaGrid(cx, cy, width - 2 * via_in_metal, extend - 2 * via_in_metal, via_spacing, via_width));
-		polysVias1 = polysVias1.concat(viaGrid(cx, cy, width - 2 * via_in_metal, extend - 2 * via_in_metal, via_spacing, via_width));
+		const vPolys = viaGrid(cx, cy, width - 2 * via_in_metal, extend - 2 * via_in_metal, via_spacing, via_width);
+		polysVias2 = polysVias2.concat(vPolys);
+		polysVias1 = polysVias1.concat(vPolys);
+
+		// Network: via connection for center tap
+		const topNode = addNode(cx, cy, 'm3');
+		const botNode = addNode(cx, cy, 'm1');
+		vias.push({ id: `via_ct${vias.length}`, topNode: topNode.id, bottomNode: botNode.id, resistance: 0.1, polygons: vPolys, renderLayer: 'vias2' });
 	}
 
 	for (const [cx, cy] of viaCentersTB) {
 		const dx = Math.sign(cx) * (extend - width) / 2;
-		polysVias1 = polysVias1.concat(viaGrid(cx + dx, cy, extend - 2 * via_in_metal, width - 2 * via_in_metal, via_spacing, via_width));
+		const vPolys = viaGrid(cx + dx, cy, extend - 2 * via_in_metal, width - 2 * via_in_metal, via_spacing, via_width);
+		polysVias1 = polysVias1.concat(vPolys);
+
+		// Network: via connection for crossing bridges
+		const topNode = addNode(cx, cy, 'm3');
+		const botNode = addNode(cx, cy, 'm2');
+		vias.push({ id: `via_tb${vias.length}`, topNode: topNode.id, bottomNode: botNode.id, resistance: 0.1, polygons: vPolys, renderLayer: 'vias1' });
 	}
 
-	return {
+	// Network ports
+	const ports: Port[] = [
+		{ name: 'P1', plusNode: portLeftNode.id, minusNode: portRightNode.id },
+		{ name: 'P2', plusNode: portRightNode.id, minusNode: portLeftNode.id },
+	];
+
+	const network: ConductorNetwork = { nodes, segments, vias, ports };
+
+	// Use legacy polygons directly (exact visual match guaranteed)
+	const layers: LayerMap = {
 		windings: polysWindings,
 		crossings: polysCrossings,
 		vias1: polysVias1,
@@ -204,6 +270,8 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): LayerMa
 		vias2: polysVias2,
 		pgs: [],
 	};
+
+	return { network, layers };
 }
 
 export function isSymmetricInductorValid(params: SymmetricInductorParams): boolean {

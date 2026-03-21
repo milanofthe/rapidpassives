@@ -17,13 +17,13 @@
 			title: 'Symmetric Inductor',
 			href: '/symmetric-inductor',
 			desc: 'Differential symmetric inductor with optional center tap',
-			layers: buildSymmetricInductor({ Dout: 120, N: 2, sides: 8, width: 10, spacing: 3, center_tap: false, via_extent: 6, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }),
+			layers: buildSymmetricInductor({ Dout: 120, N: 2, sides: 8, width: 10, spacing: 3, center_tap: false, via_extent: 6, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
 		},
 		{
 			title: 'Symmetric Transformer',
 			href: '/symmetric-transformer',
 			desc: 'Interleaved transformer with configurable winding ratio',
-			layers: buildSymmetricTransformer({ Dout: 120, N1: 1, N2: 2, sides: 8, width: 8, spacing: 3, center_tap_primary: false, center_tap_secondary: false, via_extent: 5, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }),
+			layers: buildSymmetricTransformer({ Dout: 120, N1: 1, N2: 2, sides: 8, width: 8, spacing: 3, center_tap_primary: false, center_tap_secondary: false, via_extent: 5, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
 		},
 	];
 

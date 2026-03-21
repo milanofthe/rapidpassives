@@ -1,7 +1,8 @@
 import type { Polygon, LayerMap, SymmetricTransformerParams } from './types';
+import type { ConductorNetwork, ConductorNode, ConductorSegment, ViaConnection, Port, GeometryResult } from './network';
 import { viaGrid, routingGeometric45 } from './utils';
 
-export function buildSymmetricTransformer(params: SymmetricTransformerParams): LayerMap {
+export function buildSymmetricTransformer(params: SymmetricTransformerParams): GeometryResult {
 	const { Dout, N1, N2, sides, width, spacing, center_tap_primary, center_tap_secondary,
 		via_extent, via_spacing, via_width, via_in_metal } = params;
 
@@ -297,7 +298,56 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): L
 		}
 	}
 
-	return {
+	// --- Build minimal conductor network ---
+	// Full topology extraction deferred — the polygon generation is too interleaved
+	// For now, capture via positions and port nodes for solver use
+	const netNodes: ConductorNode[] = [];
+	const netSegments: ConductorSegment[] = [];
+	const netVias: ViaConnection[] = [];
+	let _nid = 0;
+
+	function _addNode(x: number, y: number, layerId: string): ConductorNode {
+		const node: ConductorNode = { id: `n${_nid++}`, x, y, layerId };
+		netNodes.push(node);
+		return node;
+	}
+
+	// Via connections
+	for (const [cx, cy] of viaCentersTCT) {
+		const topNode = _addNode(cx, cy, 'm3');
+		const botNode = _addNode(cx, cy, 'm1');
+		const vPolys = viaGrid(cx, cy, width - 2 * via_in_metal, Math.min(width, extend) - 2 * via_in_metal, via_spacing, via_width);
+		netVias.push({ id: `via_ct${netVias.length}`, topNode: topNode.id, bottomNode: botNode.id, resistance: 0.1, polygons: vPolys, renderLayer: 'vias2' });
+	}
+
+	for (const [cx, cy] of viaCentersTB) {
+		const topNode = _addNode(cx, cy, 'm3');
+		const botNode = _addNode(cx, cy, 'm2');
+		const dx = Math.sign(cx) * (extend - width) / 2;
+		const dy = Math.sign(cy) * (extend - width) / 2;
+		let vPolys: Polygon[];
+		if (Math.abs(cy) > Math.abs(cx)) {
+			vPolys = viaGrid(cx + dx, cy, extend - 2 * via_in_metal, width - 2 * via_in_metal, via_spacing, via_width);
+		} else {
+			vPolys = viaGrid(cx, cy + dy, width - 2 * via_in_metal, extend - 2 * via_in_metal, via_spacing, via_width);
+		}
+		netVias.push({ id: `via_tb${netVias.length}`, topNode: topNode.id, bottomNode: botNode.id, resistance: 0.1, polygons: vPolys, renderLayer: 'vias1' });
+	}
+
+	// Port nodes
+	const p1Plus = _addNode(-sepTotal / 2, -Dout / 2, 'm3');
+	const p1Minus = _addNode(sepTotal / 2, -Dout / 2, 'm3');
+	const p2Plus = _addNode(-sepTotal / 2, Dout / 2, 'm3');
+	const p2Minus = _addNode(sepTotal / 2, Dout / 2, 'm3');
+
+	const netPorts: Port[] = [
+		{ name: 'P1', plusNode: p1Plus.id, minusNode: p1Minus.id },
+		{ name: 'P2', plusNode: p2Plus.id, minusNode: p2Minus.id },
+	];
+
+	const network: ConductorNetwork = { nodes: netNodes, segments: netSegments, vias: netVias, ports: netPorts };
+
+	const layers: LayerMap = {
 		windings: polysWindings,
 		crossings: polysCrossings,
 		vias1: polysVias1,
@@ -305,6 +355,8 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): L
 		vias2: polysVias2,
 		pgs: [],
 	};
+
+	return { network, layers };
 }
 
 export function isSymmetricTransformerValid(params: SymmetricTransformerParams): boolean {
