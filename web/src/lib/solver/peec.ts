@@ -42,8 +42,9 @@ export interface SimulationResult {
 export interface SimOptions {
 	fMin: number;        // Hz
 	fMax: number;        // Hz
-	nPoints: number;     // number of frequency points (log-spaced)
+	nPoints: number;
 	z0?: number;         // reference impedance for S-params (default 50Ω)
+	logScale?: boolean;  // true = log-spaced (default), false = linear
 }
 
 /**
@@ -54,7 +55,7 @@ export function solvePEEC(
 	stack: ProcessStack,
 	options: SimOptions
 ): SimulationResult {
-	const { fMin, fMax, nPoints, z0 = 50 } = options;
+	const { fMin, fMax, nPoints, z0 = 50, logScale = true } = options;
 
 	// Build node map
 	const nodeMap = new Map<string, ConductorNode>();
@@ -97,14 +98,18 @@ export function solvePEEC(
 	// through all segments. The impedance is the sum of all segment impedances.
 	const nPorts = network.ports.length;
 
-	// Generate frequency points (log-spaced)
+	// Generate frequency points
 	const freqs: FrequencyPoint[] = [];
-	const logMin = Math.log10(Math.max(fMin, 1));
-	const logMax = Math.log10(fMax);
 
 	for (let i = 0; i < nPoints; i++) {
-		const logF = logMin + i * (logMax - logMin) / (nPoints - 1);
-		const freq = Math.pow(10, logF);
+		let freq: number;
+		if (logScale) {
+			const logMin = Math.log10(Math.max(fMin, 1));
+			const logMax = Math.log10(fMax);
+			freq = Math.pow(10, logMin + i * (logMax - logMin) / (nPoints - 1));
+		} else {
+			freq = fMin + i * (fMax - fMin) / (nPoints - 1);
+		}
 		const omega = 2 * PI * freq;
 
 		// Frequency-dependent resistance (skin effect)

@@ -12,7 +12,7 @@
 	import { solvePEEC, type SimulationResult } from '$lib/solver/peec';
 
 	let simResult = $state<SimulationResult | null>(null);
-	let simSettings = $state({ fMin: 1e8, fMax: 50e9, nPoints: 100, z0: 50 });
+	let simSettings = $state({ fMin: 1e8, fMax: 50e9, nPoints: 100, z0: 50, logScale: true });
 
 	function doExport() {
 		const data = exportGds(layers, { cellName: 'SpiralInductor' });
@@ -106,6 +106,11 @@
 						oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) simSettings = { ...simSettings, z0: v }; }} />
 					<em>Ω</em>
 				</div></div>
+				<div class="f"><span>Scale</span><div class="fi">
+					<button class="toggle-btn" class:active={simSettings.logScale} onclick={() => simSettings = { ...simSettings, logScale: !simSettings.logScale }}>
+						{simSettings.logScale ? 'LOG' : 'LIN'}
+					</button><em></em>
+				</div></div>
 			</div>
 			<button class="sim-btn" onclick={doSimulate}>Simulate</button>
 		</div>
@@ -114,13 +119,7 @@
 
 <style>
 	.sim-btn {
-		background: var(--accent-secondary);
-		color: #000;
-		font-weight: 700;
 		padding: 10px;
 		font-size: 13px;
-	}
-	.sim-btn:hover {
-		background: #f0a050;
 	}
 </style>

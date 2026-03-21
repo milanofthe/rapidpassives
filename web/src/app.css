@@ -77,7 +77,7 @@ input[type="number"] {
 
 button {
 	background: var(--accent);
-	color: var(--text-muted);
+	color: var(--bg);
 	border: none;
 	padding: 6px 14px;
 	border-radius: 0;
