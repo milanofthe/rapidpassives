@@ -75,11 +75,9 @@
 	}
 	.stab:hover {
 		color: var(--text-muted);
-		background: var(--bg-surface);
 	}
 	.stab.active {
 		color: var(--accent);
-		background: var(--bg-surface);
 	}
 	.sidebar-content {
 		flex: 1;
