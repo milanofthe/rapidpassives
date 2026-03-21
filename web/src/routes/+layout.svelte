@@ -64,7 +64,7 @@
 	}
 	.divider {
 		width: 1px;
-		height: 14px;
+		align-self: stretch;
 		background: var(--border);
 	}
 	.tabs {
