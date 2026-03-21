@@ -1,12 +1,14 @@
 /**
  * PEEC (Partial Element Equivalent Circuit) MQS solver.
  *
- * Takes a ConductorNetwork + ProcessStack and computes:
- * - Impedance matrix Z(f) = R(f) + jωL
- * - Y-parameters
- * - S-parameters
+ * Uses Modified Nodal Analysis (MNA) to correctly solve for
+ * multi-port impedance including mutual coupling between all segments.
  *
- * For each frequency point in a sweep.
+ * The system equation per frequency:
+ *   Y_nodal · V = I_source
+ * where Y_nodal = A · Z_branch^(-1) · A^T
+ *   A = branch-node incidence matrix
+ *   Z_branch = R·I + jω·L (dense, includes mutual coupling)
  */
 
 import type { ConductorNetwork, ConductorSegment, ConductorNode } from '$lib/geometry/network';
@@ -14,33 +16,21 @@ import type { ProcessStack } from '$lib/stack/types';
 import { getStackLayer } from '$lib/stack/types';
 import { selfInductance, mutualInductance, type Filament } from './inductance';
 import { computeParasitics, applyPiModelSparams } from './parasitics';
-import { computeMultiPortZ, zToS, extractPortResults, extractCoupling, type PortPath } from './multiport';
+import { type Cx, cxMatSolve, cxMatMul, cxAdd, zToS, extractPortResults, extractCoupling, type PortFreqResult } from './multiport';
 
 const PI = Math.PI;
 const MU0 = 4 * PI * 1e-7;
 
-/** Complex number as [real, imag] */
-type Cx = [number, number];
-
-/** Per-port result at a single frequency */
-export interface PortFreqResult {
-	name: string;
-	L: number;   // H
-	R: number;   // Ω
-	Q: number;
-}
-
 /** Result for a single frequency point */
 export interface FrequencyPoint {
-	freq: number;        // Hz
-	Z: Cx[][];           // impedance matrix (n_ports × n_ports)
-	Y: Cx[][];           // admittance matrix
-	S: Cx[][];           // S-parameter matrix
-	L: number;           // effective inductance (H) — from Z[0][0]
-	Q: number;           // quality factor
-	R: number;           // effective resistance (Ω)
-	ports: PortFreqResult[];  // per-port results
-	k?: number;          // coupling coefficient (transformers)
+	freq: number;
+	Z: Cx[][];
+	S: Cx[][];
+	L: number;
+	Q: number;
+	R: number;
+	ports: PortFreqResult[];
+	k?: number;
 }
 
 /** Full simulation result */
@@ -49,23 +39,23 @@ export interface SimulationResult {
 	filaments: Filament[];
 	network: ConductorNetwork;
 	logScale: boolean;
-	portNames: string[];  // names of independent ports
+	portNames: string[];
 	nPorts: number;
 }
 
 /** Simulation options */
 export interface SimOptions {
-	fMin: number;        // Hz
-	fMax: number;        // Hz
+	fMin: number;
+	fMax: number;
 	nPoints: number;
-	z0?: number;         // reference impedance for S-params (default 50Ω)
-	logScale?: boolean;  // true = log-spaced (default), false = linear
-	conductorSpacing?: number; // spacing between turns in um (for Cs calculation)
-	hasPgs?: boolean;    // whether PGS is enabled
+	z0?: number;
+	logScale?: boolean;
+	conductorSpacing?: number;
+	hasPgs?: boolean;
 }
 
 /**
- * Run PEEC simulation on a conductor network.
+ * Run PEEC simulation using MNA formulation.
  */
 export function solvePEEC(
 	network: ConductorNetwork,
@@ -74,15 +64,31 @@ export function solvePEEC(
 ): SimulationResult {
 	const { fMin, fMax, nPoints, z0 = 50, logScale = true, conductorSpacing = 2, hasPgs = false } = options;
 
-	// Build node map
 	const nodeMap = new Map<string, ConductorNode>();
 	for (const n of network.nodes) nodeMap.set(n.id, n);
 
 	// Convert segments to filaments
 	const filaments = segmentsToFilaments(network.segments, nodeMap, stack);
+	const nFil = filaments.length;
+
+	if (nFil === 0) {
+		return { freqs: [], filaments, network, logScale, portNames: [], nPorts: 0 };
+	}
+
+	// Map segments to filament indices (some segments may be filtered as zero-length)
+	const segToFil = new Map<number, number>();
+	{
+		let fi = 0;
+		for (let si = 0; si < network.segments.length; si++) {
+			const from = nodeMap.get(network.segments[si].fromNode);
+			const to = nodeMap.get(network.segments[si].toNode);
+			if (!from || !to) continue;
+			const dx = (to.x - from.x) * 1e-6, dy = (to.y - from.y) * 1e-6;
+			if (Math.sqrt(dx * dx + dy * dy) > 1e-12) { segToFil.set(si, fi); fi++; }
+		}
+	}
 
 	// Compute inductance matrix L[i][j]
-	const nFil = filaments.length;
 	const L = new Array(nFil);
 	for (let i = 0; i < nFil; i++) {
 		L[i] = new Float64Array(nFil);
@@ -91,106 +97,251 @@ export function solvePEEC(
 				L[i][j] = selfInductance(filaments[i].width, filaments[i].length, filaments[i].height);
 			} else {
 				const m = mutualInductance(filaments[i], filaments[j]);
-				L[i][j] = m;
-				L[j][i] = m;
+				L[i][j] = m; L[j][i] = m;
 			}
 		}
 	}
 
-	// Compute DC resistance per filament
+	// DC resistance per filament
 	const Rdc = filaments.map((fil, idx) => {
-		const seg = network.segments[idx];
-		const sl = getStackLayer(stack, seg.layerId);
-		const rsh = sl?.rsh ?? 0.03;
-		return rsh * fil.length / fil.width;
+		const seg = findSegForFilament(idx, segToFil, network.segments);
+		const sl = seg ? getStackLayer(stack, seg.layerId) : null;
+		return (sl?.rsh ?? 0.03) * fil.length / fil.width;
 	});
 
-	// Build mesh matrix M
-	// For a simple series path (spiral inductor), each segment is one mesh branch.
-	// The mesh matrix maps mesh currents to branch currents.
-	// For a single-port series path: M = identity (each segment carries the same current)
-	// For multi-port networks: need proper mesh analysis
+	// --- Build node index map ---
+	// Only include nodes that are actually used by segments or vias
+	const usedNodes = new Set<string>();
+	for (const seg of network.segments) {
+		if (segToFil.has(network.segments.indexOf(seg))) {
+			usedNodes.add(seg.fromNode);
+			usedNodes.add(seg.toNode);
+		}
+	}
+	for (const via of network.vias) {
+		usedNodes.add(via.topNode);
+		usedNodes.add(via.bottomNode);
+	}
+	// Also include port nodes
+	for (const port of network.ports) {
+		usedNodes.add(port.plusNode);
+		usedNodes.add(port.minusNode);
+	}
 
-	// Compute pi-model parasitic elements
+	const nodeIds = Array.from(usedNodes);
+	const nodeIdx = new Map<string, number>();
+	nodeIds.forEach((id, i) => nodeIdx.set(id, i));
+	const nNodes = nodeIds.length;
+
+	// --- Build incidence matrix A (nNodes × nBranches) ---
+	// Branches = filaments + vias
+	const nVias = network.vias.length;
+	const nBranches = nFil + nVias;
+
+	// A[node][branch] = +1 if branch leaves node, -1 if enters
+	// Stored as dense for simplicity (small matrices)
+	const A: number[][] = Array.from({ length: nNodes }, () => new Array(nBranches).fill(0));
+
+	// Filament branches
+	for (const [segIdx, filI] of segToFil) {
+		const seg = network.segments[segIdx];
+		const fromI = nodeIdx.get(seg.fromNode);
+		const toI = nodeIdx.get(seg.toNode);
+		if (fromI !== undefined) A[fromI][filI] = +1;
+		if (toI !== undefined) A[toI][filI] = -1;
+	}
+
+	// Via branches (indices nFil..nFil+nVias-1)
+	network.vias.forEach((via, vi) => {
+		const topI = nodeIdx.get(via.topNode);
+		const botI = nodeIdx.get(via.bottomNode);
+		if (topI !== undefined) A[topI][nFil + vi] = +1;
+		if (botI !== undefined) A[botI][nFil + vi] = -1;
+	});
+
+	// --- Identify unique ports ---
+	const seenPorts = new Set<string>();
+	const uniquePorts: typeof network.ports = [];
+	for (const p of network.ports) {
+		const key = [p.plusNode, p.minusNode].sort().join('-');
+		if (!seenPorts.has(key)) { seenPorts.add(key); uniquePorts.push(p); }
+	}
+	const nPorts = uniquePorts.length;
+	const portNames = uniquePorts.map(p => p.name);
+
+	// Ground node: use the first port's minus node as reference
+	const groundNode = uniquePorts[0]?.minusNode;
+	const groundIdx = groundNode ? nodeIdx.get(groundNode) : undefined;
+
+	// Parasitics
 	const parasitics = computeParasitics(filaments, stack, conductorSpacing * 1e-6, hasPgs);
 
-	// Generate frequency points
+	// --- Frequency sweep ---
 	const freqs: FrequencyPoint[] = [];
 
-	for (let i = 0; i < nPoints; i++) {
+	for (let fi = 0; fi < nPoints; fi++) {
 		let freq: number;
 		if (logScale) {
 			const logMin = Math.log10(Math.max(fMin, 1));
 			const logMax = Math.log10(fMax);
-			freq = Math.pow(10, logMin + i * (logMax - logMin) / (nPoints - 1));
+			freq = Math.pow(10, logMin + fi * (logMax - logMin) / (nPoints - 1));
 		} else {
-			freq = fMin + i * (fMax - fMin) / (nPoints - 1);
+			freq = fMin + fi * (fMax - fMin) / (nPoints - 1);
 		}
 		const omega = 2 * PI * freq;
 
-		// Frequency-dependent resistance (skin effect)
+		// Frequency-dependent resistance
 		const Rf = Rdc.map((rdc, idx) => {
 			const fil = filaments[idx];
-			const seg = network.segments[idx];
-			const sl = getStackLayer(stack, seg.layerId);
+			const seg = findSegForFilament(idx, segToFil, network.segments);
+			const sl = seg ? getStackLayer(stack, seg.layerId) : null;
 			const sigma = 1 / ((sl?.rsh ?? 0.03) * fil.height);
-			const delta = Math.sqrt(2 / (omega * MU0 * sigma)); // skin depth
-			const t = fil.height;
-			const w = fil.width;
-
-			// Skin effect correction factor
-			if (delta >= t / 2) {
-				return rdc; // below skin effect onset
-			}
-			// Approximate: effective cross-section reduced by skin effect
-			const effectiveArea = w * t - (w - 2 * delta) * Math.max(0, t - 2 * delta);
-			const fullArea = w * t;
-			return rdc * fullArea / effectiveArea;
+			const delta = Math.sqrt(2 / (omega * MU0 * sigma));
+			if (delta >= fil.height / 2) return rdc;
+			const effectiveArea = fil.width * fil.height -
+				(fil.width - 2 * delta) * Math.max(0, fil.height - 2 * delta);
+			return rdc * (fil.width * fil.height) / effectiveArea;
 		});
 
-		// Total impedance: Z = Σ(R_i + jωL_ii) + jω * Σ_{i≠j} L_ij
-		// For series path, all filaments carry the same current
-		let Zre = 0, Zim = 0;
+		// Build Z_branch (nBranches × nBranches, complex)
+		const Zb: Cx[][] = Array.from({ length: nBranches }, () =>
+			Array.from({ length: nBranches }, () => [0, 0] as Cx)
+		);
+
+		// Filament block: Z[i][j] = R[i]·δ(i,j) + jω·L[i][j]
 		for (let i = 0; i < nFil; i++) {
-			Zre += Rf[i];
 			for (let j = 0; j < nFil; j++) {
-				Zim += omega * L[i][j];
+				Zb[i][j] = [i === j ? Rf[i] : 0, omega * L[i][j]];
 			}
 		}
 
-		// Add via resistances
-		for (const via of network.vias) {
-			Zre += via.resistance;
+		// Via block: diagonal, pure resistance
+		for (let vi = 0; vi < nVias; vi++) {
+			Zb[nFil + vi][nFil + vi] = [network.vias[vi].resistance, 0];
 		}
 
-		// Apply pi-model parasitics and compute S-params via ABCD
-		const sp = applyPiModelSparams(Zre, Zim, omega, parasitics, z0);
+		// Invert Z_branch to get Y_branch
+		const Yb = cxMatSolve(Zb,
+			Array.from({ length: nBranches }, (_, i) =>
+				Array.from({ length: nBranches }, (_, j) => (i === j ? [1, 0] : [0, 0]) as Cx)
+			)
+		);
 
-		const S11: Cx = sp.S11;
-		const S21: Cx = sp.S21;
-		const S: Cx[][] = [[S11, S21], [S21, S11]];
-		const Z: Cx[][] = [[[sp.Zeff[0], sp.Zeff[1]], [sp.Zeff[0], sp.Zeff[1]]], [[sp.Zeff[0], sp.Zeff[1]], [sp.Zeff[0], sp.Zeff[1]]]];
-		const Y: Cx[][] = [];
+		if (!Yb) {
+			// Singular — skip this frequency
+			freqs.push({ freq, Z: [], S: [], L: 0, Q: 0, R: 0, ports: [], k: undefined });
+			continue;
+		}
 
-		// L and Q from effective impedance (Z_eff = B/D from ABCD)
+		// Y_nodal = A · Y_branch · A^T (all real A, complex Yb)
+		// Step 1: T = Y_branch · A^T (nBranches × nNodes)
+		const AT: Cx[][] = Array.from({ length: nBranches }, (_, b) =>
+			Array.from({ length: nNodes }, (_, n) => [A[n][b], 0] as Cx)
+		);
+		const T = cxMatMul(Yb, AT);
+
+		// Step 2: Y_nodal = A · T (nNodes × nNodes)
+		const Acx: Cx[][] = A.map(row => row.map(v => [v, 0] as Cx));
+		const Yn = cxMatMul(Acx, T);
+
+		// Ground the reference node by removing its row/column
+		// and solving the reduced system
+		const reducedSize = groundIdx !== undefined ? nNodes - 1 : nNodes;
+		const origToReduced = new Map<number, number>();
+		let ri = 0;
+		for (let i = 0; i < nNodes; i++) {
+			if (i === groundIdx) continue;
+			origToReduced.set(i, ri++);
+		}
+
+		// Build reduced Y_nodal
+		const YnR: Cx[][] = Array.from({ length: reducedSize }, () =>
+			Array.from({ length: reducedSize }, () => [0, 0] as Cx)
+		);
+		for (let i = 0; i < nNodes; i++) {
+			const ri = origToReduced.get(i);
+			if (ri === undefined) continue;
+			for (let j = 0; j < nNodes; j++) {
+				const rj = origToReduced.get(j);
+				if (rj === undefined) continue;
+				YnR[ri][rj] = Yn[i][j];
+			}
+		}
+
+		// For each port, build RHS and solve
+		const Zmp: Cx[][] = Array.from({ length: nPorts }, () =>
+			Array.from({ length: nPorts }, () => [0, 0] as Cx)
+		);
+
+		// Build all RHS columns at once
+		const RHS: Cx[][] = Array.from({ length: reducedSize }, () =>
+			Array.from({ length: nPorts }, () => [0, 0] as Cx)
+		);
+
+		for (let pi = 0; pi < nPorts; pi++) {
+			const port = uniquePorts[pi];
+			const plusI = nodeIdx.get(port.plusNode);
+			const minusI = nodeIdx.get(port.minusNode);
+			if (plusI !== undefined) {
+				const r = origToReduced.get(plusI);
+				if (r !== undefined) RHS[r][pi] = [1, 0];
+			}
+			if (minusI !== undefined) {
+				const r = origToReduced.get(minusI);
+				if (r !== undefined) RHS[r][pi] = [-1, 0];
+			}
+		}
+
+		// Solve Y_nodal · V = RHS for all ports at once
+		const V = cxMatSolve(YnR, RHS);
+		if (!V) {
+			freqs.push({ freq, Z: [], S: [], L: 0, Q: 0, R: 0, ports: [], k: undefined });
+			continue;
+		}
+
+		// Extract Z-matrix: Z[i][j] = V_port_i when port j is excited
+		for (let pi = 0; pi < nPorts; pi++) {
+			for (let pj = 0; pj < nPorts; pj++) {
+				const port = uniquePorts[pi];
+				const plusI = nodeIdx.get(port.plusNode);
+				const minusI = nodeIdx.get(port.minusNode);
+				const plusR = plusI !== undefined ? origToReduced.get(plusI) : undefined;
+				const minusR = minusI !== undefined ? origToReduced.get(minusI) : undefined;
+				const vPlus: Cx = plusR !== undefined ? V[plusR][pj] : [0, 0];
+				const vMinus: Cx = minusR !== undefined ? V[minusR][pj] : [0, 0];
+				Zmp[pi][pj] = [vPlus[0] - vMinus[0], vPlus[1] - vMinus[1]];
+			}
+		}
+
+		// Convert Z to S
+		const S = zToS(Zmp, z0);
+
+		// Primary port L/Q/R (with pi-model parasitics on port 0)
+		const Z00re = Zmp[0]?.[0]?.[0] ?? 0;
+		const Z00im = Zmp[0]?.[0]?.[1] ?? 0;
+		const sp = applyPiModelSparams(Z00re, Z00im, omega, parasitics, z0);
 		const Leff = omega > 0 ? sp.Zeff[1] / omega : 0;
 		const Q = sp.Zeff[0] > 0 ? sp.Zeff[1] / sp.Zeff[0] : 0;
 
-		// Per-port results (single-port for now, all segments in one path)
-		const ports: PortFreqResult[] = [{ name: 'Total', L: Leff, R: sp.Zeff[0], Q }];
+		const portResults = extractPortResults(Zmp, omega, portNames);
+		const k = nPorts >= 2 ? extractCoupling(Zmp, omega) : undefined;
 
-		freqs.push({ freq, Z, Y, S, L: Leff, Q, R: sp.Zeff[0], ports });
+		freqs.push({ freq, Z: Zmp, S, L: Leff, Q, R: sp.Zeff[0], ports: portResults, k });
 	}
 
-	// Determine unique port names (deduplicate reverse pairs)
-	const seenPorts = new Set<string>();
-	const portNames: string[] = [];
-	for (const p of network.ports) {
-		const key = [p.plusNode, p.minusNode].sort().join('-');
-		if (!seenPorts.has(key)) { seenPorts.add(key); portNames.push(p.name); }
-	}
+	return { freqs, filaments, network, logScale, portNames, nPorts };
+}
 
-	return { freqs, filaments, network, logScale, portNames, nPorts: portNames.length };
+/** Find the segment corresponding to a filament index */
+function findSegForFilament(
+	filIdx: number,
+	segToFil: Map<number, number>,
+	segments: ConductorSegment[],
+): ConductorSegment | null {
+	for (const [si, fi] of segToFil) {
+		if (fi === filIdx) return segments[si];
+	}
+	return null;
 }
 
 /** Convert network segments to filaments with 3D coordinates from stack */
@@ -200,28 +351,16 @@ function segmentsToFilaments(
 	stack: ProcessStack
 ): Filament[] {
 	return segments.map(seg => {
-		const from = nodeMap.get(seg.fromNode)!;
-		const to = nodeMap.get(seg.toNode)!;
+		const from = nodeMap.get(seg.fromNode);
+		const to = nodeMap.get(seg.toNode);
+		if (!from || !to) return null;
 		const sl = getStackLayer(stack, seg.layerId);
-
-		const z = (sl?.z ?? 300) * 1e-6;       // convert um to m
-		const t = (sl?.thickness ?? 1) * 1e-6;  // convert um to m
-		const w = seg.width * 1e-6;             // convert um to m
-
-		const dx = (to.x - from.x) * 1e-6;
-		const dy = (to.y - from.y) * 1e-6;
+		const z = (sl?.z ?? 300) * 1e-6;
+		const t = (sl?.thickness ?? 1) * 1e-6;
+		const w = seg.width * 1e-6;
+		const dx = (to.x - from.x) * 1e-6, dy = (to.y - from.y) * 1e-6;
 		const length = Math.sqrt(dx * dx + dy * dy);
-
-		return {
-			x0: from.x * 1e-6,
-			y0: from.y * 1e-6,
-			z0: z + t / 2,
-			x1: to.x * 1e-6,
-			y1: to.y * 1e-6,
-			z1: z + t / 2,
-			width: w,
-			height: t,
-			length,
-		};
-	}).filter(f => f.length > 1e-12);
+		if (length < 1e-12) return null;
+		return { x0: from.x * 1e-6, y0: from.y * 1e-6, z0: z + t / 2, x1: to.x * 1e-6, y1: to.y * 1e-6, z1: z + t / 2, width: w, height: t, length };
+	}).filter((f): f is Filament => f !== null);
 }

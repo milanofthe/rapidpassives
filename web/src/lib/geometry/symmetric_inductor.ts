@@ -40,9 +40,17 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 	const vias: ViaConnection[] = [];
 	let nid = 0, sid = 0;
 
+	const _nodeReg = new Map<string, ConductorNode>();
+
 	function addNode(x: number, y: number, layerId: string): ConductorNode {
-		const node: ConductorNode = { id: `n${nid++}`, x, y, layerId };
+		const sx = Math.round(x * 1000) / 1000;
+		const sy = Math.round(y * 1000) / 1000;
+		const key = `${sx},${sy},${layerId}`;
+		const existing = _nodeReg.get(key);
+		if (existing) return existing;
+		const node: ConductorNode = { id: `n${nid++}`, x: sx, y: sy, layerId };
 		nodes.push(node);
+		_nodeReg.set(key, node);
 		return node;
 	}
 
@@ -53,10 +61,10 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 		});
 	}
 
-	// Port nodes — positioned at the outer edge of port polygons
-	const portXOffset = center_tap ? spacing + width : (spacing + width) / 2;
-	const portLeftNode = addNode(-portXOffset, -Dout / 2 - width, 'm3');
-	const portRightNode = addNode(portXOffset, -Dout / 2 - width, 'm3');
+	// Port nodes — will be assigned after winding segments are built
+	// (placeholder, replaced below after segments exist)
+	let portLeftNode: ConductorNode = addNode(0, 0, 'm3');
+	let portRightNode: ConductorNode = addNode(0, 0, 'm3');
 
 	let r1 = R1, r2 = R2;
 
@@ -254,13 +262,40 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 		vias.push({ id: `via_tb${vias.length}`, topNode: topNode.id, bottomNode: botNode.id, resistance: 0.1, polygons: vPolys, renderLayer: 'vias1' });
 	}
 
-	// Network ports
+	// Assign port nodes to nearest connected segment nodes
+	{
+		const segNodeIds = new Set<string>();
+		for (const s of segments) { segNodeIds.add(s.fromNode); segNodeIds.add(s.toNode); }
+		for (const v of vias) { segNodeIds.add(v.topNode); segNodeIds.add(v.bottomNode); }
+
+		function findNearest(tx: number, ty: number): ConductorNode {
+			let best: ConductorNode | null = null, bestD = Infinity;
+			for (const n of nodes) {
+				if (!segNodeIds.has(n.id)) continue;
+				const d = (n.x - tx) ** 2 + (n.y - ty) ** 2;
+				if (d < bestD) { bestD = d; best = n; }
+			}
+			return best ?? addNode(tx, ty, 'm3');
+		}
+
+		const portXOffset = center_tap ? spacing + width : (spacing + width) / 2;
+		portLeftNode = findNearest(-portXOffset, -Dout / 2);
+		portRightNode = findNearest(portXOffset, -Dout / 2);
+	}
+
 	const ports: Port[] = [
 		{ name: 'P1', plusNode: portLeftNode.id, minusNode: portRightNode.id },
-		{ name: 'P2', plusNode: portRightNode.id, minusNode: portLeftNode.id },
 	];
 	if (center_tap) {
-		const ctNode = addNode(0, -Dout / 2 - width, 'm3');
+		const segNodeIds = new Set<string>();
+		for (const s of segments) { segNodeIds.add(s.fromNode); segNodeIds.add(s.toNode); }
+		let ctBest: ConductorNode | null = null, ctBestD = Infinity;
+		for (const n of nodes) {
+			if (!segNodeIds.has(n.id)) continue;
+			const d = n.x ** 2 + (n.y + Dout / 2) ** 2;
+			if (d < ctBestD) { ctBestD = d; ctBest = n; }
+		}
+		const ctNode = ctBest ?? addNode(0, -Dout / 2, 'm3');
 		ports.push({ name: 'CT', plusNode: ctNode.id, minusNode: portLeftNode.id });
 	}
 

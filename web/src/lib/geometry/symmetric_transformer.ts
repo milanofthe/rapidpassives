@@ -304,9 +304,18 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 	const netVias: ViaConnection[] = [];
 	let _nid = 0, _sid = 0;
 
+	const _nodeRegistry = new Map<string, ConductorNode>();
+
 	function _addNode(x: number, y: number, layerId: string): ConductorNode {
-		const node: ConductorNode = { id: `n${_nid++}`, x, y, layerId };
+		// Snap coordinates and check for existing node at same position
+		const sx = Math.round(x * 1000) / 1000;
+		const sy = Math.round(y * 1000) / 1000;
+		const key = `${sx},${sy},${layerId}`;
+		const existing = _nodeRegistry.get(key);
+		if (existing) return existing;
+		const node: ConductorNode = { id: `n${_nid++}`, x: sx, y: sy, layerId };
 		netNodes.push(node);
+		_nodeRegistry.set(key, node);
 		return node;
 	}
 
@@ -378,29 +387,46 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 		netVias.push({ id: `via_tb${netVias.length}`, topNode: topNode.id, bottomNode: botNode.id, resistance: 0.1, polygons: vPolys, renderLayer: 'vias1' });
 	}
 
-	// Port nodes — at outer edge of port polygons
+	// Port nodes — find nearest segment nodes to port positions
+	// Segment nodes are the winding centerline nodes created above
 	const hasBotCTPort = (center_tap_primary && N1 % 2 === 0) || (center_tap_secondary && N2 % 2 !== 0);
 	const hasTopCTPort = (center_tap_primary && N1 % 2 !== 0) || (center_tap_secondary && N2 % 2 === 0);
+
+	function findNearest(targetX: number, targetY: number): ConductorNode {
+		// Search among nodes that are connected to segments
+		const segNodeIds = new Set<string>();
+		for (const s of netSegments) { segNodeIds.add(s.fromNode); segNodeIds.add(s.toNode); }
+		for (const v of netVias) { segNodeIds.add(v.topNode); segNodeIds.add(v.bottomNode); }
+
+		let best: ConductorNode | null = null;
+		let bestDist = Infinity;
+		for (const n of netNodes) {
+			if (!segNodeIds.has(n.id)) continue;
+			const d = (n.x - targetX) ** 2 + (n.y - targetY) ** 2;
+			if (d < bestDist) { bestDist = d; best = n; }
+		}
+		// If no segment node found, create a new port node (for display)
+		return best ?? _addNode(targetX, targetY, 'm3');
+	}
+
 	const botPortX = hasBotCTPort ? spacing + width : (spacing + width) / 2;
 	const topPortX = hasTopCTPort ? spacing + width : (spacing + width) / 2;
 
-	const p1Plus = _addNode(-botPortX, -Dout / 2 - width, 'm3');
-	const p1Minus = _addNode(botPortX, -Dout / 2 - width, 'm3');
-	const p2Plus = _addNode(-topPortX, Dout / 2 + width, 'm3');
-	const p2Minus = _addNode(topPortX, Dout / 2 + width, 'm3');
+	const p1Plus = findNearest(-botPortX, -Dout / 2);
+	const p1Minus = findNearest(botPortX, -Dout / 2);
+	const p2Plus = findNearest(-topPortX, Dout / 2);
+	const p2Minus = findNearest(topPortX, Dout / 2);
 
 	const netPorts: Port[] = [
 		{ name: 'P1+', plusNode: p1Plus.id, minusNode: p1Minus.id },
-		{ name: 'P1-', plusNode: p1Minus.id, minusNode: p1Plus.id },
 		{ name: 'P2+', plusNode: p2Plus.id, minusNode: p2Minus.id },
-		{ name: 'P2-', plusNode: p2Minus.id, minusNode: p2Plus.id },
 	];
 	if (hasBotCTPort) {
-		const ctBot = _addNode(0, -Dout / 2 - width, 'm3');
+		const ctBot = findNearest(0, -Dout / 2);
 		netPorts.push({ name: 'CT1', plusNode: ctBot.id, minusNode: p1Plus.id });
 	}
 	if (hasTopCTPort) {
-		const ctTop = _addNode(0, Dout / 2 + width, 'm3');
+		const ctTop = findNearest(0, Dout / 2);
 		netPorts.push({ name: 'CT2', plusNode: ctTop.id, minusNode: p2Plus.id });
 	}
 
