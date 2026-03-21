@@ -5,21 +5,28 @@
 	let { result }: { result: SimulationResult | null } = $props();
 
 	let container = $state<HTMLDivElement | null>(null);
-	let Plotly: any = null;
-	let ready = false;
+	let Plotly: any = $state(null);
 
 	onMount(async () => {
 		Plotly = (await import('plotly.js-dist-min')).default;
-		ready = true;
 	});
 
 	$effect(() => {
-		if (!ready || !Plotly || !container || !result || result.freqs.length === 0) return;
-		// Tick to ensure DOM is settled after result change
-		tick().then(() => renderPlots(container!, result!));
+		const r = result;
+		const P = Plotly;
+		const el = container;
+		if (!P || !r || r.freqs.length === 0) return;
+		// Wait for DOM if container isn't ready yet
+		if (!el) {
+			tick().then(() => {
+				if (container) renderPlots(container, r, P);
+			});
+			return;
+		}
+		renderPlots(el, r, P);
 	});
 
-	function renderPlots(el: HTMLDivElement, r: SimulationResult) {
+	function renderPlots(el: HTMLDivElement, r: SimulationResult, P: any) {
 		const f = r.freqs.map(p => p.freq);
 		const L = r.freqs.map(p => p.L * 1e9);
 		const Q = r.freqs.map(p => p.Q);
@@ -77,7 +84,7 @@
 				div.id = p.id;
 				grid.appendChild(div);
 			}
-			Plotly.react(div, p.data, { ...base, yaxis: p.yaxis }, cfg);
+			P.react(div, p.data, { ...base, yaxis: p.yaxis }, cfg);
 		}
 	}
 </script>
