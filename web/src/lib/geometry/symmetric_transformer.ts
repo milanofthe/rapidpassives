@@ -323,41 +323,71 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 		netSegments.push({ id: `s${_sid++}`, fromNode: from.id, toNode: to.id, width: w, layerId, pathId, renderLayer });
 	}
 
-	// Build centerline nodes for each winding quadrant
+	// Build centerline nodes for each winding quadrant, with connections
+	// between quadrants via crossing/bridge points.
+	//
+	// Quadrant layout (viewing from top):
+	//   UL (upper-left)  ←→  UR (upper-right)   connected at top (y>0)
+	//    ↕                     ↕
+	//   LL (lower-left)  ←→  LR (lower-right)   connected at bottom (y<0)
+	//
+	// Each quadrant arc has a first and last node. Adjacent quadrants share
+	// a junction node at the crossing/bridge entry point (±sepTotal/2, h).
 	{
 		let _r1 = Dout / 2 / Math.cos(PI / sides);
 		let _r2 = _r1 - v;
 		for (let winding = 0; winding < N; winding++) {
+			const rc = (_r1 + _r2) / 2;
 			const quadAngles = [upperLeftAngles, lowerLeftAngles, upperRightAngles, lowerRightAngles];
+
+			// Build arc nodes per quadrant, track first/last
+			const quadFirst: ConductorNode[] = [];
+			const quadLast: ConductorNode[] = [];
+
 			for (let qi = 0; qi < 4; qi++) {
 				let prev: ConductorNode | null = null;
+				let first: ConductorNode | null = null;
 				for (const phi of quadAngles[qi]) {
-					const rc = (_r1 + _r2) / 2;
 					const node = _addNode(rc * Math.cos(phi), rc * Math.sin(phi), 'm3');
+					if (!first) first = node;
 					if (prev) _addSeg(prev, node, width, 'm3', `w${winding}_q${qi}`, 'windings');
 					prev = node;
 				}
+				quadFirst.push(first!);
+				quadLast.push(prev!);
 			}
 
-			// Crossing segments on lower metal
-			if (topCrossing.includes(winding) || bottomCrossing.includes(winding)) {
-				const h = topCrossing.includes(winding)
-					? _r1 * Math.sin(PI * (0.5 - 1 / sides))
-					: (-_r2 + s) * Math.sin(PI * (0.5 - 1 / sides));
-				const crossL = _addNode(-sepTotal / 2 - width / 2, h - 3 * width / 2 - spacing, 'm2');
-				const crossR = _addNode(sepTotal / 2 + width / 2, h - width / 2, 'm2');
-				_addSeg(crossL, crossR, width, 'm2', `cross_w${winding}`, 'crossings');
-			}
+			// Connect quadrants into a continuous winding loop.
+			// The order is: UL → UR → LR → LL → (next winding UL)
+			// Quadrant indices: 0=UL, 1=LL, 2=UR, 3=LR
+			// Connection order: UL(0) → UR(2) → LR(3) → LL(1) → next UL
+			const loopOrder = [0, 2, 3, 1]; // UL, UR, LR, LL
 
-			if (lrCrossing.includes(winding)) {
-				const hR = _r1 * Math.sin(PI * (0.5 - 1 / sides));
-				const hL = (-_r2 + s) * Math.sin(PI * (0.5 - 1 / sides));
-				const crR1 = _addNode(hR - 3 * width / 2 - spacing, -sepTotal / 2 - width / 2, 'm2');
-				const crR2 = _addNode(hR - width / 2, sepTotal / 2 + width / 2, 'm2');
-				_addSeg(crR1, crR2, width, 'm2', `lrcross_r_w${winding}`, 'crossings');
-				const crL1 = _addNode(hL - 3 * width / 2 - spacing, -sepTotal / 2 - width / 2, 'm2');
-				const crL2 = _addNode(hL - width / 2, sepTotal / 2 + width / 2, 'm2');
-				_addSeg(crL1, crL2, width, 'm2', `lrcross_l_w${winding}`, 'crossings');
+			for (let li = 0; li < loopOrder.length; li++) {
+				const qi = loopOrder[li];
+				const nextQi = loopOrder[(li + 1) % loopOrder.length];
+				const fromNode = quadLast[qi];
+				const toNode = quadFirst[nextQi];
+
+				// Skip if same node (already connected)
+				if (fromNode.id === toNode.id) continue;
+
+				// Determine if this connection is a bridge (same layer)
+				// or a crossing (different layer, with vias)
+				const isBridge = topBridge.includes(winding) || bottomBridge.includes(winding) || lrBridge.includes(winding);
+				const isCrossing = topCrossing.includes(winding) || bottomCrossing.includes(winding) || lrCrossing.includes(winding);
+
+				if (isCrossing) {
+					// Connect via lower metal crossing with vias
+					const crossFrom = _addNode(fromNode.x, fromNode.y, 'm2');
+					const crossTo = _addNode(toNode.x, toNode.y, 'm2');
+					_addSeg(crossFrom, crossTo, width, 'm2', `w${winding}_cross_${li}`, 'crossings');
+					netVias.push({ id: `via_x_${winding}_${li}_a`, topNode: fromNode.id, bottomNode: crossFrom.id, resistance: 0.05, polygons: [], renderLayer: 'vias1' });
+					netVias.push({ id: `via_x_${winding}_${li}_b`, topNode: toNode.id, bottomNode: crossTo.id, resistance: 0.05, polygons: [], renderLayer: 'vias1' });
+				} else {
+					// Direct bridge on same layer
+					_addSeg(fromNode, toNode, width, 'm3', `w${winding}_bridge_${li}`, 'windings');
+				}
 			}
 
 			_r1 -= s;
