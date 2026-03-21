@@ -69,7 +69,7 @@
 					style="border-color: {layer.color}; {layer.visible ? `background: ${layer.color};` : ''}"
 					onclick={() => toggleLayer(layer.id)}
 				></button>
-				<span class="layer-title">{layer.name}</span>
+				<span class="layer-title" style="color: {layer.color};">{layer.name}</span>
 				</div>
 			<div class="layer-fields">
 				<div class="lf">
@@ -244,7 +244,6 @@
 		font-size: 10px;
 		font-family: var(--font-mono);
 		font-weight: 600;
-		color: var(--accent);
 		text-transform: uppercase;
 		letter-spacing: 1.5px;
 	}
