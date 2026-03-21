@@ -10,15 +10,15 @@ export type LayerName = 'windings' | 'crossings' | 'vias' | 'vias1' | 'vias2' | 
 /** A collection of polygons organized by layer */
 export type LayerMap = Partial<Record<LayerName, Polygon[]>>;
 
-/** Colors for each layer */
+/** Colors for each layer — warm pastel tones on dark background */
 export const LAYER_COLORS: Record<LayerName, string> = {
-	windings: '#ffd700',
-	crossings: '#e94560',
-	vias: '#333333',
-	vias1: '#333333',
-	vias2: '#555555',
-	centertap: '#2ec4b6',
-	pgs: '#3a86ff',
+	windings: '#e8944a',
+	crossings: '#d9513c',
+	vias: '#5a5a62',
+	vias1: '#5a5a62',
+	vias2: '#6e6e78',
+	centertap: '#6bbf8a',
+	pgs: '#4a7fb5',
 };
 
 /** Draw order (back to front) */

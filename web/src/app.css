@@ -1,18 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
 :root {
-	--bg: #1a1a2e;
-	--bg-surface: #16213e;
-	--bg-panel: #0f3460;
-	--text: #e0e0e0;
-	--text-muted: #8a8a9a;
-	--accent: #e94560;
-	--accent-secondary: #fca311;
-	--border: #2a2a4a;
-	--input-bg: #1a1a3e;
-	--layer-winding: #ffd700;
-	--layer-crossing: #e94560;
-	--layer-via: #333;
-	--layer-pgs: #3a86ff;
-	--layer-centertap: #2ec4b6;
+	--bg: #1c1c21;
+	--bg-surface: #232329;
+	--bg-panel: #2a2a31;
+	--bg-inset: #18181d;
+	--text: #e2ddd5;
+	--text-muted: #7d7a85;
+	--text-dim: #55535a;
+	--accent: #d9513c;
+	--accent-hover: #e5634f;
+	--accent-secondary: #e8944a;
+	--accent-dim: #d9513c33;
+	--border: #35353d;
+	--border-subtle: #2d2d34;
+	--input-bg: #18181d;
+	--input-border: #3a3a42;
+	--input-focus: #d9513c;
+	--canvas-bg: #131316;
 }
 
 * {
@@ -26,42 +31,64 @@ html, body {
 	font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 	background: var(--bg);
 	color: var(--text);
-	font-size: 14px;
+	font-size: 13px;
+	-webkit-font-smoothing: antialiased;
 }
 
 input[type="number"], input[type="text"], select {
 	background: var(--input-bg);
-	border: 1px solid var(--border);
+	border: 1px solid var(--input-border);
 	color: var(--text);
-	padding: 4px 8px;
-	border-radius: 4px;
-	font-size: 13px;
+	padding: 5px 8px;
+	border-radius: 0;
+	font-size: 12px;
+	font-family: 'JetBrains Mono', monospace;
 	width: 100%;
+	transition: border-color 0.15s;
 }
 
 input[type="number"]:focus, select:focus {
 	outline: none;
-	border-color: var(--accent);
+	border-color: var(--input-focus);
+}
+
+input[type="number"]:hover, select:hover {
+	border-color: #4a4a52;
 }
 
 button {
 	background: var(--accent);
-	color: white;
+	color: #fff;
 	border: none;
-	padding: 8px 16px;
-	border-radius: 4px;
+	padding: 6px 14px;
+	border-radius: 0;
 	cursor: pointer;
-	font-size: 13px;
-	font-weight: 500;
+	font-size: 12px;
+	font-weight: 600;
+	font-family: 'Inter', sans-serif;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	transition: background 0.15s;
 }
 
 button:hover {
-	opacity: 0.9;
+	background: var(--accent-hover);
 }
 
 label {
-	font-size: 12px;
+	font-size: 11px;
 	color: var(--text-muted);
 	display: block;
-	margin-bottom: 2px;
+	font-weight: 500;
+	letter-spacing: 0.2px;
+}
+
+::-webkit-scrollbar {
+	width: 6px;
+}
+::-webkit-scrollbar-track {
+	background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+	background: var(--border);
 }

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { LayerMap } from '$lib/geometry/types';
-	import { fitToView, renderLayers, type ViewState } from '$lib/render/canvas2d';
+	import type { LayerMap, LayerName } from '$lib/geometry/types';
+	import { fitToView, renderLayers, hitTest, type ViewState } from '$lib/render/canvas2d';
 
 	let { layers }: { layers: LayerMap } = $props();
 
@@ -11,15 +11,18 @@
 	let isDragging = false;
 	let lastMouse = { x: 0, y: 0 };
 	let cursorWorld = $state({ x: 0, y: 0 });
+	let hovered = $state<{ layer: LayerName; index: number } | null>(null);
 	let mounted = false;
 
-	/** Match canvas backing store to its CSS size, return CSS dimensions */
-	function syncCanvasSize(): { w: number; h: number } {
-		if (!canvas || !container) return { w: 0, h: 0 };
+	function getSize(): { w: number; h: number } {
+		if (!container) return { w: 0, h: 0 };
 		const rect = container.getBoundingClientRect();
-		const w = Math.round(rect.width);
-		const h = Math.round(rect.height);
-		if (canvas.width !== w || canvas.height !== h) {
+		return { w: Math.round(rect.width), h: Math.round(rect.height) };
+	}
+
+	function syncCanvas(): { w: number; h: number } {
+		const { w, h } = getSize();
+		if (w > 0 && h > 0 && canvas && (canvas.width !== w || canvas.height !== h)) {
 			canvas.width = w;
 			canvas.height = h;
 		}
@@ -28,15 +31,15 @@
 
 	function render() {
 		if (!canvas) return;
-		syncCanvasSize();
+		syncCanvas();
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
-		renderLayers(ctx, layers, view);
+		renderLayers(ctx, layers, view, hovered);
 	}
 
 	function autoFit() {
 		if (!canvas) return;
-		const { w, h } = syncCanvasSize();
+		const { w, h } = syncCanvas();
 		if (w === 0 || h === 0) return;
 		view = fitToView(w, h, layers);
 		render();
@@ -47,12 +50,10 @@
 		const rect = canvas.getBoundingClientRect();
 		const mx = e.clientX - rect.left;
 		const my = e.clientY - rect.top;
-
 		const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-		const newScale = view.scale * zoomFactor;
 
 		view = {
-			scale: newScale,
+			scale: view.scale * zoomFactor,
 			offsetX: mx - (mx - view.offsetX) * zoomFactor,
 			offsetY: my - (my - view.offsetY) * zoomFactor,
 		};
@@ -74,30 +75,44 @@
 			y: -(my - view.offsetY) / view.scale,
 		};
 
-		if (!isDragging) return;
-		const dx = e.clientX - lastMouse.x;
-		const dy = e.clientY - lastMouse.y;
-		view = { ...view, offsetX: view.offsetX + dx, offsetY: view.offsetY + dy };
-		lastMouse = { x: e.clientX, y: e.clientY };
-		render();
+		if (isDragging) {
+			const dx = e.clientX - lastMouse.x;
+			const dy = e.clientY - lastMouse.y;
+			view = { ...view, offsetX: view.offsetX + dx, offsetY: view.offsetY + dy };
+			lastMouse = { x: e.clientX, y: e.clientY };
+			render();
+		} else {
+			const hit = hitTest(layers, view, mx, my);
+			if (hit?.layer !== hovered?.layer || hit?.index !== hovered?.index) {
+				hovered = hit;
+				render();
+			}
+		}
 	}
 
 	function onPointerUp() {
 		isDragging = false;
 	}
 
+	function onDblClick() {
+		autoFit();
+	}
+
 	onMount(() => {
 		mounted = true;
-		// Handle window resize
 		const ro = new ResizeObserver(() => {
-			if (mounted) render();
+			if (mounted) {
+				syncCanvas();
+				render();
+			}
 		});
 		ro.observe(container);
+		// Initial fit after layout settles
+		requestAnimationFrame(() => autoFit());
 		return () => ro.disconnect();
 	});
 
 	$effect(() => {
-		// Re-fit when layers change
 		layers;
 		if (mounted && canvas) {
 			autoFit();
@@ -112,18 +127,21 @@
 		onpointerdown={onPointerDown}
 		onpointermove={onPointerMove}
 		onpointerup={onPointerUp}
+		ondblclick={onDblClick}
 	></canvas>
-	<div class="coords">
-		x: {cursorWorld.x.toFixed(1)}, y: {cursorWorld.y.toFixed(1)}
+	<div class="hud">
+		<span class="coord">x {cursorWorld.x.toFixed(1)}</span>
+		<span class="coord">y {cursorWorld.y.toFixed(1)}</span>
+		{#if hovered}
+			<span class="layer-tag" style="color: var(--accent)">{hovered.layer}</span>
+		{/if}
 	</div>
-	<button class="fit-btn" onclick={autoFit}>Fit</button>
 </div>
 
 <style>
 	.viewer {
-		position: relative;
-		width: 100%;
-		height: 100%;
+		position: absolute;
+		inset: 0;
 		overflow: hidden;
 	}
 	canvas {
@@ -132,24 +150,19 @@
 		height: 100%;
 		cursor: crosshair;
 	}
-	.coords {
+	.hud {
 		position: absolute;
 		bottom: 8px;
 		left: 8px;
+		display: flex;
+		gap: 10px;
 		font-size: 11px;
-		color: var(--text-muted);
-		font-family: monospace;
-		background: rgba(0,0,0,0.5);
-		padding: 2px 6px;
-		border-radius: 3px;
+		font-family: 'JetBrains Mono', monospace;
+		color: var(--text-dim);
+		background: rgba(19, 19, 22, 0.8);
+		padding: 3px 8px;
 	}
-	.fit-btn {
-		position: absolute;
-		top: 8px;
-		right: 8px;
-		padding: 4px 10px;
-		font-size: 11px;
-		background: var(--bg-panel);
-		border: 1px solid var(--border);
+	.layer-tag {
+		font-weight: 600;
 	}
 </style>

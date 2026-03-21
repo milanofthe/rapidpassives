@@ -23,7 +23,7 @@
 
 <div class="panel">
 	<div class="section">
-		<div class="section-title">Geometry Type</div>
+		<div class="section-header">Type</div>
 		<select bind:value={geometryType}>
 			<option value="spiral">Spiral Inductor</option>
 			<option value="symmetric_inductor">Symmetric Inductor</option>
@@ -33,44 +33,77 @@
 
 	{#if geometryType === 'spiral'}
 		<div class="section">
-			<div class="section-title">Geometry</div>
-			<div class="param-grid">
-				<label>Outer Diameter</label>
-				<input type="number" bind:value={params.Dout} step="1" min="1" />
-
-				<label>Turns (N)</label>
-				<input type="number" bind:value={params.N} step="1" min="1" max="20" />
-
-				<label>Sides</label>
-				<input type="number" bind:value={params.sides} step="2" min="4" max="64" />
-
-				<label>Conductor Width</label>
-				<input type="number" bind:value={params.width} step="0.5" min="0.1" />
-
-				<label>Conductor Spacing</label>
-				<input type="number" bind:value={params.spacing} step="0.5" min="0.1" />
+			<div class="section-header">Geometry</div>
+			<div class="field">
+				<span class="field-label">Dout</span>
+				<div class="field-input">
+					<input type="number" bind:value={params.Dout} step="1" min="1" />
+					<span class="field-unit">um</span>
+				</div>
+			</div>
+			<div class="field">
+				<span class="field-label">N</span>
+				<div class="field-input">
+					<input type="number" bind:value={params.N} step="1" min="1" max="20" />
+					<span class="field-unit">turns</span>
+				</div>
+			</div>
+			<div class="field">
+				<span class="field-label">Sides</span>
+				<div class="field-input">
+					<input type="number" bind:value={params.sides} step="2" min="4" max="64" />
+				</div>
+			</div>
+			<div class="field">
+				<span class="field-label">Width</span>
+				<div class="field-input">
+					<input type="number" bind:value={params.width} step="0.5" min="0.1" />
+					<span class="field-unit">um</span>
+				</div>
+			</div>
+			<div class="field">
+				<span class="field-label">Spacing</span>
+				<div class="field-input">
+					<input type="number" bind:value={params.spacing} step="0.5" min="0.1" />
+					<span class="field-unit">um</span>
+				</div>
 			</div>
 		</div>
 
 		<div class="section">
-			<div class="section-title">Via Parameters</div>
-			<div class="param-grid">
-				<label>Via Spacing</label>
-				<input type="number" bind:value={params.via_spacing} step="0.1" min="0.1" />
-
-				<label>Via Width</label>
-				<input type="number" bind:value={params.via_width} step="0.1" min="0.1" />
-
-				<label>Via in Metal</label>
-				<input type="number" bind:value={params.via_in_metal} step="0.05" min="0" />
+			<div class="section-header">Vias</div>
+			<div class="field">
+				<span class="field-label">Spacing</span>
+				<div class="field-input">
+					<input type="number" bind:value={params.via_spacing} step="0.1" min="0.1" />
+					<span class="field-unit">um</span>
+				</div>
 			</div>
+			<div class="field">
+				<span class="field-label">Width</span>
+				<div class="field-input">
+					<input type="number" bind:value={params.via_width} step="0.1" min="0.1" />
+					<span class="field-unit">um</span>
+				</div>
+			</div>
+			<div class="field">
+				<span class="field-label">Enclosure</span>
+				<div class="field-input">
+					<input type="number" bind:value={params.via_in_metal} step="0.05" min="0" />
+					<span class="field-unit">um</span>
+				</div>
+			</div>
+		</div>
+	{:else}
+		<div class="section">
+			<div class="placeholder">Not yet implemented</div>
 		</div>
 	{/if}
 
 	<div class="actions">
-		<button onclick={resetDefaults}>Reset</button>
+		<button class="btn-secondary" onclick={resetDefaults}>Reset</button>
 		{#if onexport}
-			<button class="export" onclick={onexport}>Export GDS</button>
+			<button onclick={onexport}>Export GDS</button>
 		{/if}
 	</div>
 </div>
@@ -79,50 +112,88 @@
 	.panel {
 		height: 100%;
 		overflow-y: auto;
-		padding: 12px;
+		padding: 10px;
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
+		gap: 2px;
+		background: var(--bg);
 	}
 	.section {
 		background: var(--bg-surface);
-		border: 1px solid var(--border);
-		border-radius: 6px;
+		border: 1px solid var(--border-subtle);
 		padding: 10px;
 	}
-	.section-title {
-		font-size: 11px;
+	.section-header {
+		font-size: 10px;
 		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		color: var(--accent-secondary);
-		margin-bottom: 8px;
+		letter-spacing: 1.5px;
+		color: var(--accent);
 		font-weight: 600;
+		margin-bottom: 10px;
+		font-family: 'JetBrains Mono', monospace;
 	}
-	.param-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 6px 8px;
+	.field {
+		display: flex;
 		align-items: center;
+		gap: 8px;
+		padding: 4px 6px;
+		margin: 0 -6px;
+		transition: background 0.1s;
+	}
+	.field:hover {
+		background: var(--accent-dim);
+	}
+	.field-label {
+		font-size: 12px;
+		color: var(--text-muted);
+		min-width: 70px;
+		font-family: 'JetBrains Mono', monospace;
+	}
+	.field:hover .field-label {
+		color: var(--text);
+	}
+	.field-input {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+	.field-unit {
+		font-size: 10px;
+		color: var(--text-dim);
+		min-width: 28px;
+		font-family: 'JetBrains Mono', monospace;
 	}
 	select {
-		width: 100%;
 		background: var(--input-bg);
-		border: 1px solid var(--border);
+		border: 1px solid var(--input-border);
 		color: var(--text);
-		padding: 4px 8px;
-		border-radius: 4px;
-		font-size: 13px;
+		padding: 6px 8px;
+		border-radius: 0;
+		font-size: 12px;
+		width: 100%;
+	}
+	.placeholder {
+		color: var(--text-dim);
+		font-size: 12px;
+		text-align: center;
+		padding: 20px 0;
+		font-style: italic;
 	}
 	.actions {
 		display: flex;
-		gap: 8px;
+		gap: 2px;
 		margin-top: auto;
+		padding-top: 8px;
 	}
 	.actions button {
 		flex: 1;
 	}
-	.export {
-		background: var(--accent-secondary);
-		color: #000;
+	.btn-secondary {
+		background: var(--bg-panel);
+		border: 1px solid var(--border);
+	}
+	.btn-secondary:hover {
+		background: var(--border);
 	}
 </style>

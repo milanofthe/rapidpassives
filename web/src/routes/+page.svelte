@@ -56,9 +56,11 @@
 		flex: 1;
 		display: flex;
 		flex-direction: column;
+		min-width: 0;
 	}
 	.viewer-pane {
 		flex: 1;
 		position: relative;
+		min-height: 0;
 	}
 </style>
