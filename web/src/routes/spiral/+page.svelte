@@ -10,6 +10,7 @@
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
 	import { solvePEEC, type SimulationResult } from '$lib/solver/peec';
+	import { generateFastHenryInput, downloadFastHenryInput } from '$lib/solver/fasthenry_export';
 
 	let simResult = $state<SimulationResult | null>(null);
 	let simulating = $state(false);
@@ -18,6 +19,16 @@
 	function doExport() {
 		const data = exportGds(layers, { cellName: 'SpiralInductor' });
 		downloadGds(data, 'spiral_inductor.gds');
+	}
+
+	function doExportFH() {
+		if (!result) return;
+		const inp = generateFastHenryInput(result.network, stack, {
+			title: 'Spiral Inductor',
+			fMin: simSettings.fMin,
+			fMax: simSettings.fMax,
+		});
+		downloadFastHenryInput(inp, 'spiral_inductor.inp');
 	}
 
 	async function doSimulate() {
@@ -127,6 +138,7 @@
 			</div>
 			<div class="sim-actions">
 				<button onclick={doSimulate}>{simulating ? 'Simulating...' : 'Simulate'}</button>
+				<button class="btn-secondary" onclick={doExportFH}>Export .inp</button>
 			</div>
 		</div>
 	{/snippet}
@@ -143,8 +155,17 @@
 	.sim-actions {
 		margin-top: auto;
 		display: flex;
+		gap: 2px;
 	}
 	.sim-actions button {
 		flex: 1;
+	}
+	.btn-secondary {
+		background: var(--bg-panel);
+		border: 1px solid var(--border);
+		color: var(--text-muted);
+	}
+	.btn-secondary:hover {
+		background: var(--border);
 	}
 </style>

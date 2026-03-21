@@ -2,6 +2,8 @@ import type { Polygon, LayerMap, SpiralInductorParams } from './types';
 import type { ConductorNetwork, ConductorNode, ConductorSegment, ViaConnection, Port, GeometryResult } from './network';
 import { networkToLayers } from './polygonize';
 import { viaGrid, pgs4 } from './utils';
+import { computeViaResistance } from './via_resistance';
+import { createDefaultStack } from '$lib/stack/types';
 
 /** Build spiral inductor geometry using network-first approach */
 export function buildSpiralInductor(params: SpiralInductorParams): GeometryResult {
@@ -151,12 +153,19 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 	// Via bottom node (start of underpass on lower metal)
 	const viaBotNode = addNode(viaCenterX, viaCenterY, 'm2');
 
-	// Via connection
+	// Via connection — compute actual resistance from via array geometry
+	const viaGridWidthX = width - 2 * via_in_metal;
+	const viaGridWidthY = extend > width
+		? extend - 2 * via_in_metal
+		: width - 2 * via_in_metal;
+	const defaultStack = createDefaultStack();
+	const viaR = computeViaResistance(viaGridWidthX, viaGridWidthY, via_spacing, via_width, defaultStack, 'm3', 'm2');
+
 	const viaConn: ViaConnection = {
 		id: 'via0',
 		topNode: viaTopNode.id,
 		bottomNode: viaBotNode.id,
-		resistance: 0.1,
+		resistance: viaR,
 		polygons: viaPolys,
 		renderLayer: 'vias',
 	};
