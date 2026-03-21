@@ -159,78 +159,104 @@ export function brickToBrick(
 }
 
 /**
- * Compute mutual inductance between two parallel filaments.
- * Transforms 3D filament geometry into Hoer-Love local coordinates.
+ * Compute mutual inductance between two filaments at arbitrary angles.
+ * Uses the Grover/Neumann formula (from FastHenry's mutualfil).
  *
- * Both filaments must be parallel (same direction vector).
  * Returns 0 for perpendicular filaments.
+ * For parallel filaments, falls back to the Hoer-Love brick-to-brick formula.
  */
 export function mutualInductance(fi: Filament, fj: Filament): number {
-	// Direction of filament i
-	const dix = fi.x1 - fi.x0;
-	const diy = fi.y1 - fi.y0;
-	const diz = fi.z1 - fi.z0;
-	const li = fi.length;
+	const li = fi.length, lj = fj.length;
+	if (li < EPS || lj < EPS) return 0;
 
-	if (li < EPS) return 0;
+	// Endpoint distances squared
+	const R1sq = sq(fi.x1 - fj.x1) + sq(fi.y1 - fj.y1) + sq(fi.z1 - fj.z1);
+	const R2sq = sq(fi.x1 - fj.x0) + sq(fi.y1 - fj.y0) + sq(fi.z1 - fj.z0);
+	const R3sq = sq(fi.x0 - fj.x0) + sq(fi.y0 - fj.y0) + sq(fi.z0 - fj.z0);
+	const R4sq = sq(fi.x0 - fj.x1) + sq(fi.y0 - fj.y1) + sq(fi.z0 - fj.z1);
+	const R1 = Math.sqrt(R1sq), R2 = Math.sqrt(R2sq);
+	const R3 = Math.sqrt(R3sq), R4 = Math.sqrt(R4sq);
 
-	// Direction of filament j
-	const djx = fj.x1 - fj.x0;
-	const djy = fj.y1 - fj.y0;
-	const djz = fj.z1 - fj.z0;
-	const lj = fj.length;
+	// Dot product of direction vectors (not normalized by lengths)
+	const dotp = (fi.x1 - fi.x0) * (fj.x1 - fj.x0)
+		+ (fi.y1 - fi.y0) * (fj.y1 - fj.y0)
+		+ (fi.z1 - fi.z0) * (fj.z1 - fj.z0);
+	const cose = dotp / (li * lj);
 
-	if (lj < EPS) return 0;
+	// Perpendicular filaments: M = 0
+	if (Math.abs(cose) < EPS) return 0;
 
-	// Check parallelism via dot product
-	const dot = (dix * djx + diy * djy + diz * djz) / (li * lj);
-	if (Math.abs(Math.abs(dot) - 1) > 0.01) {
-		// Not parallel — use approximate formula or return 0
-		// For non-parallel filaments, mutual inductance is typically small
-		// and requires numerical integration. Skip for now.
-		return 0;
+	// Touching endpoints
+	if (R1 < EPS || R2 < EPS || R3 < EPS || R4 < EPS) {
+		let R: number;
+		if (R1 < EPS) R = R3; else if (R2 < EPS) R = R4;
+		else if (R3 < EPS) R = R1; else R = R2;
+		return MU_OVER_4PI * 2 * cose * (li * atanh(lj / (li + R)) + lj * atanh(li / (lj + R)));
 	}
 
-	const sign = dot > 0 ? 1 : -1;
-
-	// Local coordinate system: z along filament i, x = width direction, y = height direction
-	const zx = dix / li, zy = diy / li, zz = diz / li;
-
-	// Width direction: perpendicular to length in the xy-plane
-	let wx: number, wy: number, wz: number;
-	if (Math.abs(zz) > 0.9) {
-		// Filament is mostly vertical — use x as width dir
-		wx = 1; wy = 0; wz = 0;
-	} else {
-		// Default: perpendicular in xy-plane
-		wx = -zy; wy = zx; wz = 0;
-		const wm = Math.sqrt(wx * wx + wy * wy);
-		wx /= wm; wy /= wm;
+	// Parallel filaments — use Hoer-Love brick-to-brick for finite cross-section
+	if (Math.abs(Math.abs(cose) - 1) < 0.001) {
+		const sign = cose > 0 ? 1 : -1;
+		const zx = (fi.x1 - fi.x0) / li, zy = (fi.y1 - fi.y0) / li, zz = (fi.z1 - fi.z0) / li;
+		let wx: number, wy: number, wz: number;
+		if (Math.abs(zz) > 0.9) { wx = 1; wy = 0; wz = 0; }
+		else { wx = -zy; wy = zx; wz = 0; const wm = Math.sqrt(wx*wx+wy*wy); wx /= wm; wy /= wm; }
+		const hx = zy*wz-zz*wy, hy = zz*wx-zx*wz, hz = zx*wy-zy*wx;
+		const vox = wx*fi.width/2+hx*fi.height/2, voy = wy*fi.width/2+hy*fi.height/2, voz = wz*fi.width/2+hz*fi.height/2;
+		const ex = (fj.x0-fi.x0)+vox, ey = (fj.y0-fi.y0)+voy, ez = (fj.z0-fi.z0)+voz;
+		const E = wx*ex+wy*ey+wz*ez - fj.width/2;
+		const P = hx*ex+hy*ey+hz*ez - fj.height/2;
+		const l3 = zx*ex+zy*ey+zz*ez;
+		return sign * brickToBrick(E, fi.width, fj.width, P, fi.height, fj.height, l3, li, lj);
 	}
 
-	// Height direction: cross product of length and width
-	const hx = zy * wz - zz * wy;
-	const hy = zz * wx - zx * wz;
-	const hz = zx * wy - zy * wx;
+	// Arbitrary angle — Grover formula (from FastHenry mutualfil)
+	const l2 = li * li, m2 = lj * lj;
+	const alpha = R4sq - R3sq + R2sq - R1sq;
+	const alpha2 = alpha * alpha;
 
-	// Vector from fi lower-left corner to fj start
-	const vox = wx * fi.width / 2 + hx * fi.height / 2;
-	const voy = wy * fi.width / 2 + hy * fi.height / 2;
-	const voz = wz * fi.width / 2 + hz * fi.height / 2;
+	const u = li * (2 * m2 * (R2sq - R3sq - l2) + alpha * (R4sq - R3sq - m2)) / (4 * l2 * m2 - alpha2);
+	const v = lj * (2 * l2 * (R4sq - R3sq - m2) + alpha * (R2sq - R3sq - l2)) / (4 * l2 * m2 - alpha2);
 
-	const endx = (fj.x0 - fi.x0) + vox;
-	const endy = (fj.y0 - fi.y0) + voy;
-	const endz = (fj.z0 - fi.z0) + voz;
+	let d2 = R3sq - u * u - v * v + 2 * u * v * cose;
+	if (Math.abs(d2) < EPS * (R3sq + u * u + v * v + 1)) d2 = 0;
+	if (d2 < 0) d2 = 0;
+	const d = Math.sqrt(d2);
 
-	// Project into local coordinates
-	const E = (wx * endx + wy * endy + wz * endz) - fj.width / 2;
-	const P = (hx * endx + hy * endy + hz * endz) - fj.height / 2;
-	const l3 = zx * endx + zy * endy + zz * endz;
+	const sinsq = 1 - cose * cose;
+	const sine = Math.sqrt(Math.max(0, sinsq));
 
-	return sign * brickToBrick(E, fi.width, fj.width, P, fi.height, fj.height, l3, li, lj);
+	let omega = 0;
+	if (d > EPS) {
+		const dc = d * d * cose;
+		const ds = d * sine;
+		const ss = sinsq;
+		omega = Math.atan2(dc + (u + li) * (v + lj) * ss, ds * R1)
+			- Math.atan2(dc + (u + li) * v * ss, ds * R2)
+			+ Math.atan2(dc + u * v * ss, ds * R3)
+			- Math.atan2(dc + u * (v + lj) * ss, ds * R4);
+	}
+
+	const tmp4 = (u + li) * atanh(lj / (R1 + R2))
+		+ (v + lj) * atanh(li / (R1 + R4))
+		- u * atanh(lj / (R3 + R4))
+		- v * atanh(li / (R2 + R3));
+
+	const tmp5 = sine > 1e-150 ? omega * d / sine : 0;
+
+	return MU_OVER_4PI * cose * (2 * tmp4 - tmp5);
 }
+
+function sq(x: number): number { return x * x; }
 
 /** asinh for portability */
 function asinh(x: number): number {
 	return Math.log(x + Math.sqrt(x * x + 1));
+}
+
+/** atanh with clamping for numerical stability */
+function atanh(x: number): number {
+	if (x >= 1) return 20;   // clamp to avoid Infinity
+	if (x <= -1) return -20;
+	return 0.5 * Math.log((1 + x) / (1 - x));
 }
