@@ -13,8 +13,16 @@
 	let layers = $derived.by<LayerMap>(() => {
 		try {
 			if (geometryType === 'spiral') {
-				return buildSpiralInductor(params);
+				// Access each field to ensure Svelte tracks them
+				const p = {
+					Dout: params.Dout, N: params.N, sides: params.sides,
+					width: params.width, spacing: params.spacing,
+					via_spacing: params.via_spacing, via_width: params.via_width,
+					via_in_metal: params.via_in_metal,
+				};
+				return buildSpiralInductor(p);
 			}
+			// Other types not yet implemented
 			return {};
 		} catch {
 			return {};

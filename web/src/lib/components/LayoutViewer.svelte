@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { LayerMap, LayerName } from '$lib/geometry/types';
+	import { onMount } from 'svelte';
+	import type { LayerMap } from '$lib/geometry/types';
 	import { fitToView, renderLayers, type ViewState } from '$lib/render/canvas2d';
 
 	let { layers }: { layers: LayerMap } = $props();
@@ -10,24 +11,24 @@
 	let isDragging = false;
 	let lastMouse = { x: 0, y: 0 };
 	let cursorWorld = $state({ x: 0, y: 0 });
+	let mounted = false;
 
-	function setupCanvas() {
-		if (!canvas || !container) return;
-		const dpr = window.devicePixelRatio || 1;
+	/** Match canvas backing store to its CSS size, return CSS dimensions */
+	function syncCanvasSize(): { w: number; h: number } {
+		if (!canvas || !container) return { w: 0, h: 0 };
 		const rect = container.getBoundingClientRect();
-		canvas.width = rect.width * dpr;
-		canvas.height = rect.height * dpr;
-		canvas.style.width = rect.width + 'px';
-		canvas.style.height = rect.height + 'px';
-		const ctx = canvas.getContext('2d')!;
-		ctx.scale(dpr, dpr);
-		// Reset canvas dimensions for rendering (use CSS size)
-		canvas.width = rect.width;
-		canvas.height = rect.height;
+		const w = Math.round(rect.width);
+		const h = Math.round(rect.height);
+		if (canvas.width !== w || canvas.height !== h) {
+			canvas.width = w;
+			canvas.height = h;
+		}
+		return { w, h };
 	}
 
 	function render() {
 		if (!canvas) return;
+		syncCanvasSize();
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
 		renderLayers(ctx, layers, view);
@@ -35,7 +36,9 @@
 
 	function autoFit() {
 		if (!canvas) return;
-		view = fitToView(canvas, layers);
+		const { w, h } = syncCanvasSize();
+		if (w === 0 || h === 0) return;
+		view = fitToView(w, h, layers);
 		render();
 	}
 
@@ -83,11 +86,20 @@
 		isDragging = false;
 	}
 
+	onMount(() => {
+		mounted = true;
+		// Handle window resize
+		const ro = new ResizeObserver(() => {
+			if (mounted) render();
+		});
+		ro.observe(container);
+		return () => ro.disconnect();
+	});
+
 	$effect(() => {
-		// Re-render when layers change
+		// Re-fit when layers change
 		layers;
-		if (canvas) {
-			setupCanvas();
+		if (mounted && canvas) {
 			autoFit();
 		}
 	});
@@ -115,6 +127,7 @@
 		overflow: hidden;
 	}
 	canvas {
+		display: block;
 		width: 100%;
 		height: 100%;
 		cursor: crosshair;

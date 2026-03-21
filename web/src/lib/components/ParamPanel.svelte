@@ -26,8 +26,8 @@
 		<div class="section-title">Geometry Type</div>
 		<select bind:value={geometryType}>
 			<option value="spiral">Spiral Inductor</option>
-			<option value="symmetric_inductor" disabled>Symmetric Inductor</option>
-			<option value="symmetric_transformer" disabled>Symmetric Transformer</option>
+			<option value="symmetric_inductor">Symmetric Inductor</option>
+			<option value="symmetric_transformer">Symmetric Transformer</option>
 		</select>
 	</div>
 

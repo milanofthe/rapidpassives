@@ -12,7 +12,7 @@ export function createViewState(): ViewState {
 }
 
 /** Fit all geometry into the canvas with some padding */
-export function fitToView(canvas: HTMLCanvasElement, layers: LayerMap): ViewState {
+export function fitToView(canvasW: number, canvasH: number, layers: LayerMap): ViewState {
 	let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
 	for (const polys of Object.values(layers)) {
@@ -28,14 +28,14 @@ export function fitToView(canvas: HTMLCanvasElement, layers: LayerMap): ViewStat
 	const w = maxX - minX || 1;
 	const h = maxY - minY || 1;
 	const padding = 0.1;
-	const scaleX = canvas.width * (1 - padding * 2) / w;
-	const scaleY = canvas.height * (1 - padding * 2) / h;
+	const scaleX = canvasW * (1 - padding * 2) / w;
+	const scaleY = canvasH * (1 - padding * 2) / h;
 	const scale = Math.min(scaleX, scaleY);
 
 	return {
 		scale,
-		offsetX: canvas.width / 2 - (minX + maxX) / 2 * scale,
-		offsetY: canvas.height / 2 + (minY + maxY) / 2 * scale, // flip Y
+		offsetX: canvasW / 2 - (minX + maxX) / 2 * scale,
+		offsetY: canvasH / 2 + (minY + maxY) / 2 * scale, // flip Y
 	};
 }
 
