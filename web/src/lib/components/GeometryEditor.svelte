@@ -67,11 +67,11 @@
 		font-weight: 600;
 		letter-spacing: 1px;
 		text-transform: uppercase;
-		background: var(--bg);
+		background: var(--bg-surface);
 		color: var(--text-dim);
 		border: none;
 		cursor: pointer;
-		transition: color 0.15s, background 0.15s;
+		transition: color 0.15s;
 	}
 	.stab:hover {
 		color: var(--text-muted);
