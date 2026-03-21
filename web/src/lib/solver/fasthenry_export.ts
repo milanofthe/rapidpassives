@@ -87,21 +87,25 @@ export function generateFastHenryInput(
 		const botName = nodeNames.get(via.bottomNode);
 		if (!topName || !botName) continue;
 
-		// Model via array as .equiv (ideal short) for simplicity
-		// FastHenry doesn't handle via arrays natively — an .equiv
-		// node equivalence is the closest approximation
-		lines.push(`* Via: ${via.id} (${via.polygons.length} via polygons)`);
-		lines.push(`.equiv ${topName} ${botName}`);
+		// Model via array as a short vertical segment with large cross-section
+		// to approximate the low-resistance parallel via array
+		const nVias = Math.max(1, via.polygons.length);
+		const equivWidth = Math.sqrt(nVias) * 1; // approximate equivalent width in um
+		lines.push(`* Via: ${via.id} (${nVias} vias)`);
+		lines.push(`E${segIdx++} ${topName} ${botName} w=${equivWidth.toFixed(1)} h=${equivWidth.toFixed(1)} sigma=5.8e7`);
 	}
 	lines.push('');
 
-	// External ports
+	// External ports — only unique pairs, avoid reverse duplicates
+	const seenPorts = new Set<string>();
 	for (const port of network.ports) {
 		const plusName = nodeNames.get(port.plusNode);
 		const minusName = nodeNames.get(port.minusNode);
-		if (plusName && minusName) {
-			lines.push(`.external ${plusName} ${minusName}`);
-		}
+		if (!plusName || !minusName) continue;
+		const key = [plusName, minusName].sort().join('-');
+		if (seenPorts.has(key)) continue;
+		seenPorts.add(key);
+		lines.push(`.external ${plusName} ${minusName}`);
 	}
 	lines.push('');
 
