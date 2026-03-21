@@ -9,6 +9,30 @@
 
 	onMount(async () => {
 		Plotly = (await import('plotly.js-dist-min')).default;
+
+		// Resize plots when container size changes
+		const ro = new ResizeObserver(() => {
+			if (!container || !Plotly) return;
+			const plots = container.querySelectorAll('.plot-grid > div');
+			for (const div of plots) {
+				Plotly.Plots?.resize(div);
+			}
+		});
+		return () => ro.disconnect();
+	});
+
+	// Observe container when it mounts
+	$effect(() => {
+		if (!container) return;
+		const ro = new ResizeObserver(() => {
+			if (!Plotly) return;
+			const plots = container!.querySelectorAll('.plot-grid > div');
+			for (const div of plots) {
+				Plotly.Plots?.resize(div);
+			}
+		});
+		ro.observe(container);
+		return () => ro.disconnect();
 	});
 
 	$effect(() => {
@@ -62,7 +86,7 @@
 				linecolor: '#35353d',
 				tickfont: { size: 9 },
 			},
-			height: 200,
+			autosize: true,
 			showlegend: false,
 		};
 		const cfg = { responsive: true, displayModeBar: false };
@@ -139,6 +163,7 @@
 	.plot-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
+		grid-auto-rows: minmax(180px, 1fr);
 		gap: 4px;
 	}
 	.no-result {

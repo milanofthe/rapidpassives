@@ -17,10 +17,44 @@
 	} = $props();
 
 	let activeTab = $state<'params' | 'stack' | 'sim'>('params');
+
+	// Resizable sidebar
+	let sidebarWidth = $state(280);
+	let draggingSidebar = false;
+
+	function onSidebarDragStart(e: PointerEvent) {
+		draggingSidebar = true;
+		(e.target as HTMLElement).setPointerCapture(e.pointerId);
+	}
+	function onSidebarDrag(e: PointerEvent) {
+		if (!draggingSidebar) return;
+		sidebarWidth = Math.max(200, Math.min(500, e.clientX));
+	}
+	function onSidebarDragEnd() {
+		draggingSidebar = false;
+	}
+
+	// Resizable results pane
+	let resultsHeight = $state(350);
+	let draggingResults = false;
+	let workspaceEl = $state<HTMLDivElement | null>(null);
+
+	function onResultsDragStart(e: PointerEvent) {
+		draggingResults = true;
+		(e.target as HTMLElement).setPointerCapture(e.pointerId);
+	}
+	function onResultsDrag(e: PointerEvent) {
+		if (!draggingResults || !workspaceEl) return;
+		const rect = workspaceEl.getBoundingClientRect();
+		resultsHeight = Math.max(100, Math.min(rect.height - 100, rect.bottom - e.clientY));
+	}
+	function onResultsDragEnd() {
+		draggingResults = false;
+	}
 </script>
 
-<div class="workspace">
-	<aside class="sidebar">
+<div class="workspace" bind:this={workspaceEl}>
+	<aside class="sidebar" style="width: {sidebarWidth}px; min-width: {sidebarWidth}px;">
 		<div class="sidebar-tabs">
 			<button class="stab" class:active={activeTab === 'params'} onclick={() => activeTab = 'params'}>Params</button>
 			{#if stackPanel}
@@ -40,6 +74,12 @@
 			{/if}
 		</div>
 	</aside>
+	<div
+		class="resize-handle-v"
+		onpointerdown={onSidebarDragStart}
+		onpointermove={onSidebarDrag}
+		onpointerup={onSidebarDragEnd}
+	></div>
 	<div class="main-area">
 		{#if !valid}
 			<div class="invalid-bar">Invalid geometry — parameters cause clipping or overlap</div>
@@ -48,7 +88,13 @@
 			<LayoutViewer {layers} {renderOpts} />
 		</div>
 		{#if simResult}
-			<div class="results-pane">
+			<div
+				class="resize-handle-h"
+				onpointerdown={onResultsDragStart}
+				onpointermove={onResultsDrag}
+				onpointerup={onResultsDragEnd}
+			></div>
+			<div class="results-pane" style="height: {resultsHeight}px;">
 				<ResultsPanel result={simResult} />
 			</div>
 		{/if}
@@ -61,12 +107,31 @@
 		height: 100%;
 	}
 	.sidebar {
-		width: 280px;
-		min-width: 280px;
-		border-right: 1px solid var(--border);
+		border-right: none;
 		background: var(--bg);
 		display: flex;
 		flex-direction: column;
+		flex-shrink: 0;
+	}
+	.resize-handle-v {
+		width: 4px;
+		cursor: col-resize;
+		background: var(--border);
+		flex-shrink: 0;
+		transition: background 0.15s;
+	}
+	.resize-handle-v:hover, .resize-handle-v:active {
+		background: var(--accent);
+	}
+	.resize-handle-h {
+		height: 4px;
+		cursor: row-resize;
+		background: var(--border);
+		flex-shrink: 0;
+		transition: background 0.15s;
+	}
+	.resize-handle-h:hover, .resize-handle-h:active {
+		background: var(--accent);
 	}
 	.sidebar-tabs {
 		display: flex;
@@ -106,7 +171,7 @@
 	}
 	.invalid-bar {
 		background: var(--accent);
-		color: #fff;
+		color: var(--bg);
 		font-size: 11px;
 		font-family: var(--font-mono);
 		padding: 4px 16px;
@@ -118,9 +183,6 @@
 		min-height: 0;
 	}
 	.results-pane {
-		height: 300px;
-		min-height: 200px;
-		border-top: 1px solid var(--border);
 		flex-shrink: 0;
 		overflow: hidden;
 	}
