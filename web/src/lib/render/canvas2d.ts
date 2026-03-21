@@ -238,9 +238,6 @@ function drawPort(ctx: CanvasRenderingContext2D, port: PortMarker, view: ViewSta
 	// Background pill
 	ctx.fillStyle = canvasTheme.bg;
 	ctx.fillRect(lx, ly, pw, ph);
-	ctx.strokeStyle = canvasTheme.highlightOutline;
-	ctx.lineWidth = 1;
-	ctx.strokeRect(lx, ly, pw, ph);
 
 	// Text
 	ctx.fillStyle = canvasTheme.highlightOutline;
