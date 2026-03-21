@@ -97,17 +97,21 @@ export function renderLayers(
 	layers: LayerMap,
 	view: ViewState,
 	highlight?: { layer: LayerName; index: number } | null,
-	opts?: RenderOptions
+	opts?: RenderOptions,
+	cssWidth?: number,
+	cssHeight?: number,
 ): void {
-	const { width, height } = ctx.canvas;
+	const dpr = window.devicePixelRatio || 1;
+	const width = cssWidth ?? ctx.canvas.width / dpr;
+	const height = cssHeight ?? ctx.canvas.height / dpr;
 	ctx.clearRect(0, 0, width, height);
 
 	// Background
 	ctx.fillStyle = canvasTheme.bg;
 	ctx.fillRect(0, 0, width, height);
 
-	drawGrid(ctx, view);
-	drawCrosshair(ctx, view);
+	drawGrid(ctx, view, width, height);
+	drawCrosshair(ctx, view, width, height);
 
 	// Layers back to front
 	for (const layerName of LAYER_ORDER) {
@@ -174,8 +178,7 @@ function drawPolygonOutline(ctx: CanvasRenderingContext2D, poly: Polygon, view: 
 	ctx.stroke();
 }
 
-function drawGrid(ctx: CanvasRenderingContext2D, view: ViewState): void {
-	const { width, height } = ctx.canvas;
+function drawGrid(ctx: CanvasRenderingContext2D, view: ViewState, width: number, height: number): void {
 
 	const targetPx = 60;
 	const worldSpacing = targetPx / view.scale;
@@ -206,15 +209,15 @@ function drawGrid(ctx: CanvasRenderingContext2D, view: ViewState): void {
 	}
 }
 
-function drawCrosshair(ctx: CanvasRenderingContext2D, view: ViewState): void {
+function drawCrosshair(ctx: CanvasRenderingContext2D, view: ViewState, width: number, height: number): void {
 	const cx = view.offsetX;
 	const cy = view.offsetY;
 	ctx.strokeStyle = canvasTheme.crosshair;
 	ctx.lineWidth = canvasTheme.crosshairWeight;
 	ctx.setLineDash(canvasTheme.crosshairDash);
 	ctx.beginPath();
-	ctx.moveTo(cx, 0); ctx.lineTo(cx, ctx.canvas.height);
-	ctx.moveTo(0, cy); ctx.lineTo(ctx.canvas.width, cy);
+	ctx.moveTo(cx, 0); ctx.lineTo(cx, height);
+	ctx.moveTo(0, cy); ctx.lineTo(width, cy);
 	ctx.stroke();
 	ctx.setLineDash([]);
 }
@@ -222,33 +225,32 @@ function drawCrosshair(ctx: CanvasRenderingContext2D, view: ViewState): void {
 function drawPort(ctx: CanvasRenderingContext2D, port: PortMarker, view: ViewState): void {
 	const sx = port.x * view.scale + view.offsetX;
 	const sy = -port.y * view.scale + view.offsetY;
-	const s = 4;
 
-	// Crosshair marker
-	ctx.strokeStyle = canvasTheme.crosshair;
+	// Label with background
+	const label = port.name;
+	ctx.font = '600 10px JetBrains Mono, monospace';
+	const tm = ctx.measureText(label);
+	const pw = tm.width + 8;
+	const ph = 16;
+	const lx = sx + 6;
+	const ly = sy - ph / 2;
+
+	// Background pill
+	ctx.fillStyle = canvasTheme.bg;
+	ctx.fillRect(lx, ly, pw, ph);
+	ctx.strokeStyle = canvasTheme.highlightOutline;
 	ctx.lineWidth = 1;
-	ctx.beginPath();
-	ctx.moveTo(sx - s * 2, sy); ctx.lineTo(sx - s, sy);
-	ctx.moveTo(sx + s, sy); ctx.lineTo(sx + s * 2, sy);
-	ctx.moveTo(sx, sy - s * 2); ctx.lineTo(sx, sy - s);
-	ctx.moveTo(sx, sy + s); ctx.lineTo(sx, sy + s * 2);
-	ctx.stroke();
+	ctx.strokeRect(lx, ly, pw, ph);
 
-	// Diamond
-	ctx.beginPath();
-	ctx.moveTo(sx, sy - s);
-	ctx.lineTo(sx + s, sy);
-	ctx.lineTo(sx, sy + s);
-	ctx.lineTo(sx - s, sy);
-	ctx.closePath();
-	ctx.strokeStyle = canvasTheme.crosshair;
-	ctx.lineWidth = 1.5;
-	ctx.stroke();
-
-	// Label
-	ctx.font = '500 9px JetBrains Mono, monospace';
-	ctx.fillStyle = canvasTheme.crosshair;
+	// Text
+	ctx.fillStyle = canvasTheme.highlightOutline;
 	ctx.textAlign = 'left';
 	ctx.textBaseline = 'middle';
-	ctx.fillText(port.name, sx + s * 2 + 3, sy);
+	ctx.fillText(label, lx + 4, sy);
+
+	// Dot
+	ctx.beginPath();
+	ctx.arc(sx, sy, 3, 0, 2 * Math.PI);
+	ctx.fillStyle = canvasTheme.highlightOutline;
+	ctx.fill();
 }

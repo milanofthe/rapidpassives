@@ -23,19 +23,31 @@
 
 	function syncCanvas(): { w: number; h: number } {
 		const { w, h } = getSize();
-		if (w > 0 && h > 0 && canvas && (canvas.width !== w || canvas.height !== h)) {
-			canvas.width = w;
-			canvas.height = h;
+		if (w <= 0 || h <= 0 || !canvas) return { w, h };
+		const dpr = window.devicePixelRatio || 1;
+		const bw = Math.round(w * dpr);
+		const bh = Math.round(h * dpr);
+		if (canvas.width !== bw || canvas.height !== bh) {
+			canvas.width = bw;
+			canvas.height = bh;
 		}
 		return { w, h };
 	}
 
 	function render() {
 		if (!canvas) return;
-		syncCanvas();
+		const { w, h } = syncCanvas();
+		if (w <= 0 || h <= 0) return;
+		const dpr = window.devicePixelRatio || 1;
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
-		renderLayers(ctx, layers, view, hovered, renderOpts);
+		ctx.save();
+		ctx.scale(dpr, dpr);
+		// Tell the renderer the CSS dimensions, not the backing store dimensions
+		canvas.style.width = w + 'px';
+		canvas.style.height = h + 'px';
+		renderLayers(ctx, layers, view, hovered, renderOpts, w, h);
+		ctx.restore();
 	}
 
 	function autoFit() {
