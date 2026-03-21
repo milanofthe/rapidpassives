@@ -37,7 +37,7 @@
 			<button class="spin-btn" onclick={() => nudge(field, -step, min, max)}>-</button>
 			<input type="number" bind:value={params[field]} {step} {min} {max} />
 			<button class="spin-btn" onclick={() => nudge(field, step, min, max)}>+</button>
-			{#if unit}<span class="field-unit">{unit}</span>{/if}
+			<span class="field-unit">{unit ?? ''}</span>
 		</div>
 	</div>
 {/snippet}
