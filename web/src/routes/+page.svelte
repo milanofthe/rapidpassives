@@ -1,29 +1,51 @@
 <script lang="ts">
-	import type { GeometryType, SpiralInductorParams, LayerMap } from '$lib/geometry/types';
+	import type { GeometryType, GeometryParams, SpiralInductorParams, SymmetricInductorParams, SymmetricTransformerParams, LayerMap } from '$lib/geometry/types';
 	import { buildSpiralInductor } from '$lib/geometry/spiral';
+	import { buildSymmetricInductor } from '$lib/geometry/symmetric_inductor';
+	import { buildSymmetricTransformer } from '$lib/geometry/symmetric_transformer';
 	import LayoutViewer from '$lib/components/LayoutViewer.svelte';
 	import ParamPanel from '$lib/components/ParamPanel.svelte';
 
+	const defaults: Record<GeometryType, GeometryParams> = {
+		spiral: {
+			Dout: 130, N: 3, sides: 8, width: 10, spacing: 4,
+			via_spacing: 0.8, via_width: 1, via_in_metal: 0.45,
+		} satisfies SpiralInductorParams,
+		symmetric_inductor: {
+			Dout: 250, N: 3, sides: 8, width: 16, spacing: 2,
+			center_tap: false, via_extent: 8,
+			via_spacing: 0.8, via_width: 1, via_in_metal: 0.45,
+		} satisfies SymmetricInductorParams,
+		symmetric_transformer: {
+			Dout: 200, N1: 2, N2: 3, sides: 8, width: 12, spacing: 2,
+			center_tap_primary: true, center_tap_secondary: false,
+			via_extent: 8, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45,
+		} satisfies SymmetricTransformerParams,
+	};
+
 	let geometryType = $state<GeometryType>('spiral');
-	let params = $state<SpiralInductorParams>({
-		Dout: 130, N: 3, sides: 8, width: 10, spacing: 4,
-		via_spacing: 0.8, via_width: 1, via_in_metal: 0.45,
+	let params = $state<GeometryParams>({ ...defaults.spiral });
+
+	// Switch defaults when geometry type changes
+	let prevType: GeometryType = 'spiral';
+	$effect(() => {
+		const current = geometryType;
+		if (current !== prevType) {
+			prevType = current;
+			params = { ...defaults[current] };
+		}
 	});
 
 	let layers = $derived.by<LayerMap>(() => {
 		try {
-			if (geometryType === 'spiral') {
-				// Access each field to ensure Svelte tracks them
-				const p = {
-					Dout: params.Dout, N: params.N, sides: params.sides,
-					width: params.width, spacing: params.spacing,
-					via_spacing: params.via_spacing, via_width: params.via_width,
-					via_in_metal: params.via_in_metal,
-				};
-				return buildSpiralInductor(p);
+			switch (geometryType) {
+				case 'spiral':
+					return buildSpiralInductor(params as SpiralInductorParams);
+				case 'symmetric_inductor':
+					return buildSymmetricInductor(params as SymmetricInductorParams);
+				case 'symmetric_transformer':
+					return buildSymmetricTransformer(params as SymmetricTransformerParams);
 			}
-			// Other types not yet implemented
-			return {};
 		} catch {
 			return {};
 		}

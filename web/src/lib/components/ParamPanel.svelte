@@ -1,49 +1,56 @@
 <script lang="ts">
-	import type { GeometryType, SpiralInductorParams } from '$lib/geometry/types';
+	import type { GeometryType, GeometryParams } from '$lib/geometry/types';
 
 	let {
 		geometryType = $bindable<GeometryType>('spiral'),
-		params = $bindable<SpiralInductorParams>(),
+		params = $bindable<GeometryParams>(),
 		onexport,
 	}: {
 		geometryType: GeometryType;
-		params: SpiralInductorParams;
+		params: GeometryParams;
 		onexport?: () => void;
 	} = $props();
 
-	const spiralDefaults: SpiralInductorParams = {
-		Dout: 130, N: 3, sides: 8, width: 10, spacing: 4,
-		via_spacing: 0.8, via_width: 1, via_in_metal: 0.45,
-	};
-
-	function resetDefaults() {
-		params = { ...spiralDefaults };
-	}
-
-	function nudge(field: keyof SpiralInductorParams, step: number, min?: number, max?: number) {
-		let v = (params[field] as number) + step;
+	function nudge(field: string, step: number, min?: number, max?: number) {
+		let v = ((params as any)[field] as number) + step;
 		if (min !== undefined) v = Math.max(min, v);
 		if (max !== undefined) v = Math.min(max, v);
 		v = Math.round(v * 1000) / 1000;
 		params = { ...params, [field]: v };
 	}
 
-	function setField(field: keyof SpiralInductorParams, e: Event) {
+	function setField(field: string, e: Event) {
 		const v = parseFloat((e.target as HTMLInputElement).value);
 		if (!isNaN(v)) {
 			params = { ...params, [field]: v };
 		}
 	}
+
+	function toggleField(field: string) {
+		params = { ...params, [field]: !(params as any)[field] };
+	}
 </script>
 
-{#snippet numfield(label: string, field: keyof SpiralInductorParams, step: number, unit?: string, min?: number, max?: number)}
+{#snippet numfield(label: string, field: string, step: number, unit?: string, min?: number, max?: number)}
 	<div class="field">
 		<span class="field-label">{label}</span>
 		<div class="field-input">
 			<button class="spin-btn" onclick={() => nudge(field, -step, min, max)}>-</button>
-			<input type="number" value={params[field]} {step} {min} {max} oninput={(e) => setField(field, e)} />
+			<input type="number" value={(params as any)[field]} {step} {min} {max} oninput={(e) => setField(field, e)} />
 			<button class="spin-btn" onclick={() => nudge(field, step, min, max)}>+</button>
 			<span class="field-unit">{unit ?? ''}</span>
+		</div>
+	</div>
+{/snippet}
+
+{#snippet boolfield(label: string, field: string)}
+	<div class="field">
+		<span class="field-label">{label}</span>
+		<div class="field-input">
+			<button class="toggle-btn" class:active={(params as any)[field]} onclick={() => toggleField(field)}>
+				{(params as any)[field] ? 'ON' : 'OFF'}
+			</button>
+			<span class="field-unit"></span>
 		</div>
 	</div>
 {/snippet}
@@ -67,21 +74,60 @@
 			{@render numfield('Width', 'width', 0.5, 'um', 0.1)}
 			{@render numfield('Spacing', 'spacing', 0.5, 'um', 0.1)}
 		</div>
-
 		<div class="section">
 			<div class="section-header">Vias</div>
 			{@render numfield('Spacing', 'via_spacing', 0.1, 'um', 0.1)}
 			{@render numfield('Width', 'via_width', 0.1, 'um', 0.1)}
 			{@render numfield('In Metal', 'via_in_metal', 0.05, 'um', 0)}
 		</div>
-	{:else}
+
+	{:else if geometryType === 'symmetric_inductor'}
 		<div class="section">
-			<div class="placeholder">Not yet implemented</div>
+			<div class="section-header">Geometry</div>
+			{@render numfield('Dout', 'Dout', 1, 'um', 1)}
+			{@render numfield('N', 'N', 1, 'turns', 1, 20)}
+			{@render numfield('Sides', 'sides', 2, undefined, 4, 64)}
+			{@render numfield('Width', 'width', 0.5, 'um', 0.1)}
+			{@render numfield('Spacing', 'spacing', 0.5, 'um', 0.1)}
+			{@render boolfield('Center Tap', 'center_tap')}
+		</div>
+		<div class="section">
+			<div class="section-header">Vias</div>
+			{@render numfield('Extent', 'via_extent', 0.5, 'um', 0.5)}
+			{@render numfield('Spacing', 'via_spacing', 0.1, 'um', 0.1)}
+			{@render numfield('Width', 'via_width', 0.1, 'um', 0.1)}
+			{@render numfield('In Metal', 'via_in_metal', 0.05, 'um', 0)}
+		</div>
+
+	{:else if geometryType === 'symmetric_transformer'}
+		<div class="section">
+			<div class="section-header">Geometry</div>
+			{@render numfield('Dout', 'Dout', 1, 'um', 1)}
+			{@render numfield('Sides', 'sides', 2, undefined, 4, 64)}
+			{@render numfield('Width', 'width', 0.5, 'um', 0.1)}
+			{@render numfield('Spacing', 'spacing', 0.5, 'um', 0.1)}
+		</div>
+		<div class="section">
+			<div class="section-header">Primary</div>
+			{@render numfield('N1', 'N1', 1, 'turns', 1, 20)}
+			{@render boolfield('Center Tap', 'center_tap_primary')}
+		</div>
+		<div class="section">
+			<div class="section-header">Secondary</div>
+			{@render numfield('N2', 'N2', 1, 'turns', 1, 20)}
+			{@render boolfield('Center Tap', 'center_tap_secondary')}
+		</div>
+		<div class="section">
+			<div class="section-header">Vias</div>
+			{@render numfield('Extent', 'via_extent', 0.5, 'um', 0.5)}
+			{@render numfield('Spacing', 'via_spacing', 0.1, 'um', 0.1)}
+			{@render numfield('Width', 'via_width', 0.1, 'um', 0.1)}
+			{@render numfield('In Metal', 'via_in_metal', 0.05, 'um', 0)}
 		</div>
 	{/if}
 
 	<div class="actions">
-		<button class="btn-secondary" onclick={resetDefaults}>Reset</button>
+		<button class="btn-secondary" onclick={onexport}>Reset</button>
 		{#if onexport}
 			<button onclick={onexport}>Export GDS</button>
 		{/if}
@@ -167,6 +213,24 @@
 		background: var(--accent);
 		color: #fff;
 	}
+	.toggle-btn {
+		flex: 1;
+		background: var(--bg-panel);
+		color: var(--text-dim);
+		border: 1px solid var(--input-border);
+		padding: 4px 8px;
+		font-size: 11px;
+		font-family: var(--font-mono);
+		text-transform: none;
+		letter-spacing: 0.5px;
+		cursor: pointer;
+		transition: background 0.1s, color 0.1s;
+	}
+	.toggle-btn.active {
+		background: var(--accent);
+		color: #fff;
+		border-color: var(--accent);
+	}
 	select {
 		background: var(--input-bg);
 		border: 1px solid var(--input-border);
@@ -175,13 +239,6 @@
 		border-radius: 0;
 		font-size: 12px;
 		width: 100%;
-	}
-	.placeholder {
-		color: var(--text-dim);
-		font-size: 12px;
-		text-align: center;
-		padding: 20px 0;
-		font-style: italic;
 	}
 	.actions {
 		display: flex;
