@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import type { SimulationResult } from '$lib/solver/peec';
+	import { plotColors, fonts } from '$lib/theme';
 
 	let { result }: { result: SimulationResult | null } = $props();
 
@@ -75,29 +76,28 @@
 
 		const xType = r.logScale ? 'log' : 'linear';
 		const base = {
-			font: { family: 'JetBrains Mono, monospace', size: 10, color: '#7d7a85' },
+			font: { family: fonts.mono, size: 10, color: plotColors.text },
 			paper_bgcolor: 'rgba(0,0,0,0)',
-			plot_bgcolor: '#18181d',
+			plot_bgcolor: plotColors.bg,
 			margin: { t: 8, r: 12, b: 44, l: 60 },
 			xaxis: {
 				type: xType as any,
 				title: { text: 'Frequency (Hz)', font: { size: 9 }, standoff: 8 },
-				gridcolor: '#2a2a32',
-				linecolor: '#35353d',
+				gridcolor: plotColors.grid,
+				linecolor: plotColors.axis,
 				tickfont: { size: 9 },
 			},
 			autosize: true,
 			showlegend: false,
 		};
 		const cfg = { responsive: true, displayModeBar: false };
-		const colors = ['#e8944a', '#d9513c', '#6bbf8a', '#7b5e8a', '#4a9ec2', '#c4c46b'];
 		const tr = (y: number[], ci: number, name?: string) => ({
 			x: f, y, type: 'scatter' as const, mode: 'lines' as const,
-			line: { color: colors[ci % colors.length], width: 2 },
+			line: { color: plotColors.cycle[ci % plotColors.cycle.length], width: 2 },
 			...(name ? { name, showlegend: true } : {}),
 		});
 		const yax = (title: string, ...datasets: number[][]) => {
-			const axis: any = { title: { text: title, font: { size: 10 }, standoff: 12 }, gridcolor: '#2a2a32', tickfont: { size: 9 } };
+			const axis: any = { title: { text: title, font: { size: 10 }, standoff: 12 }, gridcolor: plotColors.grid, tickfont: { size: 9 } };
 			if (datasets.length > 0) {
 				// Smart y-range: if variation is small relative to mean, zoom in
 				const all = datasets.flat().filter(v => isFinite(v));

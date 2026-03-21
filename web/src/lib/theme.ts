@@ -60,6 +60,21 @@ export const layerColors = {
 	pgs:        '#7b5e8a',
 } as const;
 
+// --- Plot colors ---
+
+export const plotColors = {
+	/** Trace color cycle for simulation plots */
+	cycle: ['#e8944a', '#d9513c', '#6bbf8a', '#7b5e8a', '#4a9ec2', '#c4c46b'] as string[],
+	/** Plot area background */
+	bg: '#18181d',
+	/** Grid lines */
+	grid: '#2a2a32',
+	/** Axis lines */
+	axis: '#35353d',
+	/** Text color */
+	text: '#7d7a85',
+} as const;
+
 // --- Fonts ---
 
 export const fonts = {
