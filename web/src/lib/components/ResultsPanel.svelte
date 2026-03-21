@@ -141,6 +141,12 @@
 			}
 			P.react(div, p.data, { ...base, yaxis: p.yaxis, showlegend: p.legend ?? false, legend: { font: { size: 9 }, x: 0.02, y: 0.98 } }, cfg);
 		}
+
+		// Force resize after initial render to fit grid cells
+		requestAnimationFrame(() => {
+			const divs = grid.querySelectorAll(':scope > div');
+			for (const div of divs) P.Plots?.resize(div);
+		});
 	}
 </script>
 

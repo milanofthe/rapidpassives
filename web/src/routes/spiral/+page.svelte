@@ -55,7 +55,15 @@
 		return mergeLayers(l);
 	});
 	let valid = $derived(isSpiralValid({ ...p }));
-	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack) });
+	let portMarkers = $derived.by(() => {
+		if (!result) return [];
+		const nodeMap = new Map(result.network.nodes.map(n => [n.id, n]));
+		return result.network.ports.map(port => {
+			const node = nodeMap.get(port.plusNode);
+			return node ? { name: port.name, x: node.x, y: node.y } : null;
+		}).filter((p): p is { name: string; x: number; y: number } => p !== null);
+	});
+	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack), ports: portMarkers });
 </script>
 
 <GeometryEditor {layers} {valid} {renderOpts} {simResult}>

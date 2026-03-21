@@ -79,9 +79,16 @@ function pointInPolygon(px: number, py: number, poly: Polygon): boolean {
 	return inside;
 }
 
+export interface PortMarker {
+	name: string;
+	x: number;
+	y: number;
+}
+
 export interface RenderOptions {
 	colorOverrides?: Record<string, string>;
 	visibleLayers?: Set<LayerName>;
+	ports?: PortMarker[];
 }
 
 /** Render all layers to a canvas context */
@@ -130,6 +137,12 @@ export function renderLayers(
 		}
 	}
 
+	// Port markers
+	if (opts?.ports) {
+		for (const port of opts.ports) {
+			drawPort(ctx, port, view);
+		}
+	}
 }
 
 function brighten(hex: string, amount: number): string {
@@ -204,4 +217,26 @@ function drawCrosshair(ctx: CanvasRenderingContext2D, view: ViewState): void {
 	ctx.moveTo(0, cy); ctx.lineTo(ctx.canvas.width, cy);
 	ctx.stroke();
 	ctx.setLineDash([]);
+}
+
+function drawPort(ctx: CanvasRenderingContext2D, port: PortMarker, view: ViewState): void {
+	const sx = port.x * view.scale + view.offsetX;
+	const sy = -port.y * view.scale + view.offsetY;
+	const r = 6;
+
+	// Circle
+	ctx.beginPath();
+	ctx.arc(sx, sy, r, 0, 2 * Math.PI);
+	ctx.fillStyle = '#d9513c';
+	ctx.fill();
+	ctx.strokeStyle = '#fff';
+	ctx.lineWidth = 1.5;
+	ctx.stroke();
+
+	// Label
+	ctx.font = '600 10px JetBrains Mono, monospace';
+	ctx.fillStyle = '#fff';
+	ctx.textAlign = 'left';
+	ctx.textBaseline = 'middle';
+	ctx.fillText(port.name, sx + r + 4, sy);
 }
