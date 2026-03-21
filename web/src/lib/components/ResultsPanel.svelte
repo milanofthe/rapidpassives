@@ -69,24 +69,43 @@
 		const tr = (y: number[], color: string) => ({
 			x: f, y, type: 'scatter' as const, mode: 'lines' as const, line: { color, width: 2 },
 		});
-		const yax = (title: string) => ({ title: { text: title, font: { size: 10 } }, gridcolor: '#2a2a32', tickfont: { size: 9 } });
+		const yax = (title: string, ...datasets: number[][]) => {
+			const axis: any = { title: { text: title, font: { size: 10 } }, gridcolor: '#2a2a32', tickfont: { size: 9 } };
+			if (datasets.length > 0) {
+				// Smart y-range: if variation is small relative to mean, zoom in
+				const all = datasets.flat().filter(v => isFinite(v));
+				if (all.length > 0) {
+					const min = Math.min(...all);
+					const max = Math.max(...all);
+					const range = max - min;
+					const mid = (min + max) / 2;
+					const absMax = Math.max(Math.abs(min), Math.abs(max));
+					// If range is < 5% of the absolute value, zoom in with 20% padding
+					if (absMax > 0 && range / absMax < 0.05) {
+						const pad = Math.max(range * 0.2, absMax * 0.005);
+						axis.range = [min - pad, max + pad];
+					}
+				}
+			}
+			return axis;
+		};
 
 		const trNamed = (y: number[], color: string, name: string) => ({
 			...tr(y, color), name, showlegend: true,
 		});
 
 		const plots = [
-			{ id: 'p-l', data: [tr(L, '#e8944a')], yaxis: yax('L (nH)'), legend: false },
-			{ id: 'p-q', data: [tr(Q, '#d9513c')], yaxis: yax('Q'), legend: false },
-			{ id: 'p-r', data: [tr(R, '#6bbf8a')], yaxis: yax('R (Ω)'), legend: false },
+			{ id: 'p-l', data: [tr(L, '#e8944a')], yaxis: yax('L (nH)', L), legend: false },
+			{ id: 'p-q', data: [tr(Q, '#d9513c')], yaxis: yax('Q', Q), legend: false },
+			{ id: 'p-r', data: [tr(R, '#6bbf8a')], yaxis: yax('R (Ω)', R), legend: false },
 			{ id: 'p-s', data: [
 				trNamed(s11Mag, '#7b5e8a', '|S11|'),
 				trNamed(s21Mag, '#e8944a', '|S21|'),
-			], yaxis: yax('dB'), legend: true },
+			], yaxis: yax('dB', s11Mag, s21Mag), legend: true },
 			{ id: 'p-ph', data: [
 				trNamed(s11Phase, '#7b5e8a', '∠S11'),
 				trNamed(s21Phase, '#e8944a', '∠S21'),
-			], yaxis: yax('Phase (°)'), legend: true },
+			], yaxis: yax('Phase (°)', s11Phase, s21Phase), legend: true },
 		];
 
 		const grid = el.querySelector('.plot-grid')!;
