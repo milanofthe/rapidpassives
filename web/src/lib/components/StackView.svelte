@@ -36,7 +36,7 @@
 		<div class="cs-oxide"><span>Oxide</span></div>
 		{#each sortedLayers as layer, i}
 			{@const isVia = layer.type === 'via'}
-			{@const h = isVia ? Math.max(8, layer.thickness * 12) : Math.max(14, layer.thickness * 14)}
+			{@const h = isVia ? Math.max(14, layer.thickness * 20) : Math.max(24, layer.thickness * 24)}
 			<div
 				class="cs-row"
 				class:dimmed={!layer.visible}
@@ -155,7 +155,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		height: 32px;
+		height: 54px;
 		background: repeating-linear-gradient(
 			45deg,
 			var(--bg-panel),
@@ -171,7 +171,7 @@
 	}
 
 	.cs-oxide {
-		height: 6px;
+		height: 10px;
 		background: #2e2e38;
 		display: flex;
 		align-items: center;
@@ -185,7 +185,7 @@
 	}
 
 	.cs-oxide-gap {
-		height: 4px;
+		height: 7px;
 		background: #2e2e38;
 	}
 
@@ -231,7 +231,7 @@
 	}
 
 	.cs-passivation {
-		height: 3px;
+		height: 5px;
 		background: #3a3a44;
 	}
 
