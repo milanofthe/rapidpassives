@@ -27,17 +27,22 @@
 		},
 	];
 
-	let canvases: HTMLCanvasElement[] = [];
+	let canvases = $state<HTMLCanvasElement[]>([]);
 
 	function renderCard(canvas: HTMLCanvasElement, layers: LayerMap) {
 		if (!canvas) return;
 		const rect = canvas.parentElement!.getBoundingClientRect();
 		const size = Math.round(Math.min(rect.width, rect.height));
-		canvas.width = size;
-		canvas.height = size;
+		if (size <= 0) return;
+		const dpr = window.devicePixelRatio || 1;
+		canvas.width = Math.round(size * dpr);
+		canvas.height = Math.round(size * dpr);
+		canvas.style.width = size + 'px';
+		canvas.style.height = size + 'px';
 		const ctx = canvas.getContext('2d')!;
+		ctx.scale(dpr, dpr);
 		const view = fitToView(size, size, layers);
-		renderLayers(ctx, layers, view);
+		renderLayers(ctx, layers, view, null, undefined, size, size);
 	}
 
 	onMount(() => {
