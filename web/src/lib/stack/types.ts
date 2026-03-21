@@ -106,7 +106,7 @@ export function createDefaultStack(): ProcessStack {
 				z: 300.0,
 				thickness: 0.3,
 				rsh: 0.1,
-				color: '#6b5b6e',
+				color: '#7b5e8a',
 				gdsLayers: ['pgs'],
 				visible: true,
 			},

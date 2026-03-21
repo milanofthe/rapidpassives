@@ -57,7 +57,7 @@ export const layerColors = {
 	vias1:      '#5a5a62',
 	vias2:      '#6e6e78',
 	centertap:  '#6bbf8a',
-	pgs:        '#6b5b6e',
+	pgs:        '#7b5e8a',
 } as const;
 
 // --- Fonts ---
