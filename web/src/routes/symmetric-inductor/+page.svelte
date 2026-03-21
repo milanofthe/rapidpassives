@@ -60,7 +60,7 @@
 		if (!result) return [];
 		const nodeMap = new Map(result.network.nodes.map(n => [n.id, n]));
 		return result.network.ports.map(port => {
-			const node = nodeMap.get(port.plusNode);
+			const node = nodeMap.get(port.node);
 			return node ? { name: port.name, x: node.x, y: node.y } : null;
 		}).filter((p): p is { name: string; x: number; y: number } => p !== null);
 	});

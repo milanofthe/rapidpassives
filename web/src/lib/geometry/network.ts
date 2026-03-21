@@ -38,11 +38,11 @@ export interface ViaConnection {
 	renderLayer: LayerName;
 }
 
-/** External terminal pair for S-parameter extraction */
+/** A port terminal referenced to ground */
 export interface Port {
 	name: string;
-	plusNode: string;
-	minusNode: string;
+	/** Node where current is injected (ground is the common reference) */
+	node: string;
 }
 
 /** Complete conductor topology for a passive device */

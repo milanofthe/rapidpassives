@@ -124,8 +124,7 @@ export function solvePEEC(
 	}
 	// Also include port nodes
 	for (const port of network.ports) {
-		usedNodes.add(port.plusNode);
-		usedNodes.add(port.minusNode);
+		usedNodes.add(port.node);
 	}
 
 	const nodeIds = Array.from(usedNodes);
@@ -159,19 +158,21 @@ export function solvePEEC(
 		if (botI !== undefined) A[botI][nFil + vi] = -1;
 	});
 
-	// --- Identify unique ports ---
-	const seenPorts = new Set<string>();
-	const uniquePorts: typeof network.ports = [];
-	for (const p of network.ports) {
-		const key = [p.plusNode, p.minusNode].sort().join('-');
-		if (!seenPorts.has(key)) { seenPorts.add(key); uniquePorts.push(p); }
-	}
+	// --- Ports (each is a single node referenced to ground) ---
+	const uniquePorts = network.ports;
 	const nPorts = uniquePorts.length;
 	const portNames = uniquePorts.map(p => p.name);
 
-	// Ground node: use the first port's minus node as reference
-	const groundNode = uniquePorts[0]?.minusNode;
-	const groundIdx = groundNode ? nodeIdx.get(groundNode) : undefined;
+	// Ground node: pick a node NOT used by any port
+	// Use the first node that's connected but not a port node
+	const portNodeIds = new Set(uniquePorts.map(p => p.node));
+	let groundIdx: number | undefined;
+	for (let i = 0; i < nNodes; i++) {
+		if (!portNodeIds.has(nodeIds[i])) {
+			groundIdx = i;
+			break;
+		}
+	}
 
 	// Parasitics
 	const parasitics = computeParasitics(filaments, stack, conductorSpacing * 1e-6, hasPgs);
@@ -280,15 +281,10 @@ export function solvePEEC(
 
 		for (let pi = 0; pi < nPorts; pi++) {
 			const port = uniquePorts[pi];
-			const plusI = nodeIdx.get(port.plusNode);
-			const minusI = nodeIdx.get(port.minusNode);
-			if (plusI !== undefined) {
-				const r = origToReduced.get(plusI);
+			const portI = nodeIdx.get(port.node);
+			if (portI !== undefined) {
+				const r = origToReduced.get(portI);
 				if (r !== undefined) RHS[r][pi] = [1, 0];
-			}
-			if (minusI !== undefined) {
-				const r = origToReduced.get(minusI);
-				if (r !== undefined) RHS[r][pi] = [-1, 0];
 			}
 		}
 
@@ -300,16 +296,12 @@ export function solvePEEC(
 		}
 
 		// Extract Z-matrix: Z[i][j] = V_port_i when port j is excited
+		// Z[i][j] = voltage at port i node when unit current injected at port j
 		for (let pi = 0; pi < nPorts; pi++) {
+			const portNodeI = nodeIdx.get(uniquePorts[pi].node);
+			const portR = portNodeI !== undefined ? origToReduced.get(portNodeI) : undefined;
 			for (let pj = 0; pj < nPorts; pj++) {
-				const port = uniquePorts[pi];
-				const plusI = nodeIdx.get(port.plusNode);
-				const minusI = nodeIdx.get(port.minusNode);
-				const plusR = plusI !== undefined ? origToReduced.get(plusI) : undefined;
-				const minusR = minusI !== undefined ? origToReduced.get(minusI) : undefined;
-				const vPlus: Cx = plusR !== undefined ? V[plusR][pj] : [0, 0];
-				const vMinus: Cx = minusR !== undefined ? V[minusR][pj] : [0, 0];
-				Zmp[pi][pj] = [vPlus[0] - vMinus[0], vPlus[1] - vMinus[1]];
+				Zmp[pi][pj] = portR !== undefined ? V[portR][pj] : [0, 0];
 			}
 		}
 

@@ -448,16 +448,18 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 	const p2Minus = findNearest(topPortX, Dout / 2);
 
 	const netPorts: Port[] = [
-		{ name: 'P1+', plusNode: p1Plus.id, minusNode: p1Minus.id },
-		{ name: 'P2+', plusNode: p2Plus.id, minusNode: p2Minus.id },
+		{ name: 'P1+', node: p1Plus.id },
+		{ name: 'P1-', node: p1Minus.id },
+		{ name: 'P2+', node: p2Plus.id },
+		{ name: 'P2-', node: p2Minus.id },
 	];
 	if (hasBotCTPort) {
 		const ctBot = findNearest(0, -Dout / 2);
-		netPorts.push({ name: 'CT1', plusNode: ctBot.id, minusNode: p1Plus.id });
+		netPorts.push({ name: 'CT1', node: ctBot.id });
 	}
 	if (hasTopCTPort) {
 		const ctTop = findNearest(0, Dout / 2);
-		netPorts.push({ name: 'CT2', plusNode: ctTop.id, minusNode: p2Plus.id });
+		netPorts.push({ name: 'CT2', node: ctTop.id });
 	}
 
 	const network: ConductorNetwork = { nodes: netNodes, segments: netSegments, vias: netVias, ports: netPorts };

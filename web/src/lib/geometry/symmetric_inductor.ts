@@ -194,15 +194,15 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 	if (nearRight.id !== portRight.id) addSeg(portRight, nearRight, width, 'm3', 'port', 'windings');
 
 	const ports: Port[] = [
-		{ name: 'P1', plusNode: portLeft.id, minusNode: portRight.id },
-		{ name: 'P2', plusNode: portRight.id, minusNode: portLeft.id },
+		{ name: 'P1', node: portLeft.id },
+		{ name: 'P2', node: portRight.id },
 	];
 
 	if (center_tap) {
 		const ctNode = addNode(0, -Dout / 2 - width, 'm3');
 		const nearCT = findNearestSeg(0, -Dout / 2 - width);
 		if (nearCT.id !== ctNode.id) addSeg(ctNode, nearCT, width, 'm3', 'ct', 'centertap');
-		ports.push({ name: 'CT', plusNode: ctNode.id, minusNode: portLeft.id });
+		ports.push({ name: 'CT', node: ctNode.id });
 	}
 
 	const network: ConductorNetwork = { nodes, segments, vias, ports };

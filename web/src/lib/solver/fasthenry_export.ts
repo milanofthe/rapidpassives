@@ -96,16 +96,14 @@ export function generateFastHenryInput(
 	}
 	lines.push('');
 
-	// External ports — only unique pairs, avoid reverse duplicates
-	const seenPorts = new Set<string>();
-	for (const port of network.ports) {
-		const plusName = nodeNames.get(port.plusNode);
-		const minusName = nodeNames.get(port.minusNode);
-		if (!plusName || !minusName) continue;
-		const key = [plusName, minusName].sort().join('-');
-		if (seenPorts.has(key)) continue;
-		seenPorts.add(key);
-		lines.push(`.external ${plusName} ${minusName}`);
+	// External ports — pair consecutive ports (P1-P2, P3-P4, etc.)
+	// FastHenry uses .external node1 node2 pairs
+	for (let pi = 0; pi < network.ports.length - 1; pi += 2) {
+		const name1 = nodeNames.get(network.ports[pi].node);
+		const name2 = nodeNames.get(network.ports[pi + 1].node);
+		if (name1 && name2) {
+			lines.push(`.external ${name1} ${name2}`);
+		}
 	}
 	lines.push('');
 

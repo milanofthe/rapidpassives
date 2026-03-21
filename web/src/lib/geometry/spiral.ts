@@ -179,8 +179,8 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 	});
 
 	const ports: Port[] = [
-		{ name: 'P1', plusNode: p1Node.id, minusNode: p2Node.id },
-		{ name: 'P2', plusNode: p2Node.id, minusNode: p1Node.id },
+		{ name: 'P1', node: p1Node.id },
+		{ name: 'P2', node: p2Node.id },
 	];
 
 	const network: ConductorNetwork = {
