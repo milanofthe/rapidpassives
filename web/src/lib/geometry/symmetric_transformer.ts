@@ -298,18 +298,62 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 		}
 	}
 
-	// --- Build minimal conductor network ---
-	// Full topology extraction deferred — the polygon generation is too interleaved
-	// For now, capture via positions and port nodes for solver use
+	// --- Build conductor network with winding segments ---
 	const netNodes: ConductorNode[] = [];
 	const netSegments: ConductorSegment[] = [];
 	const netVias: ViaConnection[] = [];
-	let _nid = 0;
+	let _nid = 0, _sid = 0;
 
 	function _addNode(x: number, y: number, layerId: string): ConductorNode {
 		const node: ConductorNode = { id: `n${_nid++}`, x, y, layerId };
 		netNodes.push(node);
 		return node;
+	}
+
+	function _addSeg(from: ConductorNode, to: ConductorNode, w: number, layerId: string, pathId: string, renderLayer: 'windings' | 'crossings'): void {
+		netSegments.push({ id: `s${_sid++}`, fromNode: from.id, toNode: to.id, width: w, layerId, pathId, renderLayer });
+	}
+
+	// Build centerline nodes for each winding quadrant
+	{
+		let _r1 = Dout / 2 / Math.cos(PI / sides);
+		let _r2 = _r1 - v;
+		for (let winding = 0; winding < N; winding++) {
+			const quadAngles = [upperLeftAngles, lowerLeftAngles, upperRightAngles, lowerRightAngles];
+			for (let qi = 0; qi < 4; qi++) {
+				let prev: ConductorNode | null = null;
+				for (const phi of quadAngles[qi]) {
+					const rc = (_r1 + _r2) / 2;
+					const node = _addNode(rc * Math.cos(phi), rc * Math.sin(phi), 'm3');
+					if (prev) _addSeg(prev, node, width, 'm3', `w${winding}_q${qi}`, 'windings');
+					prev = node;
+				}
+			}
+
+			// Crossing segments on lower metal
+			if (topCrossing.includes(winding) || bottomCrossing.includes(winding)) {
+				const h = topCrossing.includes(winding)
+					? _r1 * Math.sin(PI * (0.5 - 1 / sides))
+					: (-_r2 + s) * Math.sin(PI * (0.5 - 1 / sides));
+				const crossL = _addNode(-sepTotal / 2 - width / 2, h - 3 * width / 2 - spacing, 'm2');
+				const crossR = _addNode(sepTotal / 2 + width / 2, h - width / 2, 'm2');
+				_addSeg(crossL, crossR, width, 'm2', `cross_w${winding}`, 'crossings');
+			}
+
+			if (lrCrossing.includes(winding)) {
+				const hR = _r1 * Math.sin(PI * (0.5 - 1 / sides));
+				const hL = (-_r2 + s) * Math.sin(PI * (0.5 - 1 / sides));
+				const crR1 = _addNode(hR - 3 * width / 2 - spacing, -sepTotal / 2 - width / 2, 'm2');
+				const crR2 = _addNode(hR - width / 2, sepTotal / 2 + width / 2, 'm2');
+				_addSeg(crR1, crR2, width, 'm2', `lrcross_r_w${winding}`, 'crossings');
+				const crL1 = _addNode(hL - 3 * width / 2 - spacing, -sepTotal / 2 - width / 2, 'm2');
+				const crL2 = _addNode(hL - width / 2, sepTotal / 2 + width / 2, 'm2');
+				_addSeg(crL1, crL2, width, 'm2', `lrcross_l_w${winding}`, 'crossings');
+			}
+
+			_r1 -= s;
+			_r2 -= s;
+		}
 	}
 
 	// Via connections
