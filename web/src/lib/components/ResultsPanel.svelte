@@ -162,8 +162,8 @@
 	}
 	.plot-grid {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		grid-template-rows: repeat(3, minmax(150px, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+		grid-auto-rows: minmax(150px, 1fr);
 		gap: 4px;
 		min-height: 100%;
 	}
