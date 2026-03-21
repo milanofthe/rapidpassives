@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
 	import type { SpiralInductorParams, LayerMap } from '$lib/geometry/types';
-	import { buildSpiralInductor } from '$lib/geometry/spiral';
+	import { buildSpiralInductor, isSpiralValid } from '$lib/geometry/spiral';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import { nudgeValue, parseInput } from '$lib/components/fields';
@@ -16,9 +16,10 @@
 	function inp(k: keyof SpiralInductorParams, e: Event) { const v = parseInput(e); if (v !== null) set(k, v); }
 
 	let layers = $derived.by<LayerMap>(() => { try { return buildSpiralInductor({ ...p }); } catch { return {}; } });
+	let valid = $derived(isSpiralValid({ ...p }));
 </script>
 
-<GeometryEditor {layers}>
+<GeometryEditor {layers} {valid}>
 	{#snippet sidebar()}
 		<ParamSidebar>
 			<div class="param-section"><h4>Geometry</h4>

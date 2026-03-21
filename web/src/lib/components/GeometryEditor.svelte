@@ -3,7 +3,7 @@
 	import LayoutViewer from './LayoutViewer.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar }: { layers: LayerMap; sidebar: Snippet } = $props();
+	let { layers, sidebar, valid = true }: { layers: LayerMap; sidebar: Snippet; valid?: boolean } = $props();
 </script>
 
 <div class="workspace">
@@ -11,6 +11,9 @@
 		{@render sidebar()}
 	</aside>
 	<div class="main-area">
+		{#if !valid}
+			<div class="invalid-bar">Invalid geometry — parameters cause clipping or overlap</div>
+		{/if}
 		<div class="viewer-pane">
 			<LayoutViewer {layers} />
 		</div>
@@ -33,6 +36,14 @@
 		display: flex;
 		flex-direction: column;
 		min-width: 0;
+	}
+	.invalid-bar {
+		background: var(--accent);
+		color: #fff;
+		font-size: 11px;
+		font-family: var(--font-mono);
+		padding: 4px 16px;
+		flex-shrink: 0;
 	}
 	.viewer-pane {
 		flex: 1;

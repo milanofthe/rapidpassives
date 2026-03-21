@@ -83,7 +83,7 @@
 	.hero h2 {
 		font-size: 20px;
 		font-weight: 700;
-		color: var(--text);
+		color: var(--accent);
 		font-family: var(--font-mono);
 		letter-spacing: 1px;
 		margin-bottom: 8px;
@@ -133,7 +133,7 @@
 	.card-info h3 {
 		font-size: 13px;
 		font-weight: 600;
-		color: var(--accent-secondary);
+		color: var(--accent);
 		font-family: var(--font-mono);
 		margin-bottom: 4px;
 	}

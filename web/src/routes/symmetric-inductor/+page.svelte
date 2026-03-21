@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
 	import type { SymmetricInductorParams, LayerMap } from '$lib/geometry/types';
-	import { buildSymmetricInductor } from '$lib/geometry/symmetric_inductor';
+	import { buildSymmetricInductor, isSymmetricInductorValid } from '$lib/geometry/symmetric_inductor';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import { nudgeValue, parseInput } from '$lib/components/fields';
@@ -17,9 +17,10 @@
 	function inp(k: keyof SymmetricInductorParams, e: Event) { const v = parseInput(e); if (v !== null) set(k, v); }
 
 	let layers = $derived.by<LayerMap>(() => { try { return buildSymmetricInductor({ ...p }); } catch { return {}; } });
+	let valid = $derived(isSymmetricInductorValid({ ...p }));
 </script>
 
-<GeometryEditor {layers}>
+<GeometryEditor {layers} {valid}>
 	{#snippet sidebar()}
 		<ParamSidebar>
 			<div class="param-section"><h4>Geometry</h4>

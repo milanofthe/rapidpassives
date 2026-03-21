@@ -307,6 +307,26 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): L
 	};
 }
 
+export function isSymmetricTransformerValid(params: SymmetricTransformerParams): boolean {
+	const { Dout, N1, N2, sides, width, spacing, center_tap_primary, center_tap_secondary, via_extent } = params;
+	const N = N1 + N2;
+
+	if (center_tap_secondary && center_tap_primary && N % 2 !== 0) return false;
+
+	const h = width + spacing + (Math.SQRT2 - 1) * (2 * spacing + width);
+	let q = 2 * width + spacing;
+	if (center_tap_secondary || center_tap_primary) q += width + spacing;
+	const e = via_extent;
+	const d2 = Dout / 2 - (N - 1) * (spacing + width);
+	const d1 = Dout / 2 - (N - 1) * spacing - N * width;
+
+	const topBridgeOk = h / 2 + e <= d2 * Math.tan(Math.PI / sides);
+	const bottomBridgeOk = h / 2 <= d1 * Math.tan(Math.PI / sides);
+	const portOk = q / 2 <= Dout / 2 * Math.tan(Math.PI / sides);
+
+	return topBridgeOk && bottomBridgeOk && portOk;
+}
+
 function range(a: number, b?: number): number[] {
 	if (b === undefined) { b = a; a = 0; }
 	const r: number[] = [];

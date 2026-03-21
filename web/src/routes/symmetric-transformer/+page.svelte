@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
 	import type { SymmetricTransformerParams, LayerMap } from '$lib/geometry/types';
-	import { buildSymmetricTransformer } from '$lib/geometry/symmetric_transformer';
+	import { buildSymmetricTransformer, isSymmetricTransformerValid } from '$lib/geometry/symmetric_transformer';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import { nudgeValue, parseInput } from '$lib/components/fields';
@@ -17,9 +17,10 @@
 	function inp(k: keyof SymmetricTransformerParams, e: Event) { const v = parseInput(e); if (v !== null) set(k, v); }
 
 	let layers = $derived.by<LayerMap>(() => { try { return buildSymmetricTransformer({ ...p }); } catch { return {}; } });
+	let valid = $derived(isSymmetricTransformerValid({ ...p }));
 </script>
 
-<GeometryEditor {layers}>
+<GeometryEditor {layers} {valid}>
 	{#snippet sidebar()}
 		<ParamSidebar>
 			<div class="param-section"><h4>Geometry</h4>

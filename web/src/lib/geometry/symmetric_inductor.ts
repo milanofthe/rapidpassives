@@ -205,3 +205,18 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): LayerMa
 		pgs: [],
 	};
 }
+
+export function isSymmetricInductorValid(params: SymmetricInductorParams): boolean {
+	const { Dout, N, sides, width, spacing, via_extent } = params;
+	const h = width + spacing + (Math.SQRT2 - 1) * (2 * spacing + width);
+	const q = 2 * width + spacing;
+	const e = via_extent;
+	const d2 = Dout / 2 - (N - 1) * (spacing + width);
+	const d1 = Dout / 2 - (N - 1) * spacing - N * width;
+
+	const topBridgeOk = h / 2 + e <= d2 * Math.tan(Math.PI / sides);
+	const bottomBridgeOk = h / 2 <= d1 * Math.tan(Math.PI / sides);
+	const portOk = q / 2 <= Dout / 2 * Math.tan(Math.PI / sides);
+
+	return topBridgeOk && bottomBridgeOk && portOk;
+}
