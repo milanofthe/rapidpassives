@@ -1,6 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Spiral winding (orange) -->
-  <path d="M22 9 L26 13 L26 19 L22 23 L10 23 L6 19 L6 13 L10 9 L20 9 L23 12 L23 17 L20 20 L12 20 L9 17 L9 13 L12 11 L18 11 L20 13 L20 16 L18 18 L14 18 L13 16 L13 14 L16 14" stroke="#e8944a" stroke-width="2" fill="none"/>
-  <!-- Underpass (red) -->
-  <line x1="16" y1="14" x2="22" y2="9" stroke="#d9513c" stroke-width="1.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- 2-turn octagonal spiral, clean geometry -->
+  <!-- Outer turn -->
+  <path d="M24 7 L28 11 L28 21 L24 25 L8 25 L4 21 L4 11 L8 7 Z" stroke="#e8944a" stroke-width="2.5" fill="none"/>
+  <!-- Inner turn -->
+  <path d="M20 11 L23 14 L23 18 L20 21 L12 21 L9 18 L9 14 L12 11 Z" stroke="#e8944a" stroke-width="2.5" fill="none"/>
+  <!-- Connection between turns (top right) -->
+  <line x1="24" y1="7" x2="20" y2="11" stroke="#e8944a" stroke-width="2.5"/>
+  <!-- Underpass (bottom) -->
+  <line x1="8" y1="25" x2="12" y2="21" stroke="#d9513c" stroke-width="2"/>
 </svg>
