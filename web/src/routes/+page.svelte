@@ -11,7 +11,7 @@
 			title: 'Spiral Inductor',
 			href: '/spiral',
 			desc: 'Single-ended spiral with underpass routing',
-			layers: buildSpiralInductor({ Dout: 80, N: 2, sides: 8, width: 8, spacing: 4, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }),
+			layers: buildSpiralInductor({ Dout: 80, N: 2, sides: 8, width: 8, spacing: 4, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
 		},
 		{
 			title: 'Symmetric Inductor',

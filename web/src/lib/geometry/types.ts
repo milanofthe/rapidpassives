@@ -67,3 +67,5 @@ export interface PgsParams {
 export type GeometryParams = SpiralInductorParams | SymmetricInductorParams | SymmetricTransformerParams;
 
 export type GeometryType = 'spiral' | 'symmetric_inductor' | 'symmetric_transformer';
+
+export type { ConductorNetwork, ConductorNode, ConductorSegment, ViaConnection, Port, GeometryResult } from './network';

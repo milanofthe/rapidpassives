@@ -154,3 +154,14 @@ export function stackToVisibleSet(stack: ProcessStack): Set<LayerName> {
 	}
 	return set;
 }
+
+/** Find a StackLayer by its id */
+export function getStackLayer(stack: ProcessStack, layerId: string): StackLayer | undefined {
+	return stack.layers.find(l => l.id === layerId);
+}
+
+/** Get the primary render LayerName for a stack layer id */
+export function layerIdToRenderLayer(stack: ProcessStack, layerId: string): LayerName | undefined {
+	const sl = getStackLayer(stack, layerId);
+	return sl?.gdsLayers[0];
+}
