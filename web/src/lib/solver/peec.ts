@@ -21,6 +21,14 @@ import { type Cx, cxMatSolve, cxMatMul, cxAdd, zToS, extractPortResults, extract
 const PI = Math.PI;
 const MU0 = 4 * PI * 1e-7;
 
+/** Winding-level result (primary/secondary) */
+export interface WindingResult {
+	name: string;
+	L: number;  // differential inductance (H)
+	R: number;  // differential resistance (Ω)
+	Q: number;
+}
+
 /** Result for a single frequency point */
 export interface FrequencyPoint {
 	freq: number;
@@ -30,6 +38,7 @@ export interface FrequencyPoint {
 	Q: number;
 	R: number;
 	ports: PortFreqResult[];
+	windings: WindingResult[];  // primary/secondary level results
 	k?: number;
 }
 
@@ -316,9 +325,45 @@ export function solvePEEC(
 		const Q = sp.Zeff[0] > 0 ? sp.Zeff[1] / sp.Zeff[0] : 0;
 
 		const portResults = extractPortResults(Zmp, omega, portNames);
-		const k = nPorts >= 4 ? extractCoupling(Zmp, omega) : undefined;
 
-		freqs.push({ freq, Z: Zmp, S, L: Leff, Q, R: sp.Zeff[0], ports: portResults, k });
+		// Compute winding-level results (differential impedance between port pairs)
+		const windings: WindingResult[] = [];
+		if (nPorts === 2) {
+			// 2-port inductor: Z_diff = Z11 - Z12 - Z21 + Z22
+			const zdr = Zmp[0][0][0] - Zmp[0][1][0] - Zmp[1][0][0] + Zmp[1][1][0];
+			const zdi = Zmp[0][0][1] - Zmp[0][1][1] - Zmp[1][0][1] + Zmp[1][1][1];
+			const wL = omega > 0 ? zdi / omega : 0;
+			windings.push({ name: 'L', L: wL, R: zdr, Q: zdr > 0 ? zdi / zdr : 0 });
+		} else if (nPorts >= 4) {
+			// 4-port transformer: primary = ports 0,1; secondary = ports 2,3
+			const zd1r = Zmp[0][0][0] - Zmp[0][1][0] - Zmp[1][0][0] + Zmp[1][1][0];
+			const zd1i = Zmp[0][0][1] - Zmp[0][1][1] - Zmp[1][0][1] + Zmp[1][1][1];
+			const zd2r = Zmp[2][2][0] - Zmp[2][3][0] - Zmp[3][2][0] + Zmp[3][3][0];
+			const zd2i = Zmp[2][2][1] - Zmp[2][3][1] - Zmp[3][2][1] + Zmp[3][3][1];
+			const wL1 = omega > 0 ? zd1i / omega : 0;
+			const wL2 = omega > 0 ? zd2i / omega : 0;
+			windings.push({ name: 'Primary', L: wL1, R: zd1r, Q: zd1r > 0 ? zd1i / zd1r : 0 });
+			windings.push({ name: 'Secondary', L: wL2, R: zd2r, Q: zd2r > 0 ? zd2i / zd2r : 0 });
+		}
+
+		// Coupling from differential impedances
+		let k: number | undefined;
+		if (windings.length >= 2 && omega > 0) {
+			// M = (Z_diff_12) / omega where Z_diff_12 = Z[0][2] - Z[0][3] - Z[1][2] + Z[1][3]
+			const zmr = Zmp[0][2][0] - Zmp[0][3][0] - Zmp[1][2][0] + Zmp[1][3][0];
+			const zmi = Zmp[0][2][1] - Zmp[0][3][1] - Zmp[1][2][1] + Zmp[1][3][1];
+			const M = zmi / omega;
+			if (windings[0].L > 0 && windings[1].L > 0) {
+				k = Math.abs(M) / Math.sqrt(windings[0].L * windings[1].L);
+			}
+		}
+
+		// Use first winding as the "primary" L/Q/R
+		const primL = windings[0]?.L ?? Leff;
+		const primR = windings[0]?.R ?? sp.Zeff[0];
+		const primQ = windings[0]?.Q ?? Q;
+
+		freqs.push({ freq, Z: Zmp, S, L: primL, Q: primQ, R: primR, ports: portResults, windings, k });
 	}
 
 	return { freqs, filaments, network, logScale, portNames, nPorts };

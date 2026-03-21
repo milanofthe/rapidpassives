@@ -121,23 +121,22 @@
 			return axis;
 		};
 
-		// Per-port L/Q/R traces
-		const nPortResults = r.freqs[0]?.ports?.length ?? 0;
-		const multiPort = nPortResults > 1;
+		// Winding-level L/Q/R traces (primary/secondary for transformers)
+		const nWindings = r.freqs[0]?.windings?.length ?? 0;
 
 		const lTraces: any[] = [], qTraces: any[] = [], rTraces: any[] = [];
 		const lData: number[][] = [], qData: number[][] = [], rData: number[][] = [];
 
-		if (multiPort) {
-			for (let pi = 0; pi < nPortResults; pi++) {
-				const name = r.freqs[0].ports[pi]?.name ?? `Port ${pi}`;
-				const pL = r.freqs.map(p => (p.ports[pi]?.L ?? 0) * 1e9);
-				const pQ = r.freqs.map(p => p.ports[pi]?.Q ?? 0);
-				const pR = r.freqs.map(p => p.ports[pi]?.R ?? 0);
-				lTraces.push(tr(pL, pi, `L_${name}`));
-				qTraces.push(tr(pQ, pi, `Q_${name}`));
-				rTraces.push(tr(pR, pi, `R_${name}`));
-				lData.push(pL); qData.push(pQ); rData.push(pR);
+		if (nWindings > 1) {
+			for (let wi = 0; wi < nWindings; wi++) {
+				const name = r.freqs[0].windings[wi]?.name ?? `W${wi + 1}`;
+				const wL = r.freqs.map(p => (p.windings[wi]?.L ?? 0) * 1e9);
+				const wQ = r.freqs.map(p => p.windings[wi]?.Q ?? 0);
+				const wR = r.freqs.map(p => p.windings[wi]?.R ?? 0);
+				lTraces.push(tr(wL, wi, `L ${name}`));
+				qTraces.push(tr(wQ, wi, `Q ${name}`));
+				rTraces.push(tr(wR, wi, `R ${name}`));
+				lData.push(wL); qData.push(wQ); rData.push(wR);
 			}
 		} else {
 			lTraces.push(tr(L, 0));
