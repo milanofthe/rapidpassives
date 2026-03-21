@@ -8,6 +8,7 @@
 	import StackView from '$lib/components/StackView.svelte';
 	import { nudgeValue, parseInput } from '$lib/components/fields';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
+	import { mergeLayers } from '$lib/geometry/merge';
 
 	function doExport() {
 		const data = exportGds(layers, { cellName: 'SpiralInductor' });
@@ -37,7 +38,7 @@
 		if (!result) return {};
 		const l = { ...result.layers };
 		if (pgs.enabled) addPgs(l, pgs.D, pgs.width, pgs.spacing);
-		return l;
+		return mergeLayers(l);
 	});
 	let valid = $derived(isSpiralValid({ ...p }));
 	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack) });
