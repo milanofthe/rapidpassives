@@ -19,7 +19,28 @@
 	function resetDefaults() {
 		params = { ...spiralDefaults };
 	}
+
+	function nudge(field: keyof SpiralInductorParams, step: number, min?: number, max?: number) {
+		let v = (params[field] as number) + step;
+		if (min !== undefined) v = Math.max(min, v);
+		if (max !== undefined) v = Math.min(max, v);
+		// Round to avoid floating point drift
+		v = Math.round(v * 1000) / 1000;
+		(params as any)[field] = v;
+	}
 </script>
+
+{#snippet numfield(label: string, field: keyof SpiralInductorParams, step: number, unit?: string, min?: number, max?: number)}
+	<div class="field">
+		<span class="field-label">{label}</span>
+		<div class="field-input">
+			<button class="spin-btn" onclick={() => nudge(field, -step, min, max)}>-</button>
+			<input type="number" bind:value={params[field]} {step} {min} {max} />
+			<button class="spin-btn" onclick={() => nudge(field, step, min, max)}>+</button>
+			{#if unit}<span class="field-unit">{unit}</span>{/if}
+		</div>
+	</div>
+{/snippet}
 
 <div class="panel">
 	<div class="section">
@@ -34,65 +55,18 @@
 	{#if geometryType === 'spiral'}
 		<div class="section">
 			<div class="section-header">Geometry</div>
-			<div class="field">
-				<span class="field-label">Dout</span>
-				<div class="field-input">
-					<input type="number" bind:value={params.Dout} step="1" min="1" />
-					<span class="field-unit">um</span>
-				</div>
-			</div>
-			<div class="field">
-				<span class="field-label">N</span>
-				<div class="field-input">
-					<input type="number" bind:value={params.N} step="1" min="1" max="20" />
-					<span class="field-unit">turns</span>
-				</div>
-			</div>
-			<div class="field">
-				<span class="field-label">Sides</span>
-				<div class="field-input">
-					<input type="number" bind:value={params.sides} step="2" min="4" max="64" />
-				</div>
-			</div>
-			<div class="field">
-				<span class="field-label">Width</span>
-				<div class="field-input">
-					<input type="number" bind:value={params.width} step="0.5" min="0.1" />
-					<span class="field-unit">um</span>
-				</div>
-			</div>
-			<div class="field">
-				<span class="field-label">Spacing</span>
-				<div class="field-input">
-					<input type="number" bind:value={params.spacing} step="0.5" min="0.1" />
-					<span class="field-unit">um</span>
-				</div>
-			</div>
+			{@render numfield('Dout', 'Dout', 1, 'um', 1)}
+			{@render numfield('N', 'N', 1, 'turns', 1, 20)}
+			{@render numfield('Sides', 'sides', 2, undefined, 4, 64)}
+			{@render numfield('Width', 'width', 0.5, 'um', 0.1)}
+			{@render numfield('Spacing', 'spacing', 0.5, 'um', 0.1)}
 		</div>
 
 		<div class="section">
 			<div class="section-header">Vias</div>
-			<div class="field">
-				<span class="field-label">Spacing</span>
-				<div class="field-input">
-					<input type="number" bind:value={params.via_spacing} step="0.1" min="0.1" />
-					<span class="field-unit">um</span>
-				</div>
-			</div>
-			<div class="field">
-				<span class="field-label">Width</span>
-				<div class="field-input">
-					<input type="number" bind:value={params.via_width} step="0.1" min="0.1" />
-					<span class="field-unit">um</span>
-				</div>
-			</div>
-			<div class="field">
-				<span class="field-label">Enclosure</span>
-				<div class="field-input">
-					<input type="number" bind:value={params.via_in_metal} step="0.05" min="0" />
-					<span class="field-unit">um</span>
-				</div>
-			</div>
+			{@render numfield('Spacing', 'via_spacing', 0.1, 'um', 0.1)}
+			{@render numfield('Width', 'via_width', 0.1, 'um', 0.1)}
+			{@render numfield('Enclosure', 'via_in_metal', 0.05, 'um', 0)}
 		</div>
 	{:else}
 		<div class="section">
@@ -156,13 +130,43 @@
 		flex: 1;
 		display: flex;
 		align-items: center;
-		gap: 4px;
+		gap: 0;
+	}
+	.field-input input {
+		border-left: none;
+		border-right: none;
+		text-align: center;
+		min-width: 0;
 	}
 	.field-unit {
 		font-size: 10px;
 		color: var(--text-dim);
-		min-width: 28px;
+		min-width: 32px;
+		padding-left: 6px;
 		font-family: 'JetBrains Mono', monospace;
+	}
+	.spin-btn {
+		background: var(--bg-panel);
+		color: var(--text-muted);
+		border: 1px solid var(--input-border);
+		padding: 0;
+		width: 22px;
+		height: 26px;
+		font-size: 14px;
+		font-weight: 400;
+		font-family: 'JetBrains Mono', monospace;
+		text-transform: none;
+		letter-spacing: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: background 0.1s, color 0.1s;
+		flex-shrink: 0;
+	}
+	.spin-btn:hover {
+		background: var(--accent);
+		color: #fff;
 	}
 	select {
 		background: var(--input-bg);

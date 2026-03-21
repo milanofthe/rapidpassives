@@ -56,6 +56,18 @@ input[type="number"]:hover, select:hover {
 	border-color: #4a4a52;
 }
 
+/* Number input spinner arrows */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	appearance: none;
+	margin: 0;
+}
+
+input[type="number"] {
+	-moz-appearance: textfield;
+}
+
 button {
 	background: var(--accent);
 	color: #fff;
