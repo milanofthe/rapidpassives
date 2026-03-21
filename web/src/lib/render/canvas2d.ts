@@ -91,6 +91,7 @@ export function renderLayers(
 	ctx.fillRect(0, 0, width, height);
 
 	drawGrid(ctx, view);
+	drawCrosshair(ctx, view);
 
 	// Layers back to front
 	for (const layerName of LAYER_ORDER) {
@@ -118,7 +119,6 @@ export function renderLayers(
 		}
 	}
 
-	drawCrosshair(ctx, view);
 }
 
 function brighten(hex: string, amount: number): string {
@@ -162,7 +162,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, view: ViewState): void {
 	else if (residual < 5) gridStep = 2 * magnitude;
 	else gridStep = 5 * magnitude;
 
-	ctx.strokeStyle = '#1e1e24';
+	ctx.strokeStyle = '#2a2a32';
 	ctx.lineWidth = 0.5;
 
 	const worldLeft = -view.offsetX / view.scale;
