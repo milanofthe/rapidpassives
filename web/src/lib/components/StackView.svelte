@@ -1,4 +1,5 @@
 <script lang="ts">
+	import '$lib/components/fields.css';
 	import type { ProcessStack } from '$lib/stack/types';
 
 	let { stack = $bindable<ProcessStack>() }: { stack: ProcessStack } = $props();
@@ -22,13 +23,9 @@
 			.filter(l => l.type !== 'substrate')
 			.sort((a, b) => a.z - b.z)
 	);
-
-	let expanded = $state<string | null>(null);
-	function toggle(id: string) { expanded = expanded === id ? null : id; }
 </script>
 
 <div class="stack-panel">
-	<div class="section-header">Layer Stack</div>
 
 	<!-- Cross-section diagram -->
 	<div class="cross-section">
@@ -62,67 +59,64 @@
 		<div class="cs-passivation"></div>
 	</div>
 
-	<!-- Layer list -->
-	<div class="layer-list">
-		{#each [...sortedLayers].reverse() as layer}
-			<div class="layer-row" class:dimmed={!layer.visible}>
+	<!-- Layer cards — top to bottom -->
+	{#each [...sortedLayers].reverse() as layer}
+		<div class="layer-card" class:dimmed={!layer.visible} style="border-left-color: {layer.color};">
+			<div class="layer-header">
 				<button
-					class="vis-dot"
-					style="background: {layer.visible ? layer.color : 'transparent'}; border-color: {layer.color};"
+					class="vis-toggle"
+					class:active={layer.visible}
+					style="border-color: {layer.color}; {layer.visible ? `background: ${layer.color};` : ''}"
 					onclick={() => toggleLayer(layer.id)}
-					title="Toggle visibility"
 				></button>
-				<button class="layer-name" onclick={() => toggle(layer.id)}>
-					{layer.name}
-				</button>
+				<span class="layer-title">{layer.name}</span>
 				{#if layer.type === 'via'}
-					<span class="layer-tag">VIA</span>
-				{:else if layer.rsh !== undefined}
-					<span class="layer-meta">{layer.rsh} R□</span>
+					<span class="layer-badge">VIA</span>
 				{/if}
 			</div>
-
-			{#if expanded === layer.id}
-				<div class="layer-detail">
-					<div class="detail-row">
-						<span>z</span>
-						<input type="number" value={layer.z} step="0.1"
-							oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) updateLayer(layer.id, 'z', v); }} />
-						<em>um</em>
-					</div>
-					<div class="detail-row">
-						<span>thick</span>
-						<input type="number" value={layer.thickness} step="0.1" min="0.01"
-							oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) updateLayer(layer.id, 'thickness', v); }} />
-						<em>um</em>
-					</div>
-					{#if layer.type === 'metal'}
-						<div class="detail-row">
-							<span>Rsh</span>
-							<input type="number" value={layer.rsh} step="0.01" min="0"
-								oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) updateLayer(layer.id, 'rsh', v); }} />
-							<em>ohm/sq</em>
-						</div>
-					{/if}
+			<div class="layer-fields">
+				<div class="lf">
+					<span>z</span>
+					<input type="number" value={layer.z} step="0.1"
+						oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) updateLayer(layer.id, 'z', v); }} />
+					<em>um</em>
 				</div>
-			{/if}
-		{/each}
-	</div>
-
-	<!-- Substrate settings -->
-	<div class="sub-section">
-		<div class="sub-header">Substrate</div>
-		<div class="detail-row">
-			<span>rho</span>
-			<input type="number" value={stack.substrateRho} step="1" min="0.1"
-				oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) stack = { ...stack, substrateRho: v }; }} />
-			<em>ohm*cm</em>
+				<div class="lf">
+					<span>thick</span>
+					<input type="number" value={layer.thickness} step="0.1" min="0.01"
+						oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) updateLayer(layer.id, 'thickness', v); }} />
+					<em>um</em>
+				</div>
+				{#if layer.type === 'metal' && layer.rsh !== undefined}
+					<div class="lf">
+						<span>Rsh</span>
+						<input type="number" value={layer.rsh} step="0.01" min="0"
+							oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) updateLayer(layer.id, 'rsh', v); }} />
+						<em>Ω/□</em>
+					</div>
+				{/if}
+			</div>
 		</div>
-		<div class="detail-row">
-			<span>eps_ox</span>
-			<input type="number" value={stack.oxideEr} step="0.1" min="1"
-				oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) stack = { ...stack, oxideEr: v }; }} />
-			<em></em>
+	{/each}
+
+	<!-- Substrate card -->
+	<div class="layer-card sub-card">
+		<div class="layer-header">
+			<span class="layer-title">Substrate</span>
+		</div>
+		<div class="layer-fields">
+			<div class="lf">
+				<span>rho</span>
+				<input type="number" value={stack.substrateRho} step="1" min="0.1"
+					oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) stack = { ...stack, substrateRho: v }; }} />
+				<em>Ω·cm</em>
+			</div>
+			<div class="lf">
+				<span>ε_ox</span>
+				<input type="number" value={stack.oxideEr} step="0.1" min="1"
+					oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) stack = { ...stack, oxideEr: v }; }} />
+				<em></em>
+			</div>
 		</div>
 	</div>
 </div>
@@ -131,15 +125,7 @@
 	.stack-panel {
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
-	}
-	.section-header {
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 1.5px;
-		color: var(--accent);
-		font-weight: 600;
-		font-family: var(--font-mono);
+		gap: 2px;
 	}
 
 	/* === Cross section === */
@@ -149,19 +135,15 @@
 		border: 1px solid var(--border-subtle);
 		background: var(--bg-inset);
 		overflow: hidden;
+		margin-bottom: 6px;
 	}
-
 	.cs-substrate {
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		height: 54px;
 		background: repeating-linear-gradient(
-			45deg,
-			var(--bg-panel),
-			var(--bg-panel) 3px,
-			#33333a 3px,
-			#33333a 6px
+			45deg, var(--bg-panel), var(--bg-panel) 3px, #33333a 3px, #33333a 6px
 		);
 	}
 	.cs-substrate span {
@@ -169,7 +151,6 @@
 		font-family: var(--font-mono);
 		color: var(--text-dim);
 	}
-
 	.cs-oxide {
 		height: 10px;
 		background: #2e2e38;
@@ -183,12 +164,10 @@
 		color: var(--text-dim);
 		opacity: 0.5;
 	}
-
 	.cs-oxide-gap {
 		height: 7px;
 		background: #2e2e38;
 	}
-
 	.cs-row {
 		cursor: pointer;
 		transition: opacity 0.15s;
@@ -196,7 +175,6 @@
 	.cs-row.dimmed {
 		opacity: 0.15;
 	}
-
 	.cs-metal {
 		display: flex;
 		align-items: center;
@@ -210,7 +188,6 @@
 		text-shadow: 0 0 3px rgba(255,255,255,0.2);
 		pointer-events: none;
 	}
-
 	.cs-via-row {
 		display: flex;
 		align-items: stretch;
@@ -222,126 +199,96 @@
 	.cs-via-block {
 		width: 40%;
 		background: repeating-linear-gradient(
-			-45deg,
-			transparent,
-			transparent 2px,
-			rgba(0,0,0,0.3) 2px,
-			rgba(0,0,0,0.3) 4px
+			-45deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px
 		);
 	}
-
 	.cs-passivation {
 		height: 5px;
 		background: #3a3a44;
 	}
 
-	/* === Layer list === */
-	.layer-list {
-		display: flex;
-		flex-direction: column;
+	/* === Layer cards === */
+	.layer-card {
+		background: var(--bg-surface);
+		border: 1px solid var(--border-subtle);
+		border-left: 3px solid;
+		padding: 8px 10px;
+		transition: opacity 0.15s;
 	}
-	.layer-row {
+	.layer-card.dimmed {
+		opacity: 0.4;
+	}
+	.sub-card {
+		border-left-color: var(--text-dim);
+		margin-top: 4px;
+	}
+	.layer-header {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		padding: 4px 0;
+		gap: 8px;
+		margin-bottom: 6px;
 	}
-	.layer-row.dimmed {
-		opacity: 0.35;
-	}
-	.vis-dot {
-		width: 10px;
-		height: 10px;
-		border: 1.5px solid;
+	.vis-toggle {
+		width: 12px;
+		height: 12px;
+		border: 2px solid;
 		padding: 0;
-		flex-shrink: 0;
 		cursor: pointer;
-		background: none;
-		min-width: 10px;
-		min-height: 10px;
+		flex-shrink: 0;
+		min-width: 12px;
+		min-height: 12px;
+		transition: background 0.1s;
 	}
-	.vis-dot:hover {
-		opacity: 0.8;
+	.vis-toggle:hover {
+		opacity: 0.7;
 	}
-	.layer-name {
+	.vis-toggle.active {
+		background: currentColor;
+	}
+	.layer-title {
 		font-size: 11px;
 		font-family: var(--font-mono);
-		color: var(--text-muted);
-		background: none;
-		border: none;
-		padding: 0;
-		cursor: pointer;
-		text-transform: none;
-		letter-spacing: 0;
-		font-weight: 500;
-		text-align: left;
-	}
-	.layer-name:hover {
+		font-weight: 600;
 		color: var(--text);
-		background: none;
 	}
-	.layer-tag {
+	.layer-badge {
 		font-size: 8px;
 		font-family: var(--font-mono);
 		color: var(--text-dim);
-		border: 1px solid var(--border-subtle);
-		padding: 0 3px;
+		border: 1px solid var(--border);
+		padding: 0 4px;
 		margin-left: auto;
 		letter-spacing: 0.5px;
 	}
-	.layer-meta {
-		font-size: 9px;
-		font-family: var(--font-mono);
-		color: var(--text-dim);
-		margin-left: auto;
-	}
 
-	/* === Detail panel === */
-	.layer-detail {
+	/* === Layer fields — matches fields.css pattern === */
+	.layer-fields {
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
-		padding: 4px 8px 4px 18px;
-		background: var(--bg-inset);
-		border-left: 2px solid var(--border-subtle);
-		margin-left: 4px;
 	}
-	.detail-row {
+	.lf {
 		display: flex;
 		align-items: center;
 		gap: 6px;
+		padding: 2px 0;
 	}
-	.detail-row span {
+	.lf > span {
 		font-size: 10px;
 		font-family: var(--font-mono);
 		color: var(--text-dim);
-		min-width: 40px;
+		min-width: 38px;
 	}
-	.detail-row input {
-		width: 70px;
+	.lf input {
+		width: 72px;
 		font-size: 11px;
-		padding: 2px 4px;
+		padding: 3px 6px;
+		text-align: right;
 	}
-	.detail-row em {
+	.lf em {
 		font-style: normal;
 		font-size: 9px;
 		font-family: var(--font-mono);
 		color: var(--text-dim);
-	}
-
-	/* === Substrate section === */
-	.sub-section {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		padding-top: 6px;
-		border-top: 1px solid var(--border-subtle);
-	}
-	.sub-header {
-		font-size: 10px;
-		font-family: var(--font-mono);
-		color: var(--text-dim);
-		font-weight: 500;
-		margin-bottom: 2px;
+		min-width: 36px;
 	}
 </style>
