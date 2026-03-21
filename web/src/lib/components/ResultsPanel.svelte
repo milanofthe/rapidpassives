@@ -67,13 +67,19 @@
 		});
 		const yax = (title: string) => ({ title: { text: title, font: { size: 10 } }, gridcolor: '#2a2a32', tickfont: { size: 9 } });
 
+		const trNamed = (y: number[], color: string, name: string) => ({
+			...tr(y, color), name, showlegend: true,
+		});
+
 		const plots = [
-			{ id: 'p-l', data: [tr(L, '#e8944a')], yaxis: yax('L (nH)') },
-			{ id: 'p-q', data: [tr(Q, '#d9513c')], yaxis: yax('Q') },
-			{ id: 'p-r', data: [tr(R, '#6bbf8a')], yaxis: yax('R (Ω)') },
-			{ id: 'p-s11', data: [tr(s11Mag, '#7b5e8a')], yaxis: yax('|S11| (dB)') },
-			{ id: 'p-s21', data: [tr(s21Mag, '#e8944a')], yaxis: yax('|S21| (dB)') },
-			{ id: 'p-ph', data: [tr(s11Phase, '#d9513c')], yaxis: yax('∠S11 (°)') },
+			{ id: 'p-l', data: [tr(L, '#e8944a')], yaxis: yax('L (nH)'), legend: false },
+			{ id: 'p-q', data: [tr(Q, '#d9513c')], yaxis: yax('Q'), legend: false },
+			{ id: 'p-r', data: [tr(R, '#6bbf8a')], yaxis: yax('R (Ω)'), legend: false },
+			{ id: 'p-s', data: [
+				trNamed(s11Mag, '#7b5e8a', '|S11|'),
+				trNamed(s21Mag, '#e8944a', '|S21|'),
+			], yaxis: yax('dB'), legend: true },
+			{ id: 'p-ph', data: [tr(s11Phase, '#d9513c')], yaxis: yax('∠S11 (°)'), legend: false },
 		];
 
 		const grid = el.querySelector('.plot-grid')!;
@@ -84,7 +90,7 @@
 				div.id = p.id;
 				grid.appendChild(div);
 			}
-			P.react(div, p.data, { ...base, yaxis: p.yaxis }, cfg);
+			P.react(div, p.data, { ...base, yaxis: p.yaxis, showlegend: p.legend ?? false, legend: { font: { size: 9 }, x: 0.02, y: 0.98 } }, cfg);
 		}
 	}
 </script>
