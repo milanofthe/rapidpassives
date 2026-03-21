@@ -118,19 +118,12 @@
 		gap: 8px;
 		padding: 4px 6px;
 		margin: 0 -6px;
-		transition: background 0.1s;
-	}
-	.field:hover {
-		background: var(--accent-dim);
 	}
 	.field-label {
 		font-size: 12px;
 		color: var(--text-muted);
 		min-width: 70px;
 		font-family: var(--font-mono);
-	}
-	.field:hover .field-label {
-		color: var(--text);
 	}
 	.field-input {
 		flex: 1;
