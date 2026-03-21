@@ -1,15 +1,35 @@
 <script lang="ts">
 	import '../app.css';
+	import { page } from '$app/state';
+
 	let { children } = $props();
+
+	const tabs = [
+		{ href: '/spiral', label: 'Spiral' },
+		{ href: '/symmetric-inductor', label: 'Symmetric' },
+		{ href: '/symmetric-transformer', label: 'Transformer' },
+	];
+
+	const isEditor = $derived(tabs.some(t => page.url.pathname === t.href));
 </script>
 
 <div class="app">
 	<header>
-		<div class="brand">
+		<a class="brand" href="/">
 			<h1>RAPIDPASSIVES</h1>
+		</a>
+		{#if isEditor}
 			<div class="divider"></div>
-			<span class="subtitle">RFIC Inductor & Transformer Design</span>
-		</div>
+			<nav class="tabs">
+				{#each tabs as tab}
+					<a
+						href={tab.href}
+						class="tab"
+						class:active={page.url.pathname === tab.href}
+					>{tab.label}</a>
+				{/each}
+			</nav>
+		{/if}
 	</header>
 	<main>
 		{@render children()}
@@ -30,13 +50,12 @@
 		background: var(--bg-surface);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
-	}
-	.brand {
-		display: flex;
-		align-items: center;
 		gap: 12px;
 	}
-	header h1 {
+	.brand {
+		text-decoration: none;
+	}
+	.brand h1 {
 		font-size: 12px;
 		font-weight: 700;
 		color: var(--accent);
@@ -48,10 +67,30 @@
 		height: 14px;
 		background: var(--border);
 	}
-	.subtitle {
+	.tabs {
+		display: flex;
+		gap: 0;
+		height: 100%;
+	}
+	.tab {
+		display: flex;
+		align-items: center;
+		padding: 0 14px;
 		font-size: 11px;
+		font-weight: 600;
+		font-family: var(--font-mono);
+		letter-spacing: 0.5px;
 		color: var(--text-dim);
-		letter-spacing: 0.3px;
+		text-decoration: none;
+		border-bottom: 2px solid transparent;
+		transition: color 0.15s, border-color 0.15s;
+	}
+	.tab:hover {
+		color: var(--text-muted);
+	}
+	.tab.active {
+		color: var(--accent);
+		border-bottom-color: var(--accent);
 	}
 	main {
 		flex: 1;
