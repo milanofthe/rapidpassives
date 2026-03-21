@@ -97,9 +97,9 @@
 					<em>MHz</em>
 				</div></div>
 				<div class="f"><span>f_max</span><div class="fi">
-					<input type="number" value={simSettings.fMax / 1e9} step="1" min="0.1"
-						oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) simSettings = { ...simSettings, fMax: v * 1e9 }; }} />
-					<em>GHz</em>
+					<input type="number" value={simSettings.fMax / 1e6} step="1000" min="1"
+						oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) simSettings = { ...simSettings, fMax: v * 1e6 }; }} />
+					<em>MHz</em>
 				</div></div>
 				<div class="f"><span>Points</span><div class="fi">
 					<input type="number" value={simSettings.nPoints} step="10" min="10" max="500"
