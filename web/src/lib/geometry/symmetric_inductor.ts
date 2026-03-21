@@ -195,6 +195,7 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 
 	const ports: Port[] = [
 		{ name: 'P1', plusNode: portLeft.id, minusNode: portRight.id },
+		{ name: 'P2', plusNode: portRight.id, minusNode: portLeft.id },
 	];
 
 	if (center_tap) {
