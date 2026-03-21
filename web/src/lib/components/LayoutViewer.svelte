@@ -83,7 +83,7 @@
 			lastMouse = { x: e.clientX, y: e.clientY };
 			render();
 		} else {
-			const hit = hitTest(layers, view, mx, my);
+			const hit = hitTest(layers, view, mx, my, renderOpts);
 			if (hit?.layer !== hovered?.layer || hit?.index !== hovered?.index) {
 				hovered = hit;
 				render();

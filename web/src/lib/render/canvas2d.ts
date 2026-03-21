@@ -45,7 +45,8 @@ export function fitToView(canvasW: number, canvasH: number, layers: LayerMap): V
 
 /** Hit-test: find which layer+polygon the cursor is over */
 export function hitTest(
-	layers: LayerMap, view: ViewState, screenX: number, screenY: number
+	layers: LayerMap, view: ViewState, screenX: number, screenY: number,
+	opts?: RenderOptions
 ): { layer: LayerName; index: number } | null {
 	const worldX = (screenX - view.offsetX) / view.scale;
 	const worldY = -(screenY - view.offsetY) / view.scale;
@@ -53,6 +54,7 @@ export function hitTest(
 	// Check layers in reverse draw order (front to back)
 	for (let li = LAYER_ORDER.length - 1; li >= 0; li--) {
 		const layerName = LAYER_ORDER[li];
+		if (opts?.visibleLayers && !opts.visibleLayers.has(layerName)) continue;
 		const polys = layers[layerName];
 		if (!polys || polys.length === 0) continue;
 		for (let pi = polys.length - 1; pi >= 0; pi--) {
