@@ -2,8 +2,10 @@
 	import '$lib/components/fields.css';
 	import type { SymmetricInductorParams, LayerMap } from '$lib/geometry/types';
 	import { buildSymmetricInductor, isSymmetricInductorValid } from '$lib/geometry/symmetric_inductor';
+	import { createDefaultStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
+	import StackView from '$lib/components/StackView.svelte';
 	import { nudgeValue, parseInput } from '$lib/components/fields';
 
 	let p = $state<SymmetricInductorParams>({
@@ -16,11 +18,14 @@
 	function nud(k: keyof SymmetricInductorParams, s: number, mn?: number, mx?: number) { set(k, nudgeValue(p[k] as number, s, mn, mx)); }
 	function inp(k: keyof SymmetricInductorParams, e: Event) { const v = parseInput(e); if (v !== null) set(k, v); }
 
+	let stack = $state(createDefaultStack());
+
 	let layers = $derived.by<LayerMap>(() => { try { return buildSymmetricInductor({ ...p }); } catch { return {}; } });
 	let valid = $derived(isSymmetricInductorValid({ ...p }));
+	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack) });
 </script>
 
-<GeometryEditor {layers} {valid}>
+<GeometryEditor {layers} {valid} {renderOpts}>
 	{#snippet sidebar()}
 		<ParamSidebar>
 			<div class="param-section"><h4>Geometry</h4>
@@ -36,6 +41,9 @@
 				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('via_spacing',-0.1,0.1)}>-</button><input type="number" value={p.via_spacing} oninput={e => inp('via_spacing',e)}/><button onclick={() => nud('via_spacing',0.1,0.1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('via_width',-0.1,0.1)}>-</button><input type="number" value={p.via_width} oninput={e => inp('via_width',e)}/><button onclick={() => nud('via_width',0.1,0.1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>In Metal</span><div class="fi"><button onclick={() => nud('via_in_metal',-0.05,0)}>-</button><input type="number" value={p.via_in_metal} oninput={e => inp('via_in_metal',e)}/><button onclick={() => nud('via_in_metal',0.05,0)}>+</button><em>um</em></div></div>
+			</div>
+			<div class="param-section">
+				<StackView bind:stack />
 			</div>
 		</ParamSidebar>
 	{/snippet}

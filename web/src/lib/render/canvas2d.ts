@@ -77,12 +77,18 @@ function pointInPolygon(px: number, py: number, poly: Polygon): boolean {
 	return inside;
 }
 
+export interface RenderOptions {
+	colorOverrides?: Record<string, string>;
+	visibleLayers?: Set<LayerName>;
+}
+
 /** Render all layers to a canvas context */
 export function renderLayers(
 	ctx: CanvasRenderingContext2D,
 	layers: LayerMap,
 	view: ViewState,
-	highlight?: { layer: LayerName; index: number } | null
+	highlight?: { layer: LayerName; index: number } | null,
+	opts?: RenderOptions
 ): void {
 	const { width, height } = ctx.canvas;
 	ctx.clearRect(0, 0, width, height);
@@ -96,15 +102,17 @@ export function renderLayers(
 
 	// Layers back to front
 	for (const layerName of LAYER_ORDER) {
+		if (opts?.visibleLayers && !opts.visibleLayers.has(layerName)) continue;
 		const polys = layers[layerName];
 		if (!polys || polys.length === 0) continue;
 
+		const baseColor = opts?.colorOverrides?.[layerName] ?? LAYER_COLORS[layerName] ?? '#888';
 		for (let pi = 0; pi < polys.length; pi++) {
 			const isHighlighted = highlight && highlight.layer === layerName && highlight.index === pi;
 			if (isHighlighted) {
-				ctx.fillStyle = brighten(LAYER_COLORS[layerName] || '#888', canvasTheme.highlightBrighten);
+				ctx.fillStyle = brighten(baseColor, canvasTheme.highlightBrighten);
 			} else {
-				ctx.fillStyle = LAYER_COLORS[layerName] || '#888';
+				ctx.fillStyle = baseColor;
 			}
 			drawPolygon(ctx, polys[pi], view);
 		}

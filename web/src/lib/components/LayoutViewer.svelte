@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { LayerMap, LayerName } from '$lib/geometry/types';
-	import { fitToView, renderLayers, hitTest, type ViewState } from '$lib/render/canvas2d';
+	import { fitToView, renderLayers, hitTest, type ViewState, type RenderOptions } from '$lib/render/canvas2d';
 
-	let { layers }: { layers: LayerMap } = $props();
+	let { layers, renderOpts }: { layers: LayerMap; renderOpts?: RenderOptions } = $props();
 
 	let canvas: HTMLCanvasElement;
 	let container: HTMLDivElement;
@@ -34,7 +34,7 @@
 		syncCanvas();
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
-		renderLayers(ctx, layers, view, hovered);
+		renderLayers(ctx, layers, view, hovered, renderOpts);
 	}
 
 	function autoFit() {
@@ -116,6 +116,13 @@
 		layers;
 		if (mounted && canvas) {
 			autoFit();
+		}
+	});
+
+	$effect(() => {
+		renderOpts;
+		if (mounted && canvas) {
+			render();
 		}
 	});
 </script>

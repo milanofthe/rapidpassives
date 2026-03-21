@@ -1,9 +1,15 @@
 <script lang="ts">
 	import type { LayerMap } from '$lib/geometry/types';
+	import type { RenderOptions } from '$lib/render/canvas2d';
 	import LayoutViewer from './LayoutViewer.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, valid = true }: { layers: LayerMap; sidebar: Snippet; valid?: boolean } = $props();
+	let { layers, sidebar, valid = true, renderOpts }: {
+		layers: LayerMap;
+		sidebar: Snippet;
+		valid?: boolean;
+		renderOpts?: RenderOptions;
+	} = $props();
 </script>
 
 <div class="workspace">
@@ -15,7 +21,7 @@
 			<div class="invalid-bar">Invalid geometry — parameters cause clipping or overlap</div>
 		{/if}
 		<div class="viewer-pane">
-			<LayoutViewer {layers} />
+			<LayoutViewer {layers} {renderOpts} />
 		</div>
 	</div>
 </div>
