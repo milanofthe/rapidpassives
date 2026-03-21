@@ -156,15 +156,16 @@
 <style>
 	.results {
 		height: 100%;
-		overflow-y: auto;
+		overflow: auto;
 		background: var(--bg-surface);
 		padding: 8px;
 	}
 	.plot-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		grid-auto-rows: minmax(180px, 1fr);
+		grid-template-rows: repeat(3, minmax(150px, 1fr));
 		gap: 4px;
+		min-height: 100%;
 	}
 	.no-result {
 		padding: 24px;
