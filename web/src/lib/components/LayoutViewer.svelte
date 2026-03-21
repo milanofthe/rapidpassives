@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { LayerMap, LayerName } from '$lib/geometry/types';
 	import { fitToView, renderLayers, hitTest, type ViewState, type RenderOptions } from '$lib/render/canvas2d';
+	import { LAYER_COLORS } from '$lib/geometry/types';
 
 	let { layers, renderOpts }: { layers: LayerMap; renderOpts?: RenderOptions } = $props();
 
@@ -140,7 +141,7 @@
 		<span class="coord">x {cursorWorld.x.toFixed(1)}</span>
 		<span class="coord">y {cursorWorld.y.toFixed(1)}</span>
 		{#if hovered}
-			<span class="layer-tag" style="color: var(--accent)">{hovered.layer}</span>
+			<span class="layer-tag" style="color: {renderOpts?.colorOverrides?.[hovered.layer] ?? LAYER_COLORS[hovered.layer] ?? 'var(--accent)'}">{hovered.layer}</span>
 		{/if}
 	</div>
 </div>
