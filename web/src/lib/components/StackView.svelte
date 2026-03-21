@@ -70,10 +70,7 @@
 					onclick={() => toggleLayer(layer.id)}
 				></button>
 				<span class="layer-title">{layer.name}</span>
-				{#if layer.type === 'via'}
-					<span class="layer-badge">VIA</span>
-				{/if}
-			</div>
+				</div>
 			<div class="layer-fields">
 				<div class="lf">
 					<span>z</span>
@@ -250,15 +247,6 @@
 		color: var(--accent);
 		text-transform: uppercase;
 		letter-spacing: 1.5px;
-	}
-	.layer-badge {
-		font-size: 8px;
-		font-family: var(--font-mono);
-		color: var(--text-dim);
-		border: 1px solid var(--border);
-		padding: 0 4px;
-		margin-left: auto;
-		letter-spacing: 0.5px;
 	}
 
 	/* === Layer fields — matches fields.css pattern === */
