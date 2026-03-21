@@ -1,0 +1,67 @@
+:root {
+	--bg: #1a1a2e;
+	--bg-surface: #16213e;
+	--bg-panel: #0f3460;
+	--text: #e0e0e0;
+	--text-muted: #8a8a9a;
+	--accent: #e94560;
+	--accent-secondary: #fca311;
+	--border: #2a2a4a;
+	--input-bg: #1a1a3e;
+	--layer-winding: #ffd700;
+	--layer-crossing: #e94560;
+	--layer-via: #333;
+	--layer-pgs: #3a86ff;
+	--layer-centertap: #2ec4b6;
+}
+
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+html, body {
+	height: 100%;
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+	background: var(--bg);
+	color: var(--text);
+	font-size: 14px;
+}
+
+input[type="number"], input[type="text"], select {
+	background: var(--input-bg);
+	border: 1px solid var(--border);
+	color: var(--text);
+	padding: 4px 8px;
+	border-radius: 4px;
+	font-size: 13px;
+	width: 100%;
+}
+
+input[type="number"]:focus, select:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+
+button {
+	background: var(--accent);
+	color: white;
+	border: none;
+	padding: 8px 16px;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 500;
+}
+
+button:hover {
+	opacity: 0.9;
+}
+
+label {
+	font-size: 12px;
+	color: var(--text-muted);
+	display: block;
+	margin-bottom: 2px;
+}
