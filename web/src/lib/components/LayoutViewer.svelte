@@ -125,10 +125,17 @@
 		return () => ro.disconnect();
 	});
 
+	// Only auto-fit when geometry structurally changes (not on every re-render)
+	let lastLayerKey = '';
 	$effect(() => {
-		layers;
+		const key = Object.keys(layers).map(k => `${k}:${(layers as any)[k]?.length ?? 0}`).join(',');
 		if (mounted && canvas) {
-			autoFit();
+			if (key !== lastLayerKey) {
+				lastLayerKey = key;
+				autoFit();
+			} else {
+				render();
+			}
 		}
 	});
 

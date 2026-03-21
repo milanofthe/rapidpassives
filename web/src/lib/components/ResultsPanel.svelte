@@ -121,10 +121,35 @@
 			return axis;
 		};
 
-		const plots: { id: string; data: any[]; yaxis: any; legend: boolean }[] = [
-			{ id: 'p-l', data: [tr(L, 0)], yaxis: yax('L (nH)', L), legend: false },
-			{ id: 'p-q', data: [tr(Q, 0)], yaxis: yax('Q', Q), legend: false },
-			{ id: 'p-r', data: [tr(R, 0)], yaxis: yax('R (Ω)', R), legend: false },
+		// Per-port L/Q/R traces
+		const nPortResults = r.freqs[0]?.ports?.length ?? 0;
+		const multiPort = nPortResults > 1;
+
+		const lTraces: any[] = [], qTraces: any[] = [], rTraces: any[] = [];
+		const lData: number[][] = [], qData: number[][] = [], rData: number[][] = [];
+
+		if (multiPort) {
+			for (let pi = 0; pi < nPortResults; pi++) {
+				const name = r.freqs[0].ports[pi]?.name ?? `Port ${pi}`;
+				const pL = r.freqs.map(p => (p.ports[pi]?.L ?? 0) * 1e9);
+				const pQ = r.freqs.map(p => p.ports[pi]?.Q ?? 0);
+				const pR = r.freqs.map(p => p.ports[pi]?.R ?? 0);
+				lTraces.push(tr(pL, pi, `L_${name}`));
+				qTraces.push(tr(pQ, pi, `Q_${name}`));
+				rTraces.push(tr(pR, pi, `R_${name}`));
+				lData.push(pL); qData.push(pQ); rData.push(pR);
+			}
+		} else {
+			lTraces.push(tr(L, 0));
+			qTraces.push(tr(Q, 0));
+			rTraces.push(tr(R, 0));
+			lData.push(L); qData.push(Q); rData.push(R);
+		}
+
+		const plots: { id: string; data: any[]; yaxis: any }[] = [
+			{ id: 'p-l', data: lTraces, yaxis: yax('L (nH)', ...lData) },
+			{ id: 'p-q', data: qTraces, yaxis: yax('Q', ...qData) },
+			{ id: 'p-r', data: rTraces, yaxis: yax('R (Ω)', ...rData) },
 		];
 
 		// S-param magnitude plot
@@ -134,8 +159,7 @@
 				id: 'p-s',
 				data: sTracesMag.map(t => tr(t.data, t.ci % plotColors.cycle.length, hasMultiple ? t.name : undefined)),
 				yaxis: yax('|S| (dB)', ...sTracesMag.map(t => t.data)),
-				legend: hasMultiple,
-			});
+				});
 		}
 
 		// S-param phase plot
@@ -145,14 +169,13 @@
 				id: 'p-ph',
 				data: sTracesPhase.map(t => tr(t.data, t.ci % plotColors.cycle.length, hasMultiple ? t.name : undefined)),
 				yaxis: yax('Phase (°)', ...sTracesPhase.map(t => t.data)),
-				legend: hasMultiple,
-			});
+				});
 		}
 
 		// Coupling coefficient for transformer (4+ ports only)
 		if (r.freqs[0]?.k !== undefined && r.nPorts >= 4) {
 			const kData = r.freqs.map(p => p.k ?? 0);
-			plots.push({ id: 'p-k', data: [tr(kData, 3)], yaxis: yax('k', kData), legend: false });
+			plots.push({ id: 'p-k', data: [tr(kData, 3)], yaxis: yax('k', kData) });
 		}
 
 		const grid = el.querySelector('.plot-grid')!;
@@ -163,7 +186,7 @@
 				div.id = p.id;
 				grid.appendChild(div);
 			}
-			P.react(div, p.data, { ...base, yaxis: p.yaxis, showlegend: p.legend ?? false, legend: { font: { size: 9 }, x: 0.02, y: 0.98 } }, cfg);
+			P.react(div, p.data, { ...base, yaxis: p.yaxis, showlegend: false, hovermode: 'closest' }, cfg);
 		}
 
 		// Force resize after initial render to fit grid cells
