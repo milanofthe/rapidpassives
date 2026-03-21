@@ -78,10 +78,10 @@
 			font: { family: 'JetBrains Mono, monospace', size: 10, color: '#7d7a85' },
 			paper_bgcolor: 'rgba(0,0,0,0)',
 			plot_bgcolor: '#18181d',
-			margin: { t: 8, r: 12, b: 40, l: 52 },
+			margin: { t: 8, r: 12, b: 44, l: 60 },
 			xaxis: {
 				type: xType as any,
-				title: { text: 'Frequency (Hz)', font: { size: 9 } },
+				title: { text: 'Frequency (Hz)', font: { size: 9 }, standoff: 8 },
 				gridcolor: '#2a2a32',
 				linecolor: '#35353d',
 				tickfont: { size: 9 },
@@ -94,7 +94,7 @@
 			x: f, y, type: 'scatter' as const, mode: 'lines' as const, line: { color, width: 2 },
 		});
 		const yax = (title: string, ...datasets: number[][]) => {
-			const axis: any = { title: { text: title, font: { size: 10 } }, gridcolor: '#2a2a32', tickfont: { size: 9 } };
+			const axis: any = { title: { text: title, font: { size: 10 }, standoff: 12 }, gridcolor: '#2a2a32', tickfont: { size: 9 } };
 			if (datasets.length > 0) {
 				// Smart y-range: if variation is small relative to mean, zoom in
 				const all = datasets.flat().filter(v => isFinite(v));
