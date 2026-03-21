@@ -20,7 +20,7 @@
 		padding: 10px;
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
+		gap: 10px;
 		background: var(--bg);
 	}
 	.actions {
