@@ -6,31 +6,37 @@
 	import ResultsPanel from './ResultsPanel.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, stackPanel, valid = true, renderOpts, simResult }: {
+	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult }: {
 		layers: LayerMap;
 		sidebar: Snippet;
 		stackPanel?: Snippet;
+		simPanel?: Snippet;
 		valid?: boolean;
 		renderOpts?: RenderOptions;
 		simResult?: SimulationResult | null;
 	} = $props();
 
-	let activeTab = $state<'params' | 'stack'>('params');
+	let activeTab = $state<'params' | 'stack' | 'sim'>('params');
 </script>
 
 <div class="workspace">
 	<aside class="sidebar">
-		{#if stackPanel}
-			<div class="sidebar-tabs">
-				<button class="stab" class:active={activeTab === 'params'} onclick={() => activeTab = 'params'}>Params</button>
+		<div class="sidebar-tabs">
+			<button class="stab" class:active={activeTab === 'params'} onclick={() => activeTab = 'params'}>Params</button>
+			{#if stackPanel}
 				<button class="stab" class:active={activeTab === 'stack'} onclick={() => activeTab = 'stack'}>Stack</button>
-			</div>
-		{/if}
+			{/if}
+			{#if simPanel}
+				<button class="stab" class:active={activeTab === 'sim'} onclick={() => activeTab = 'sim'}>Sim</button>
+			{/if}
+		</div>
 		<div class="sidebar-content">
 			{#if activeTab === 'params'}
 				{@render sidebar()}
-			{:else if stackPanel}
+			{:else if activeTab === 'stack' && stackPanel}
 				{@render stackPanel()}
+			{:else if activeTab === 'sim' && simPanel}
+				{@render simPanel()}
 			{/if}
 		</div>
 	</aside>

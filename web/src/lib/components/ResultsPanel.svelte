@@ -1,115 +1,72 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import type { SimulationResult } from '$lib/solver/peec';
 
 	let { result }: { result: SimulationResult | null } = $props();
+
+	let container = $state<HTMLDivElement | null>(null);
+	let Plotly: any = null;
+
+	onMount(async () => {
+		Plotly = (await import('plotly.js-dist-min')).default;
+	});
+
+	$effect(() => {
+		const r = result;
+		const el = container;
+		if (!Plotly || !el || !r || r.freqs.length === 0) return;
+		renderPlots(el, r);
+	});
 
 	function getSrf(r: SimulationResult): string {
 		const srf = r.freqs.find((p, i) => i > 0 && p.L < 0);
 		return srf ? (srf.freq / 1e9).toFixed(1) : '> ' + (r.freqs[r.freqs.length - 1].freq / 1e9).toFixed(0);
 	}
 
-	let plotDiv: HTMLDivElement;
-	let Plotly: any = null;
-	let mounted = false;
-
-	onMount(async () => {
-		Plotly = (await import('plotly.js-dist-min')).default;
-		mounted = true;
-	});
-
-	$effect(() => {
-		if (!mounted || !Plotly || !plotDiv || !result) return;
-		renderPlots();
-	});
-
-	function renderPlots() {
-		if (!result || !Plotly) return;
-
-		const freqs = result.freqs;
-		const f = freqs.map(p => p.freq);
-		const L = freqs.map(p => p.L * 1e9);  // nH
-		const Q = freqs.map(p => p.Q);
-		const R = freqs.map(p => p.R);
-		const S11_dB = freqs.map(p => {
+	function renderPlots(el: HTMLDivElement, r: SimulationResult) {
+		const f = r.freqs.map(p => p.freq);
+		const L = r.freqs.map(p => p.L * 1e9);
+		const Q = r.freqs.map(p => p.Q);
+		const R = r.freqs.map(p => p.R);
+		const S11_dB = r.freqs.map(p => {
 			const re = p.S[0][0][0], im = p.S[0][0][1];
 			return 10 * Math.log10(re * re + im * im);
 		});
 
-		const layout = {
+		const base = {
 			font: { family: 'JetBrains Mono, monospace', size: 10, color: '#7d7a85' },
-			paper_bgcolor: '#232329',
+			paper_bgcolor: 'rgba(0,0,0,0)',
 			plot_bgcolor: '#18181d',
-			margin: { t: 28, r: 16, b: 36, l: 50 },
-			xaxis: {
-				type: 'log' as const,
-				title: 'Frequency (Hz)',
-				gridcolor: '#2a2a32',
-				linecolor: '#35353d',
-				tickfont: { size: 9 },
-			},
-			height: 200,
+			margin: { t: 24, r: 12, b: 32, l: 48 },
+			xaxis: { type: 'log' as const, gridcolor: '#2a2a32', linecolor: '#35353d', tickfont: { size: 9 } },
+			height: 180,
+			showlegend: false,
 		};
+		const cfg = { responsive: true, displayModeBar: false };
+		const trace = (y: number[], color: string, name: string) => ({
+			x: f, y, name, type: 'scatter' as const, mode: 'lines' as const, line: { color, width: 2 },
+		});
 
-		const traceStyle = {
-			line: { width: 2 },
-			type: 'scatter' as const,
-			mode: 'lines' as const,
-		};
-
-		// L plot
-		Plotly.react(plotDiv, [
-			{ x: f, y: L, name: 'L (nH)', line: { color: '#e8944a', width: 2 }, ...traceStyle },
-		], {
-			...layout,
-			yaxis: { title: 'L (nH)', gridcolor: '#2a2a32', linecolor: '#35353d', tickfont: { size: 9 } },
-		}, { responsive: true, displayModeBar: false });
-
-		// Create additional plot containers if they don't exist
-		ensurePlotContainer('plot-q');
-		ensurePlotContainer('plot-r');
-		ensurePlotContainer('plot-s11');
-
-		const qDiv = plotDiv.parentElement!.querySelector('#plot-q') as HTMLDivElement;
-		const rDiv = plotDiv.parentElement!.querySelector('#plot-r') as HTMLDivElement;
-		const s11Div = plotDiv.parentElement!.querySelector('#plot-s11') as HTMLDivElement;
-
-		// Q plot
-		Plotly.react(qDiv, [
-			{ x: f, y: Q, name: 'Q', line: { color: '#d9513c', width: 2 }, ...traceStyle },
-		], {
-			...layout,
-			yaxis: { title: 'Q factor', gridcolor: '#2a2a32', linecolor: '#35353d', tickfont: { size: 9 } },
-		}, { responsive: true, displayModeBar: false });
-
-		// R plot
-		Plotly.react(rDiv, [
-			{ x: f, y: R, name: 'R (Ω)', line: { color: '#6bbf8a', width: 2 }, ...traceStyle },
-		], {
-			...layout,
-			yaxis: { title: 'R (Ω)', gridcolor: '#2a2a32', linecolor: '#35353d', tickfont: { size: 9 } },
-		}, { responsive: true, displayModeBar: false });
-
-		// S11 plot
-		Plotly.react(s11Div, [
-			{ x: f, y: S11_dB, name: '|S11| (dB)', line: { color: '#7b5e8a', width: 2 }, ...traceStyle },
-		], {
-			...layout,
-			yaxis: { title: '|S11| (dB)', gridcolor: '#2a2a32', linecolor: '#35353d', tickfont: { size: 9 } },
-		}, { responsive: true, displayModeBar: false });
-	}
-
-	function ensurePlotContainer(id: string) {
-		if (!plotDiv.parentElement!.querySelector(`#${id}`)) {
-			const div = document.createElement('div');
-			div.id = id;
-			plotDiv.parentElement!.appendChild(div);
+		// Get or create plot divs
+		const ids = ['plot-l', 'plot-q', 'plot-r', 'plot-s11'];
+		for (const id of ids) {
+			if (!el.querySelector(`#${id}`)) {
+				const div = document.createElement('div');
+				div.id = id;
+				div.style.marginBottom = '4px';
+				el.querySelector('.plots')!.appendChild(div);
+			}
 		}
+
+		Plotly.react(el.querySelector('#plot-l')!, [trace(L, '#e8944a', 'L')], { ...base, yaxis: { title: 'L (nH)', gridcolor: '#2a2a32', tickfont: { size: 9 } } }, cfg);
+		Plotly.react(el.querySelector('#plot-q')!, [trace(Q, '#d9513c', 'Q')], { ...base, yaxis: { title: 'Q', gridcolor: '#2a2a32', tickfont: { size: 9 } } }, cfg);
+		Plotly.react(el.querySelector('#plot-r')!, [trace(R, '#6bbf8a', 'R')], { ...base, yaxis: { title: 'R (Ω)', gridcolor: '#2a2a32', tickfont: { size: 9 } } }, cfg);
+		Plotly.react(el.querySelector('#plot-s11')!, [trace(S11_dB, '#7b5e8a', 'S11')], { ...base, yaxis: { title: '|S11| (dB)', gridcolor: '#2a2a32', tickfont: { size: 9 } } }, cfg);
 	}
 </script>
 
-<div class="results">
-	{#if result}
+{#if result}
+	<div class="results" bind:this={container}>
 		<div class="summary">
 			<div class="stat">
 				<span class="stat-label">L</span>
@@ -130,13 +87,11 @@
 				<span class="stat-value">{result.filaments.length}</span>
 			</div>
 		</div>
-		<div class="plots">
-			<div bind:this={plotDiv}></div>
-		</div>
-	{:else}
-		<div class="no-result">Run simulation to see results</div>
-	{/if}
-</div>
+		<div class="plots"></div>
+	</div>
+{:else}
+	<div class="no-result">Run simulation to see results</div>
+{/if}
 
 <style>
 	.results {

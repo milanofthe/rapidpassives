@@ -1,15 +1,12 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	let { children, onexport, onsimulate }: { children: Snippet; onexport?: () => void; onsimulate?: () => void } = $props();
+	let { children, onexport }: { children: Snippet; onexport?: () => void } = $props();
 </script>
 
 <div class="panel">
 	{@render children()}
 	<div class="actions">
-		{#if onsimulate}
-			<button class="btn-sim" onclick={onsimulate}>Simulate</button>
-		{/if}
 		{#if onexport}
 			<button onclick={onexport}>Export GDS</button>
 		{/if}
@@ -34,12 +31,5 @@
 	}
 	.actions button {
 		flex: 1;
-	}
-	.btn-sim {
-		background: var(--accent-secondary);
-		color: #000;
-	}
-	.btn-sim:hover {
-		background: #f0a050;
 	}
 </style>

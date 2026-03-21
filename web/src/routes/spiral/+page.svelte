@@ -12,6 +12,7 @@
 	import { solvePEEC, type SimulationResult } from '$lib/solver/peec';
 
 	let simResult = $state<SimulationResult | null>(null);
+	let simSettings = $state({ fMin: 1e8, fMax: 50e9, nPoints: 100, z0: 50 });
 
 	function doExport() {
 		const data = exportGds(layers, { cellName: 'SpiralInductor' });
@@ -20,11 +21,7 @@
 
 	function doSimulate() {
 		if (!result) return;
-		simResult = solvePEEC(result.network, stack, {
-			fMin: 1e8,
-			fMax: 50e9,
-			nPoints: 100,
-		});
+		simResult = solvePEEC(result.network, stack, { ...simSettings });
 	}
 
 	let p = $state<SpiralInductorParams>({
@@ -58,7 +55,7 @@
 
 <GeometryEditor {layers} {valid} {renderOpts} {simResult}>
 	{#snippet sidebar()}
-		<ParamSidebar onexport={doExport} onsimulate={doSimulate}>
+		<ParamSidebar onexport={doExport}>
 			<div class="param-section"><h4>Geometry</h4>
 				<div class="f"><span>Dout</span><div class="fi"><button onclick={() => nud('Dout',-1,1)}>-</button><input type="number" value={p.Dout} oninput={e => inp('Dout',e)}/><button onclick={() => nud('Dout',1,1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>N</span><div class="fi"><button onclick={() => nud('N',-1,1,20)}>-</button><input type="number" value={p.N} oninput={e => inp('N',e)}/><button onclick={() => nud('N',1,1,20)}>+</button><em>turns</em></div></div>
@@ -86,4 +83,44 @@
 			<StackView bind:stack />
 		</div>
 	{/snippet}
+	{#snippet simPanel()}
+		<div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+			<div class="param-section"><h4>Frequency Sweep</h4>
+				<div class="f"><span>f_min</span><div class="fi">
+					<input type="number" value={simSettings.fMin / 1e6} step="100" min="1"
+						oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) simSettings = { ...simSettings, fMin: v * 1e6 }; }} />
+					<em>MHz</em>
+				</div></div>
+				<div class="f"><span>f_max</span><div class="fi">
+					<input type="number" value={simSettings.fMax / 1e9} step="1" min="0.1"
+						oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) simSettings = { ...simSettings, fMax: v * 1e9 }; }} />
+					<em>GHz</em>
+				</div></div>
+				<div class="f"><span>Points</span><div class="fi">
+					<input type="number" value={simSettings.nPoints} step="10" min="10" max="500"
+						oninput={(e) => { const v = parseInt((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) simSettings = { ...simSettings, nPoints: v }; }} />
+					<em></em>
+				</div></div>
+				<div class="f"><span>Z0</span><div class="fi">
+					<input type="number" value={simSettings.z0} step="5" min="1"
+						oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v) && v > 0) simSettings = { ...simSettings, z0: v }; }} />
+					<em>Ω</em>
+				</div></div>
+			</div>
+			<button class="sim-btn" onclick={doSimulate}>Simulate</button>
+		</div>
+	{/snippet}
 </GeometryEditor>
+
+<style>
+	.sim-btn {
+		background: var(--accent-secondary);
+		color: #000;
+		font-weight: 700;
+		padding: 10px;
+		font-size: 13px;
+	}
+	.sim-btn:hover {
+		background: #f0a050;
+	}
+</style>
