@@ -72,7 +72,7 @@
 			<div class="section-header">Vias</div>
 			{@render numfield('Spacing', 'via_spacing', 0.1, 'um', 0.1)}
 			{@render numfield('Width', 'via_width', 0.1, 'um', 0.1)}
-			{@render numfield('Enclosure', 'via_in_metal', 0.05, 'um', 0)}
+			{@render numfield('In Metal', 'via_in_metal', 0.05, 'um', 0)}
 		</div>
 	{:else}
 		<div class="section">
