@@ -222,21 +222,33 @@ function drawCrosshair(ctx: CanvasRenderingContext2D, view: ViewState): void {
 function drawPort(ctx: CanvasRenderingContext2D, port: PortMarker, view: ViewState): void {
 	const sx = port.x * view.scale + view.offsetX;
 	const sy = -port.y * view.scale + view.offsetY;
-	const r = 6;
+	const s = 4;
 
-	// Circle
+	// Crosshair marker
+	ctx.strokeStyle = canvasTheme.crosshair;
+	ctx.lineWidth = 1;
 	ctx.beginPath();
-	ctx.arc(sx, sy, r, 0, 2 * Math.PI);
-	ctx.fillStyle = '#d9513c';
-	ctx.fill();
-	ctx.strokeStyle = '#fff';
+	ctx.moveTo(sx - s * 2, sy); ctx.lineTo(sx - s, sy);
+	ctx.moveTo(sx + s, sy); ctx.lineTo(sx + s * 2, sy);
+	ctx.moveTo(sx, sy - s * 2); ctx.lineTo(sx, sy - s);
+	ctx.moveTo(sx, sy + s); ctx.lineTo(sx, sy + s * 2);
+	ctx.stroke();
+
+	// Diamond
+	ctx.beginPath();
+	ctx.moveTo(sx, sy - s);
+	ctx.lineTo(sx + s, sy);
+	ctx.lineTo(sx, sy + s);
+	ctx.lineTo(sx - s, sy);
+	ctx.closePath();
+	ctx.strokeStyle = canvasTheme.crosshair;
 	ctx.lineWidth = 1.5;
 	ctx.stroke();
 
 	// Label
-	ctx.font = '600 10px JetBrains Mono, monospace';
-	ctx.fillStyle = '#fff';
+	ctx.font = '500 9px JetBrains Mono, monospace';
+	ctx.fillStyle = canvasTheme.crosshair;
 	ctx.textAlign = 'left';
 	ctx.textBaseline = 'middle';
-	ctx.fillText(port.name, sx + r + 4, sy);
+	ctx.fillText(port.name, sx + s * 2 + 3, sy);
 }
