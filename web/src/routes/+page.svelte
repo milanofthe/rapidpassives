@@ -52,52 +52,73 @@
 	});
 </script>
 
-<div class="landing">
-	<div class="hero">
-		<h2>RFIC Passive Design</h2>
-		<p>Generate DRC-clean inductor and transformer layouts with real-time preview and GDS export.</p>
+<div class="page">
+	<div class="landing">
+		<div class="hero">
+			<h1>RapidPassives</h1>
+			<p>Browser-based RFIC passive design. Configure, preview, and export production-ready layouts.</p>
+		</div>
+		<div class="cards">
+			{#each cards as card, i}
+				<a class="card" href={card.href}>
+					<div class="card-preview">
+						<canvas bind:this={canvases[i]}></canvas>
+					</div>
+					<div class="card-info">
+						<h3>{card.title}</h3>
+						<p>{card.desc}</p>
+					</div>
+				</a>
+			{/each}
+		</div>
+		<div class="features">
+			<span class="pill">Real-time Preview</span>
+			<span class="pill">GDS Export</span>
+			<span class="pill">MOM Solver</span>
+			<span class="pill">Process Stack</span>
+			<span class="pill">No Install</span>
+		</div>
 	</div>
-	<div class="cards">
-		{#each cards as card, i}
-			<a class="card" href={card.href}>
-				<div class="card-preview">
-					<canvas bind:this={canvases[i]}></canvas>
-				</div>
-				<div class="card-info">
-					<h3>{card.title}</h3>
-					<p>{card.desc}</p>
-				</div>
-			</a>
-		{/each}
-	</div>
+	<footer class="landing-footer">
+		<a href="https://github.com/milanofthe/rapidpassives" target="_blank" rel="noopener">GitHub</a>
+		<span class="sep">/</span>
+		<a href="https://milanrother.com" target="_blank" rel="noopener">Milan Rother</a>
+	</footer>
 </div>
 
 <style>
-	.landing {
+	.page {
 		height: 100%;
+		display: flex;
+		flex-direction: column;
+	}
+	.landing {
+		flex: 1;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 40px;
+		gap: 32px;
 		padding: 40px;
+		min-height: 0;
 	}
 	.hero {
 		text-align: center;
 	}
-	.hero h2 {
-		font-size: var(--fs-lg);
+	.hero h1 {
+		font-size: 28px;
 		font-weight: 700;
 		color: var(--accent);
 		font-family: var(--font-mono);
-		letter-spacing: 1px;
-		margin-bottom: 8px;
+		letter-spacing: 2px;
+		margin-bottom: 10px;
 	}
 	.hero p {
 		font-size: var(--fs-sm);
 		color: var(--text-muted);
-		max-width: 500px;
+		max-width: 480px;
 		font-family: var(--font-mono);
+		line-height: 1.5;
 	}
 	.cards {
 		display: flex;
@@ -148,5 +169,50 @@
 		color: var(--text-dim);
 		line-height: 1.4;
 		font-family: var(--font-mono);
+	}
+	.features {
+		display: flex;
+		gap: 8px;
+		flex-wrap: wrap;
+		justify-content: center;
+	}
+	.pill {
+		font-size: var(--fs-xs);
+		font-family: var(--font-mono);
+		color: var(--text-muted);
+		border: 1px solid var(--border);
+		padding: 4px 12px;
+		letter-spacing: 0.3px;
+		transition: border-color 0.15s, color 0.15s;
+	}
+	.pill:hover {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+	.landing-footer {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 0 16px;
+		height: 36px;
+		background: var(--bg-surface);
+		border-top: 1px solid var(--border);
+		flex-shrink: 0;
+	}
+	.sep {
+		color: var(--border);
+		font-size: var(--fs-xs);
+	}
+	.landing-footer a {
+		font-size: var(--fs-xs);
+		font-family: var(--font-mono);
+		color: var(--text-dim);
+		text-decoration: none;
+		letter-spacing: 0.3px;
+		transition: color 0.15s;
+	}
+	.landing-footer a:hover {
+		color: var(--accent);
 	}
 </style>
