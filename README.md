@@ -1,113 +1,89 @@
-# RapidPassives - DRC clean RFIC Inductors and Transformers
+# RapidPassives
 
-RapidPassives is a tool for generating GDS files for RFIC inductors and transformers with arbitrary numbers of windings and winding ratios. In addition to the geometry generators, checker methods are implemented that ensure a valid geometry without clipping or overlap. See the `example.py` file for example usage.
+**[rapidpassives.org](https://rapidpassives.org)**
 
-For convenience, a simple GUI with geometry preview and GDS export functionality is implemented using tkinter.
+Browser-based design tool for RFIC passive components — spiral inductors, symmetric inductors, and symmetric interleaved transformers. Everything runs client-side: geometry generation, electromagnetic simulation, GDS export.
 
-## Spiral Inductors
+## Features
 
+- **Geometry generation** for octagonal spiral inductors, symmetric inductors (with optional center tap), and symmetric interleaved transformers with arbitrary winding ratios
+- **Real-time 2D canvas** with layer visibility, zoom/pan, port markers
+- **Process stack editor** with configurable metal layers, vias, PGS, substrate
+- **EM simulation** via FastHenry compiled to WebAssembly — L, R, Q, S-parameters
+- **GDS-II export** directly from the browser
+- **Fully static** — no server, no backend, deploys to GitHub Pages
 
-```python
-from rapidpassives import SpiralInductor
+## Tech Stack
 
-#instantiate the inductor for some geometry parameters
-Ind = SpiralInductor(
-    Dout=122,           # outer diameter 
-    N=3,                # number of windings 
-    sides=8,            # number of winding sides (8 -> octagonal)
-    width=10,           # conductor width
-    spacing=4,          # conductor spacing
-    via_spacing=0.8,    # spacing between vias in via array
-    via_width=1,        # width of vias in via array
-    via_in_metal=0.45)  # distance of vias to metal edge
+| Layer | Technology |
+|-------|-----------|
+| Frontend | SvelteKit (Svelte 5 runes), adapter-static |
+| Geometry | TypeScript, centerline-first network builder |
+| Rendering | Canvas 2D with DPR-aware rendering |
+| Solver | FastHenry → Emscripten → WebAssembly (389 KB) |
+| GDS | Custom binary GDSII encoder (validated against gdstk) |
+| Plots | Plotly.js |
+| Deploy | GitHub Pages via Actions |
 
-#plot the geometry
-Ind.plot()
+## Geometry Types
 
-#export as gds file
-Ind.to_gds("examples/spiralinductor.gds")
-```
+### Spiral Inductor
+Single-ended octagonal spiral with underpass return on lower metal. Configurable windings, width, spacing, outer diameter.
 
+### Symmetric Inductor
+Differential octagonal spiral with interleaved half-turns and optional center tap. Crossings on lower metal with via arrays.
 
-    
-![png](README_files/README_3_0.png)
-    
+### Symmetric Transformer
+Interleaved primary/secondary windings with independent turn counts (N1, N2). Optional center taps on both windings. Bridges and crossings for winding routing.
 
-
-## Symmetric Inductors
-
-
-```python
-from rapidpassives import SymmetricInductor
-
-#instantiate the inductor for some geometry parameters
-Ind = SymmetricInductor(
-    Dout=250,           # outer diameter
-    N=3,                # number of windings
-    sides=8,            # number of winding sides (8 -> octagonal)
-    width=16,           # conductor width
-    spacing=2,          # conductor spacing
-    center_tap=False,   # include center tap
-    via_extent=8,       # size of the via arrays for crossings
-    via_spacing=0.8,    # spacing between vias in via array
-    via_width=1,        # width of vias
-    via_in_metal=0.45)  # distance of vias to metal edge
-
-#plot the geometry
-Ind.plot()
-
-#export as gds file
-Ind.to_gds("examples/symmetricinductor.gds")
-```
-
-
-    
-![png](README_files/README_5_0.png)
-    
-
-
-## Symmetric interleaved Transformers
-
-
-```python
-from rapidpassives import SymmetricTransformer
-
-#instantiate the transformer for some geometry parameters
-Trf = SymmetricTransformer(
-    Dout=200,                    # outer diameter
-    N1=2,                        # number of primary side windings
-    N2=3,                        # number of secondary side windings
-    sides=8,                     # numer of winding sides (8 -> octagonal)
-    width=12,                    # conductor width
-    spacing=2,                   # conductor spacing
-    center_tap_primary=True,     # include primary side center tap
-    center_tap_secondary=False,  # include secondary side center tap
-    via_extent=8,                # size of the via arrays for crossings
-    via_spacing=0.8,             # spacing between vias in via array
-    via_width=1,                 # width of vias
-    via_in_metal=0.45)           # distance of vias to metal edge
-
-#plot the geometry
-Trf.plot()
-
-#export as gds file
-Trf.to_gds("examples/symmetrictransformer.gds")
-```
-
-
-    
-![png](README_files/README_7_0.png)
-    
-
-
-## GUI
-
-The GUI is implemented as a wrapper for the library in `gui.py` and can be built locally as an executable with `pyinstaller` by executing the `build_exe.bat` file in the package directory.
-
-![png](README_files/gui.png)
-
-
-
-```python
+## Project Structure
 
 ```
+rapidpassives/
+├── web/                          # SvelteKit application
+│   ├── src/
+│   │   ├── lib/
+│   │   │   ├── geometry/         # Inductor/transformer generators
+│   │   │   ├── solver/           # FastHenry WASM interface, PEEC, parasitics
+│   │   │   ├── render/           # Canvas 2D renderer
+│   │   │   ├── gds/              # GDSII binary writer
+│   │   │   ├── stack/            # Process stack model
+│   │   │   ├── components/       # Svelte UI components
+│   │   │   └── theme.ts          # Unified design tokens
+│   │   └── routes/               # SvelteKit pages
+│   ├── static/
+│   │   └── wasm/                 # Pre-built WebAssembly modules
+│   └── svelte.config.js
+├── core/
+│   ├── fasthenry/                # FastHenry WASM build scripts and patches
+│   ├── glmom/                    # GLMoM MoM solver extraction (experimental)
+│   └── mom/                      # Minimal RWG MoM solver (experimental)
+└── .github/workflows/deploy.yml  # GitHub Pages CI/CD
+```
+
+## Development
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Open http://localhost:5173
+
+## Building the WASM Solver
+
+Requires [Emscripten SDK](https://emscripten.org) and the FastHenry2 source in `../TEMP/FastHenry2/`.
+
+```bash
+cd core/fasthenry
+bash build.sh
+```
+
+## Legacy
+
+The original Python library with tkinter GUI is preserved on the [`legacy/python`](https://github.com/milanofthe/rapidpassives/tree/legacy/python) branch.
+
+## License
+
+AGPL-3.0
