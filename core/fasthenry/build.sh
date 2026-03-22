@@ -8,6 +8,10 @@ OUT_DIR="C:/Repositories/rapidpassives/web/static/wasm"
 
 mkdir -p "$OUT_DIR"
 
+# Restore any previous patches
+cd "C:/Repositories/TEMP/FastHenry2" && git checkout -- src/fasthenry/ 2>/dev/null
+cd "C:/Repositories/rapidpassives/core/fasthenry"
+
 # FastHenry source files (from Makefile OBJS + MOBJS + NONUNIOBJS)
 OBJS="induct gmres savemat_mod readGeom joelself writefastcap \
       SetupMulti calcp SetupComputePsi mulSetup BreakupSeg \
@@ -33,9 +37,12 @@ done
 cat > /tmp/fh_stubs.c << 'EOF'
 #include <string.h>
 int gethostname(char *name, int len) { strncpy(name, "wasm", len); return 0; }
-void *sbrk(int incr) { return (void*)0; }
 EOF
 SOURCES="$SOURCES /tmp/fh_stubs.c"
+
+# Patch: dumpnums caller passes 3 args but definition takes 2
+sed -i 's/^dumpnums(flag, size)$/dumpnums(flag, size, unused_up_size)/' "$FH_SRC/calcp.c"
+sed -i 's/^int flag, size;$/int flag, size, unused_up_size;/' "$FH_SRC/calcp.c"
 
 echo "Compiling FastHenry to WASM..."
 echo "Sources: $(echo $SOURCES | wc -w) files"
@@ -53,15 +60,19 @@ $EMCC \
     -Wno-return-type \
     -Wno-return-mismatch \
     -std=gnu89 \
+    -include "C:/Repositories/rapidpassives/core/fasthenry/wasm_fixups.h" \
     -s WASM=1 \
     -s ALLOW_MEMORY_GROWTH=1 \
+    -s STACK_SIZE=4194304 \
+    -s INITIAL_MEMORY=16777216 \
     -s EXPORTED_FUNCTIONS='["_main"]' \
     -s EXPORTED_RUNTIME_METHODS='["FS","callMain","cwrap"]' \
     -s MODULARIZE=1 \
     -s EXPORT_NAME='FastHenryModule' \
     -s ENVIRONMENT='web,worker' \
     -s FILESYSTEM=1 \
-    -s NO_EXIT_RUNTIME=1 \
+    -s NO_EXIT_RUNTIME=0 \
+    -Wl,--allow-multiple-definition \
     -lm \
     -o "$OUT_DIR/fasthenry.js" \
     2>&1

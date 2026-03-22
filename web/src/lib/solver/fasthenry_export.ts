@@ -40,8 +40,8 @@ export function generateFastHenryInput(
 	lines.push('.Units um');
 	lines.push('');
 
-	// Default conductivity (copper)
-	lines.push('.Default sigma=5.8e7');
+	// Default conductivity (copper) — in S/um for .Units um
+	lines.push('.Default sigma=58');
 	lines.push('');
 
 	// Nodes — FastHenry uses "Nname x=... y=... z=..."
@@ -74,7 +74,9 @@ export function generateFastHenryInput(
 
 		const sl = getStackLayer(stack, seg.layerId);
 		const h = sl?.thickness ?? 1;
-		const sigma = sl?.rsh ? 1 / (sl.rsh * h * 1e-6) : 5.8e7;
+		// FastHenry expects sigma in S/length_unit — with .Units um, that's S/um
+		const sigma_SI = sl?.rsh ? 1 / (sl.rsh * h * 1e-6) : 5.8e7;
+		const sigma = sigma_SI * 1e-6; // S/m → S/um
 
 		const name = `E${segIdx++}`;
 		lines.push(`${name} ${fromName} ${toName} w=${seg.width.toFixed(3)} h=${h.toFixed(3)} sigma=${sigma.toExponential(2)}`);
@@ -92,7 +94,7 @@ export function generateFastHenryInput(
 		const nVias = Math.max(1, via.polygons.length);
 		const equivWidth = Math.sqrt(nVias) * 1; // approximate equivalent width in um
 		lines.push(`* Via: ${via.id} (${nVias} vias)`);
-		lines.push(`E${segIdx++} ${topName} ${botName} w=${equivWidth.toFixed(1)} h=${equivWidth.toFixed(1)} sigma=5.8e7`);
+		lines.push(`E${segIdx++} ${topName} ${botName} w=${equivWidth.toFixed(1)} h=${equivWidth.toFixed(1)} sigma=58`);
 	}
 	lines.push('');
 

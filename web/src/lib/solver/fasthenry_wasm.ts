@@ -7,9 +7,11 @@
 
 import type { ConductorNetwork } from '$lib/geometry/network';
 import type { ProcessStack } from '$lib/stack/types';
+import { getStackLayer } from '$lib/stack/types';
 import { generateFastHenryInput } from './fasthenry_export';
 import type { SimulationResult, FrequencyPoint } from './peec';
 import { zToS, extractPortResults, extractCoupling, type PortFreqResult } from './multiport';
+import { type PiModelParasitics, applyPiModelSparams } from './parasitics';
 
 export interface FHResult {
 	/** Frequency points */
@@ -22,32 +24,33 @@ export interface FHResult {
 	portNames: string[];
 }
 
-let modulePromise: Promise<any> | null = null;
+let factoryLoaded = false;
 
-/** Load the FastHenry WASM module (cached) */
-async function loadModule(): Promise<any> {
-	if (!modulePromise) {
-		modulePromise = (async () => {
-			// Load the Emscripten module via script injection
-			// (it's a UMD module, not ES module)
-			if (typeof (globalThis as any).FastHenryModule === 'undefined') {
-				await new Promise<void>((resolve, reject) => {
-					const script = document.createElement('script');
-					script.src = '/wasm/fasthenry.js';
-					script.onload = () => resolve();
-					script.onerror = () => reject(new Error('Failed to load FastHenry WASM'));
-					document.head.appendChild(script);
-				});
-			}
-			const factory = (globalThis as any).FastHenryModule;
-			if (!factory) throw new Error('FastHenryModule not found');
-			return await factory({
-				print: () => {},      // suppress stdout
-				printErr: () => {},   // suppress stderr
-			});
-		})();
+/** Ensure the FastHenry factory script is loaded */
+async function ensureFactory(): Promise<void> {
+	if (factoryLoaded) return;
+	if (typeof (globalThis as any).FastHenryModule === 'undefined') {
+		await new Promise<void>((resolve, reject) => {
+			const script = document.createElement('script');
+			script.src = '/wasm/fasthenry.js';
+			script.onload = () => resolve();
+			script.onerror = () => reject(new Error('Failed to load FastHenry WASM'));
+			document.head.appendChild(script);
+		});
 	}
-	return modulePromise;
+	factoryLoaded = true;
+}
+
+/** Create a fresh FastHenry WASM module instance (new each run — FastHenry calls exit()) */
+async function createModule(): Promise<any> {
+	await ensureFactory();
+	const factory = (globalThis as any).FastHenryModule;
+	if (!factory) throw new Error('FastHenryModule not found');
+	return await factory({
+		print: () => {},
+		printErr: () => {},
+		noInitialRun: true,
+	});
 }
 
 /**
@@ -69,15 +72,16 @@ export async function runFastHenry(
 	});
 
 	try {
-		const Module = await loadModule();
+		const Module = await createModule();
 
 		// Write .inp to virtual filesystem
 		Module.FS.writeFile('/input.inp', inp);
 
-		// Capture stdout
+		// Capture stdout/stderr for debugging
 		let stdout = '';
-		const origPrint = Module.print;
+		let stderr = '';
 		Module.print = (text: string) => { stdout += text + '\n'; };
+		Module.printErr = (text: string) => { stderr += text + '\n'; };
 
 		// Run FastHenry with LU decomposition (direct solve, no multipole issues)
 		try {
@@ -87,7 +91,8 @@ export async function runFastHenry(
 			if (!e.message?.includes('exit')) throw e;
 		}
 
-		Module.print = origPrint;
+		if (stdout) console.log('FastHenry stdout:', stdout.trim());
+		if (stderr) console.warn('FastHenry stderr:', stderr.trim());
 
 		// Read Zc.mat from virtual filesystem
 		let zcContent: string;
@@ -147,33 +152,35 @@ export async function solveFastHenry(
 		const R = Z00re;
 		const Q = R > 0 ? Z00im / R : 0;
 
-		// Winding results for transformer (4+ ports)
+		// Winding results — extract per-winding L/R/Q and coupling from Z-matrix
+		// FastHenry .external pairs map to the Z-matrix rows/columns:
+		//   nPorts=1: single inductor, Z is 1x1
+		//   nPorts=2: transformer (primary + secondary), Z is 2x2
+		//     Z[0][0] = primary self-impedance
+		//     Z[1][1] = secondary self-impedance
+		//     Z[0][1] = mutual impedance
 		let windings: { name: string; L: number; R: number; Q: number }[] | undefined;
 		let k: number | undefined;
 
-		if (nPorts === 2) {
-			// 2-port: differential L
-			const zdr = (Z[0]?.[0]?.[0] ?? 0) - (Z[0]?.[1]?.[0] ?? 0) - (Z[1]?.[0]?.[0] ?? 0) + (Z[1]?.[1]?.[0] ?? 0);
-			const zdi = (Z[0]?.[0]?.[1] ?? 0) - (Z[0]?.[1]?.[1] ?? 0) - (Z[1]?.[0]?.[1] ?? 0) + (Z[1]?.[1]?.[1] ?? 0);
-			const wL = omega > 0 ? zdi / omega : 0;
-			windings = [{ name: 'L', L: wL, R: zdr, Q: zdr > 0 ? zdi / zdr : 0 }];
-		} else if (nPorts >= 4) {
-			// 4-port: primary = 0,1; secondary = 2,3
-			const zd1r = (Z[0]?.[0]?.[0]??0)-(Z[0]?.[1]?.[0]??0)-(Z[1]?.[0]?.[0]??0)+(Z[1]?.[1]?.[0]??0);
-			const zd1i = (Z[0]?.[0]?.[1]??0)-(Z[0]?.[1]?.[1]??0)-(Z[1]?.[0]?.[1]??0)+(Z[1]?.[1]?.[1]??0);
-			const zd2r = (Z[2]?.[2]?.[0]??0)-(Z[2]?.[3]?.[0]??0)-(Z[3]?.[2]?.[0]??0)+(Z[3]?.[3]?.[0]??0);
-			const zd2i = (Z[2]?.[2]?.[1]??0)-(Z[2]?.[3]?.[1]??0)-(Z[3]?.[2]?.[1]??0)+(Z[3]?.[3]?.[1]??0);
-			const wL1 = omega > 0 ? zd1i / omega : 0;
-			const wL2 = omega > 0 ? zd2i / omega : 0;
-			windings = [
-				{ name: 'Primary', L: wL1, R: zd1r, Q: zd1r > 0 ? zd1i / zd1r : 0 },
-				{ name: 'Secondary', L: wL2, R: zd2r, Q: zd2r > 0 ? zd2i / zd2r : 0 },
-			];
-			// Coupling
-			const zmr = (Z[0]?.[2]?.[0]??0)-(Z[0]?.[3]?.[0]??0)-(Z[1]?.[2]?.[0]??0)+(Z[1]?.[3]?.[0]??0);
-			const zmi = (Z[0]?.[2]?.[1]??0)-(Z[0]?.[3]?.[1]??0)-(Z[1]?.[2]?.[1]??0)+(Z[1]?.[3]?.[1]??0);
-			const M = omega > 0 ? zmi / omega : 0;
-			if (wL1 > 0 && wL2 > 0) k = Math.abs(M) / Math.sqrt(wL1 * wL2);
+		if (nPorts >= 2) {
+			windings = [];
+			for (let p = 0; p < nPorts; p++) {
+				const Zre = Z[p]?.[p]?.[0] ?? 0;
+				const Zim = Z[p]?.[p]?.[1] ?? 0;
+				const wL = omega > 0 ? Zim / omega : 0;
+				const wQ = Zre > 0 ? Zim / Zre : 0;
+				const name = nPorts === 2 ? (p === 0 ? 'Primary' : 'Secondary') : `Port${p + 1}`;
+				windings.push({ name, L: wL, R: Zre, Q: wQ });
+			}
+
+			// Coupling from mutual impedance Z[0][1]
+			if (nPorts === 2) {
+				const Z01im = Z[0]?.[1]?.[1] ?? 0;
+				const M = omega > 0 ? Z01im / omega : 0;
+				const L1 = windings[0].L;
+				const L2 = windings[1].L;
+				if (L1 > 0 && L2 > 0) k = Math.abs(M) / Math.sqrt(L1 * L2);
+			}
 		}
 
 		return { freq, Z, S, L, Q, R, ports, windings, k };

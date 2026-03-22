@@ -110,7 +110,7 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 	let R1 = R1_init, R2 = R1 - v;
 
 	// Track last nodes of each quadrant for inter-winding connections
-	let prevWindingQuadLast: ConductorNode[][] = [];
+	let prevWindingQuadLast: ConductorNode[] = [];
 
 	// Track winding entry/exit points for port assignment
 	// Winding 0 bottom-left is the first port entry
@@ -337,9 +337,43 @@ function generateLegacyPolygons(
 	function addCT(Nend: number, endsBottom: boolean) {
 		const _ext = Math.min(width, extend);
 		let xCT: number[], yCT: number[];
-		if (endsBottom) { xCT=[-width/2,-width/2,width/2,width/2]; yCT=[-Dout/2+width-_ext,-Dout/2+(spacing+width)*Nend,-Dout/2+(spacing+width)*Nend,-Dout/2+width-_ext]; }
-		else { xCT=[width/2,width/2,-width/2,-width/2]; yCT=[Dout/2-width+_ext,Dout/2-(spacing+width)*Nend,Dout/2-(spacing+width)*Nend,Dout/2-width+_ext]; }
-		if (Nend > 2) polysCenterTap.push({x:xCT,y:yCT}); else if (Nend > 1) polysCrossings.push({x:xCT,y:yCT}); else polysWindings.push({x:xCT,y:yCT});
+		let xCt1: number, yCt1: number, xCt2: number, yCt2: number;
+
+		if (endsBottom) {
+			xCT=[-width/2,-width/2,width/2,width/2];
+			yCT=[-Dout/2+width-_ext,-Dout/2+(spacing+width)*Nend,-Dout/2+(spacing+width)*Nend,-Dout/2+width-_ext];
+			xCt1=0; yCt1=-Dout/2+spacing*Nend+width*(Nend+1)-width+_ext/2;
+			xCt2=0; yCt2=-Dout/2+width/2+(width-_ext)/2;
+		} else {
+			xCT=[width/2,width/2,-width/2,-width/2];
+			yCT=[Dout/2-width+_ext,Dout/2-(spacing+width)*Nend,Dout/2-(spacing+width)*Nend,Dout/2-width+_ext];
+			xCt1=0; yCt1=Dout/2-spacing*Nend-width*(Nend+1)+width-_ext/2;
+			xCt2=0; yCt2=Dout/2-width/2-(width-_ext)/2;
+		}
+
+		if (Nend > 1) {
+			viaCentersTCT.push([xCt1, yCt1]);
+			viaCentersTCT.push([xCt2, yCt2]);
+
+			const xVP1=[xCt1-width/2,xCt1-width/2,xCt1+width/2,xCt1+width/2];
+			const yVP1=[yCt1-_ext/2,yCt1+_ext/2,yCt1+_ext/2,yCt1-_ext/2];
+			const xVP2=[xCt2-width/2,xCt2-width/2,xCt2+width/2,xCt2+width/2];
+			const yVP2=[yCt2-_ext/2,yCt2+_ext/2,yCt2+_ext/2,yCt2-_ext/2];
+
+			polysWindings.push({x:xVP1,y:yVP1});
+			polysCrossings.push({x:xVP1,y:yVP1});
+			polysCrossings.push({x:xVP2,y:yVP2});
+
+			if (Nend > 2) {
+				polysCenterTap.push({x:xCT,y:yCT});
+				polysCenterTap.push({x:xVP1,y:yVP1});
+				polysCenterTap.push({x:xVP2,y:yVP2});
+			} else {
+				polysCrossings.push({x:xCT,y:yCT});
+			}
+		} else {
+			polysWindings.push({x:xCT,y:yCT});
+		}
 	}
 	if (center_tap_primary) addCT(N1_end, N1 % 2 === 0);
 	if (center_tap_secondary) addCT(N2_end, N2 % 2 !== 0);
