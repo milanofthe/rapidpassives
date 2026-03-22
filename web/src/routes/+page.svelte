@@ -56,7 +56,7 @@
 	<div class="landing">
 		<div class="hero">
 			<h1>RapidPassives</h1>
-			<p>Browser-based RFIC passive design. Configure, preview, and export production-ready layouts.</p>
+			<p>Browser-based RFIC passive layout generator. Configure geometry, preview in real time, and export production-ready GDS-II.</p>
 		</div>
 		<div class="cards">
 			{#each cards as card, i}
@@ -74,7 +74,6 @@
 		<div class="features">
 			<span class="pill">Real-time Preview</span>
 			<span class="pill">GDS Export</span>
-			<span class="pill">MOM Solver</span>
 			<span class="pill">Process Stack</span>
 			<span class="pill">No Install</span>
 		</div>

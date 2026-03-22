@@ -2,14 +2,13 @@
 
 **[rapidpassives.org](https://rapidpassives.org)**
 
-Browser-based design tool for RFIC passive components — spiral inductors, symmetric inductors, and symmetric interleaved transformers. Everything runs client-side: geometry generation, electromagnetic simulation, GDS export.
+Browser-based layout generator for RFIC passive components — spiral inductors, symmetric inductors, and symmetric interleaved transformers. Configure geometry, preview in real time, and export production-ready GDS-II. Everything runs client-side.
 
 ## Features
 
 - **Geometry generation** for octagonal spiral inductors, symmetric inductors (with optional center tap), and symmetric interleaved transformers with arbitrary winding ratios
 - **Real-time 2D canvas** with layer visibility, zoom/pan, port markers
 - **Process stack editor** with configurable metal layers, vias, PGS, substrate
-- **EM simulation** via FastHenry compiled to WebAssembly — L, R, Q, S-parameters
 - **GDS-II export** directly from the browser
 - **Fully static** — no server, no backend, deploys to GitHub Pages
 
@@ -20,9 +19,7 @@ Browser-based design tool for RFIC passive components — spiral inductors, symm
 | Frontend | SvelteKit (Svelte 5 runes), adapter-static |
 | Geometry | TypeScript, centerline-first network builder |
 | Rendering | Canvas 2D with DPR-aware rendering |
-| Solver | FastHenry → Emscripten → WebAssembly (389 KB) |
 | GDS | Custom binary GDSII encoder (validated against gdstk) |
-| Plots | Plotly.js |
 | Deploy | GitHub Pages via Actions |
 
 ## Geometry Types
@@ -44,20 +41,13 @@ rapidpassives/
 │   ├── src/
 │   │   ├── lib/
 │   │   │   ├── geometry/         # Inductor/transformer generators
-│   │   │   ├── solver/           # FastHenry WASM interface, PEEC, parasitics
 │   │   │   ├── render/           # Canvas 2D renderer
 │   │   │   ├── gds/              # GDSII binary writer
 │   │   │   ├── stack/            # Process stack model
 │   │   │   ├── components/       # Svelte UI components
 │   │   │   └── theme.ts          # Unified design tokens
 │   │   └── routes/               # SvelteKit pages
-│   ├── static/
-│   │   └── wasm/                 # Pre-built WebAssembly modules
 │   └── svelte.config.js
-├── core/
-│   ├── fasthenry/                # FastHenry WASM build scripts and patches
-│   ├── glmom/                    # GLMoM MoM solver extraction (experimental)
-│   └── mom/                      # Minimal RWG MoM solver (experimental)
 └── .github/workflows/deploy.yml  # GitHub Pages CI/CD
 ```
 
@@ -70,15 +60,6 @@ npm run dev
 ```
 
 Open http://localhost:5173
-
-## Building the WASM Solver
-
-Requires [Emscripten SDK](https://emscripten.org) and the FastHenry2 source in `../TEMP/FastHenry2/`.
-
-```bash
-cd core/fasthenry
-bash build.sh
-```
 
 ## Legacy
 
