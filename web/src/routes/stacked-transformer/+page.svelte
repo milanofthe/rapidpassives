@@ -1,0 +1,94 @@
+<script lang="ts">
+	import '$lib/components/fields.css';
+	import type { StackedTransformerParams, PgsParams, LayerMap } from '$lib/geometry/types';
+	import { buildStackedTransformer, isStackedTransformerValid } from '$lib/geometry/stacked_transformer';
+	import { pgs4 } from '$lib/geometry/utils';
+	import { create4MetalStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
+	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
+	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
+	import StackView from '$lib/components/StackView.svelte';
+	import { nudgeValue, parseInput } from '$lib/components/fields';
+	import { exportGds, downloadGds } from '$lib/gds/writer';
+	import { mergeLayers } from '$lib/geometry/merge';
+	function doExport() {
+		const data = exportGds(layers, { cellName: 'StackedTransformer' });
+		downloadGds(data, 'stacked_transformer.gds');
+	}
+
+	let p = $state<StackedTransformerParams>({
+		Dout: 250, N1: 3, N2: 3, sides: 8, width: 12, spacing: 2,
+		center_tap_primary: false, center_tap_secondary: false,
+		via_extent: 8, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45,
+	});
+
+	let pgsP = $state<PgsParams>({ enabled: false, D: 270, width: 4, spacing: 2 });
+	let stack = $state(create4MetalStack());
+
+	function set(k: keyof StackedTransformerParams, v: any) { p = { ...p, [k]: v }; }
+	function nud(k: keyof StackedTransformerParams, s: number, mn?: number, mx?: number) { set(k, nudgeValue(p[k] as number, s, mn, mx)); }
+	function inp(k: keyof StackedTransformerParams, e: Event) { const v = parseInput(e); if (v !== null) set(k, v); }
+
+	function setPgs(k: keyof PgsParams, v: any) { pgsP = { ...pgsP, [k]: v }; }
+	function nudPgs(k: keyof PgsParams, s: number, mn?: number, mx?: number) { setPgs(k, nudgeValue(pgsP[k] as number, s, mn, mx)); }
+	function inpPgs(k: keyof PgsParams, e: Event) { const v = parseInput(e); if (v !== null) setPgs(k, v); }
+
+	let result = $derived.by(() => {
+		try { return buildStackedTransformer({ ...p }); } catch { return null; }
+	});
+	let layers = $derived.by<LayerMap>(() => {
+		if (!result) return {};
+		const l = { ...result.layers };
+		if (pgsP.enabled) l.pgs = pgs4(pgsP.D, pgsP.width, pgsP.spacing);
+		return mergeLayers(l);
+	});
+	let valid = $derived(isStackedTransformerValid({ ...p }));
+	let portMarkers = $derived.by(() => {
+		if (!result) return [];
+		const nodeMap = new Map(result.network.nodes.map(n => [n.id, n]));
+		return result.network.ports.map(port => {
+			const node = nodeMap.get(port.node);
+			return node ? { name: port.name, x: node.x, y: node.y } : null;
+		}).filter((p): p is { name: string; x: number; y: number } => p !== null);
+	});
+	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack), ports: portMarkers });
+</script>
+
+<GeometryEditor {layers} {valid} {renderOpts} {stack}>
+	{#snippet sidebar()}
+		<ParamSidebar onexport={doExport}>
+			<div class="param-section"><h4>Geometry</h4>
+				<div class="f"><span>Dout</span><div class="fi"><button onclick={() => nud('Dout',-1,1)}>-</button><input type="number" value={p.Dout} oninput={e => inp('Dout',e)}/><button onclick={() => nud('Dout',1,1)}>+</button><em>um</em></div></div>
+				<div class="f"><span>Sides</span><div class="fi"><button onclick={() => nud('sides',-2,4,64)}>-</button><input type="number" value={p.sides} oninput={e => inp('sides',e)}/><button onclick={() => nud('sides',2,4,64)}>+</button><em></em></div></div>
+				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('width',-0.5,0.1)}>-</button><input type="number" value={p.width} oninput={e => inp('width',e)}/><button onclick={() => nud('width',0.5,0.1)}>+</button><em>um</em></div></div>
+				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('spacing',-0.5,0.1)}>-</button><input type="number" value={p.spacing} oninput={e => inp('spacing',e)}/><button onclick={() => nud('spacing',0.5,0.1)}>+</button><em>um</em></div></div>
+			</div>
+			<div class="param-section"><h4>Primary (M3)</h4>
+				<div class="f"><span>N1</span><div class="fi"><button onclick={() => nud('N1',-1,1,20)}>-</button><input type="number" value={p.N1} oninput={e => inp('N1',e)}/><button onclick={() => nud('N1',1,1,20)}>+</button><em>turns</em></div></div>
+				<div class="f"><span>Center Tap</span><div class="fi"><button class="toggle-btn" class:active={p.center_tap_primary} onclick={() => set('center_tap_primary', !p.center_tap_primary)}>{p.center_tap_primary ? 'ON' : 'OFF'}</button><em></em></div></div>
+			</div>
+			<div class="param-section"><h4>Secondary (M2)</h4>
+				<div class="f"><span>N2</span><div class="fi"><button onclick={() => nud('N2',-1,1,20)}>-</button><input type="number" value={p.N2} oninput={e => inp('N2',e)}/><button onclick={() => nud('N2',1,1,20)}>+</button><em>turns</em></div></div>
+				<div class="f"><span>Center Tap</span><div class="fi"><button class="toggle-btn" class:active={p.center_tap_secondary} onclick={() => set('center_tap_secondary', !p.center_tap_secondary)}>{p.center_tap_secondary ? 'ON' : 'OFF'}</button><em></em></div></div>
+			</div>
+			<div class="param-section"><h4>Vias</h4>
+				<div class="f"><span>Extent</span><div class="fi"><button onclick={() => nud('via_extent',-0.5,0.5)}>-</button><input type="number" value={p.via_extent} oninput={e => inp('via_extent',e)}/><button onclick={() => nud('via_extent',0.5,0.5)}>+</button><em>um</em></div></div>
+				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('via_spacing',-0.1,0.1)}>-</button><input type="number" value={p.via_spacing} oninput={e => inp('via_spacing',e)}/><button onclick={() => nud('via_spacing',0.1,0.1)}>+</button><em>um</em></div></div>
+				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('via_width',-0.1,0.1)}>-</button><input type="number" value={p.via_width} oninput={e => inp('via_width',e)}/><button onclick={() => nud('via_width',0.1,0.1)}>+</button><em>um</em></div></div>
+				<div class="f"><span>In Metal</span><div class="fi"><button onclick={() => nud('via_in_metal',-0.05,0)}>-</button><input type="number" value={p.via_in_metal} oninput={e => inp('via_in_metal',e)}/><button onclick={() => nud('via_in_metal',0.05,0)}>+</button><em>um</em></div></div>
+			</div>
+			<div class="param-section"><h4>PGS</h4>
+				<div class="f"><span>Enabled</span><div class="fi"><button class="toggle-btn" class:active={pgsP.enabled} onclick={() => setPgs('enabled', !pgsP.enabled)}>{pgsP.enabled ? 'ON' : 'OFF'}</button><em></em></div></div>
+				{#if pgsP.enabled}
+					<div class="f"><span>Diameter</span><div class="fi"><button onclick={() => nudPgs('D',-1,1)}>-</button><input type="number" value={pgsP.D} oninput={e => inpPgs('D',e)}/><button onclick={() => nudPgs('D',1,1)}>+</button><em>um</em></div></div>
+					<div class="f"><span>Width</span><div class="fi"><button onclick={() => nudPgs('width',-0.5,0.1)}>-</button><input type="number" value={pgsP.width} oninput={e => inpPgs('width',e)}/><button onclick={() => nudPgs('width',0.5,0.1)}>+</button><em>um</em></div></div>
+					<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nudPgs('spacing',-0.5,0.1)}>-</button><input type="number" value={pgsP.spacing} oninput={e => inpPgs('spacing',e)}/><button onclick={() => nudPgs('spacing',0.5,0.1)}>+</button><em>um</em></div></div>
+				{/if}
+			</div>
+		</ParamSidebar>
+	{/snippet}
+	{#snippet stackPanel()}
+		<div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+			<StackView bind:stack />
+		</div>
+	{/snippet}
+</GeometryEditor>

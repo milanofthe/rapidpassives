@@ -4,11 +4,12 @@
 	import type { ProcessStack } from '$lib/stack/types';
 	import { initGL, buildMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera } from '$lib/render/canvas3d';
 
-	let { layers, stack, colorOverrides, visibleLayers }: {
+	let { layers, stack, colorOverrides, visibleLayers, wireframe = false }: {
 		layers: LayerMap;
 		stack: ProcessStack;
 		colorOverrides?: Record<string, string>;
 		visibleLayers?: Set<LayerName>;
+		wireframe?: boolean;
 	} = $props();
 
 	export function zoomIn() {
@@ -65,7 +66,7 @@
 			needsRebuild = false;
 		}
 
-		render3D(glState, camera, w, h);
+		render3D(glState, camera, w, h, wireframe);
 	}
 
 	function onWheel(e: WheelEvent) {
@@ -168,6 +169,7 @@
 		colorOverrides;
 		visibleLayers;
 		stack;
+		wireframe;
 		if (mounted && glState) {
 			needsRebuild = true;
 			renderFrame();

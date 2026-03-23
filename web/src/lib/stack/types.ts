@@ -33,91 +33,42 @@ export interface ProcessStack {
 	substrateEr: number;
 }
 
-/** Default 3-metal RFIC stack */
+// --- Stack layer definitions ---
+
+const SUB: StackLayer = { id: 'sub', name: 'Substrate', type: 'substrate', z: 0, thickness: 300, color: '#4a4a5a', gdsLayers: [], visible: true };
+const PGS: StackLayer = { id: 'pgs', name: 'PGS (Poly)', type: 'metal', z: 300.2, thickness: 0.2, rsh: 0.1, color: '#7b5e8a', gdsLayers: ['pgs'], visible: true };
+const M1: StackLayer = { id: 'm1', name: 'Metal 1', type: 'metal', z: 301.0, thickness: 0.5, rsh: 0.05, color: '#6bbf8a', gdsLayers: ['centertap', 'crossings_m1'], visible: true };
+const VIA12: StackLayer = { id: 'via12', name: 'Via 1-2', type: 'via', z: 301.5, thickness: 0.5, color: '#5a5a62', gdsLayers: ['vias2'], visible: true };
+const M2: StackLayer = { id: 'm2', name: 'Metal 2', type: 'metal', z: 302.0, thickness: 0.5, rsh: 0.03, color: '#d9513c', gdsLayers: ['crossings', 'windings_m2'], visible: true };
+const VIA23: StackLayer = { id: 'via23', name: 'Via 2-3', type: 'via', z: 302.5, thickness: 0.6, color: '#6e6e78', gdsLayers: ['vias', 'vias1'], visible: true };
+const M3: StackLayer = { id: 'm3', name: 'Metal 3', type: 'metal', z: 303.1, thickness: 1.2, rsh: 0.01, color: '#e8944a', gdsLayers: ['windings'], visible: true };
+const VIA34: StackLayer = { id: 'via34', name: 'Via 3-4', type: 'via', z: 304.3, thickness: 0.6, color: '#7a7a84', gdsLayers: ['vias3'], visible: true };
+const M4: StackLayer = { id: 'm4', name: 'Metal 4 (Top)', type: 'metal', z: 304.9, thickness: 2.0, rsh: 0.005, color: '#f0b86a', gdsLayers: ['windings_m4'], visible: true };
+
+const STACK_BASE = { substrateThickness: 300, oxideEr: 4.0, substrateRho: 10, substrateEr: 11.7 };
+
+function cloneLayers(layers: StackLayer[]): StackLayer[] {
+	return layers.map(l => ({ ...l, gdsLayers: [...l.gdsLayers] }));
+}
+
+/** 2-metal stack (spiral inductor) — M2 + M3 */
+export function create2MetalStack(): ProcessStack {
+	return { name: '2-Metal', layers: cloneLayers([SUB, PGS, M2, VIA23, M3]), ...STACK_BASE };
+}
+
+/** 3-metal stack (symmetric inductor, interleaved transformer, MOM cap) — M1 + M2 + M3 */
+export function create3MetalStack(): ProcessStack {
+	return { name: '3-Metal', layers: cloneLayers([SUB, PGS, M1, VIA12, M2, VIA23, M3]), ...STACK_BASE };
+}
+
+/** 4-metal stack (stacked transformer) — M1 + M2 + M3 + M4 */
+export function create4MetalStack(): ProcessStack {
+	return { name: '4-Metal', layers: cloneLayers([SUB, PGS, M1, VIA12, M2, VIA23, M3, VIA34, M4]), ...STACK_BASE };
+}
+
+/** Default stack — alias for 3-metal */
 export function createDefaultStack(): ProcessStack {
-	return {
-		name: 'Generic 3-Metal',
-		layers: [
-			{
-				id: 'sub',
-				name: 'Substrate',
-				type: 'substrate',
-				z: 0,
-				thickness: 300,
-				color: '#4a4a5a',
-				gdsLayers: [],
-				visible: true,
-			},
-			{
-				id: 'pgs',
-				name: 'PGS (Poly)',
-				type: 'metal',
-				z: 300.2,
-				thickness: 0.2,
-				rsh: 0.1,
-				color: '#7b5e8a',
-				gdsLayers: ['pgs'],
-				visible: true,
-			},
-			{
-				id: 'm1',
-				name: 'Metal 1',
-				type: 'metal',
-				z: 301.0,
-				thickness: 0.5,
-				rsh: 0.05,
-				color: '#6bbf8a',
-				gdsLayers: ['centertap'],
-				visible: true,
-			},
-			{
-				id: 'via12',
-				name: 'Via 1-2',
-				type: 'via',
-				z: 301.5,
-				thickness: 0.5,
-				color: '#5a5a62',
-				gdsLayers: ['vias2'],
-				visible: true,
-			},
-			{
-				id: 'm2',
-				name: 'Metal 2',
-				type: 'metal',
-				z: 302.0,
-				thickness: 0.5,
-				rsh: 0.03,
-				color: '#d9513c',
-				gdsLayers: ['crossings'],
-				visible: true,
-			},
-			{
-				id: 'via23',
-				name: 'Via 2-3',
-				type: 'via',
-				z: 302.5,
-				thickness: 0.6,
-				color: '#6e6e78',
-				gdsLayers: ['vias', 'vias1'],
-				visible: true,
-			},
-			{
-				id: 'm3',
-				name: 'Metal 3 (Top)',
-				type: 'metal',
-				z: 303.1,
-				thickness: 1.2,
-				rsh: 0.01,
-				color: '#e8944a',
-				gdsLayers: ['windings'],
-				visible: true,
-			},
-		],
-		substrateThickness: 300,
-		oxideEr: 4.0,
-		substrateRho: 10,
-		substrateEr: 11.7,
-	};
+	return create3MetalStack();
 }
 
 /** Get the color for a geometry layer from the stack */

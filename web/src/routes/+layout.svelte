@@ -5,9 +5,11 @@
 	let { children } = $props();
 
 	const tabs = [
-		{ href: '/spiral', label: 'Spiral' },
-		{ href: '/symmetric-inductor', label: 'Symmetric' },
-		{ href: '/symmetric-transformer', label: 'Transformer' },
+		{ href: '/spiral', label: 'Spiral Inductor' },
+		{ href: '/symmetric-inductor', label: 'Symmetric Inductor' },
+		{ href: '/symmetric-transformer', label: 'Interleaved Transformer' },
+		{ href: '/stacked-transformer', label: 'Stacked Transformer' },
+		{ href: '/mom-capacitor', label: 'MOM Capacitor' },
 	];
 
 	const isEditor = $derived(tabs.some(t => page.url.pathname === t.href));
@@ -16,10 +18,9 @@
 <div class="app">
 	<header>
 		<a class="brand" href="/">
-			<h1>RAPIDPASSIVES</h1>
+			<img src="/favicon.svg" alt="RapidPassives" class="logo" />
 		</a>
 		{#if isEditor}
-			<div class="divider"></div>
 			<nav class="tabs">
 				{#each tabs as tab}
 					<a
@@ -55,19 +56,12 @@
 	.brand {
 		text-decoration: none;
 	}
-	.brand h1 {
-		font-size: var(--fs-sm);
-		font-weight: 700;
-		color: var(--accent);
-		letter-spacing: 2px;
-		font-family: var(--font-mono);
+	.logo {
+		height: 22px;
+		width: auto;
+		display: block;
 	}
-	.divider {
-		width: 1px;
-		align-self: stretch;
-		background: var(--border);
-	}
-	.tabs {
+.tabs {
 		display: flex;
 		gap: 0;
 		height: 100%;

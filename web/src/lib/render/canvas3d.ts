@@ -33,6 +33,14 @@ export function createCamera(): Camera {
 interface Mesh {
 	vao: WebGLVertexArrayObject;
 	count: number;
+	wireEBO: WebGLBuffer;
+	wireCount: number;
+	color: [number, number, number];
+}
+
+interface LineMesh {
+	vao: WebGLVertexArrayObject;
+	count: number;
 	color: [number, number, number];
 }
 
@@ -44,7 +52,12 @@ interface GLState {
 	uColor: WebGLUniformLocation;
 	uLightDir: WebGLUniformLocation;
 	uAmbient: WebGLUniformLocation;
+	lineProgram: WebGLProgram;
+	uLineMVP: WebGLUniformLocation;
+	uLineColor: WebGLUniformLocation;
 	meshes: Mesh[];
+	axisMeshes: LineMesh[];
+	gridMesh: LineMesh | null;
 }
 
 // ─── Shader sources ──────────────────────────────────────────────────
@@ -74,6 +87,22 @@ void main() {
 	fragColor = vec4(lit, 1.0);
 }`;
 
+const LINE_VS = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPos;
+uniform mat4 uMVP;
+void main() {
+	gl_Position = uMVP * vec4(aPos, 1.0);
+}`;
+
+const LINE_FS = `#version 300 es
+precision highp float;
+uniform vec3 uColor;
+out vec4 fragColor;
+void main() {
+	fragColor = vec4(uColor, 1.0);
+}`;
+
 // ─── GL helpers ──────────────────────────────────────────────────────
 
 function compileShader(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader {
@@ -88,9 +117,9 @@ function compileShader(gl: WebGL2RenderingContext, type: number, src: string): W
 	return s;
 }
 
-function linkProgram(gl: WebGL2RenderingContext): WebGLProgram {
-	const vs = compileShader(gl, gl.VERTEX_SHADER, VS);
-	const fs = compileShader(gl, gl.FRAGMENT_SHADER, FS);
+function linkProgramFromSource(gl: WebGL2RenderingContext, vsSrc: string, fsSrc: string): WebGLProgram {
+	const vs = compileShader(gl, gl.VERTEX_SHADER, vsSrc);
+	const fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSrc);
 	const p = gl.createProgram()!;
 	gl.attachShader(p, vs);
 	gl.attachShader(p, fs);
@@ -101,6 +130,10 @@ function linkProgram(gl: WebGL2RenderingContext): WebGLProgram {
 	gl.deleteShader(vs);
 	gl.deleteShader(fs);
 	return p;
+}
+
+function linkProgram(gl: WebGL2RenderingContext): WebGLProgram {
+	return linkProgramFromSource(gl, VS, FS);
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -234,7 +267,7 @@ function extrudePolygon(poly: Polygon, zBottom: number, zTop: number): { positio
 	return { positions, normals };
 }
 
-function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: number[]): WebGLVertexArrayObject {
+function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: number[]): { vao: WebGLVertexArrayObject; wireEBO: WebGLBuffer; wireCount: number } {
 	const vao = gl.createVertexArray()!;
 	gl.bindVertexArray(vao);
 
@@ -249,6 +282,37 @@ function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: nu
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
 	gl.enableVertexAttribArray(1);
 	gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+
+	// Build wireframe edge indices from triangles
+	const triCount = positions.length / 9;
+	const wireIndices = new Uint32Array(triCount * 6);
+	for (let i = 0; i < triCount; i++) {
+		const base = i * 3;
+		const wi = i * 6;
+		wireIndices[wi]     = base;
+		wireIndices[wi + 1] = base + 1;
+		wireIndices[wi + 2] = base + 1;
+		wireIndices[wi + 3] = base + 2;
+		wireIndices[wi + 4] = base + 2;
+		wireIndices[wi + 5] = base;
+	}
+	const wireEBO = gl.createBuffer()!;
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wireEBO);
+	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, wireIndices, gl.STATIC_DRAW);
+
+	gl.bindVertexArray(null);
+	return { vao, wireEBO, wireCount: wireIndices.length };
+}
+
+function createLineMesh(gl: WebGL2RenderingContext, positions: number[]): WebGLVertexArrayObject {
+	const vao = gl.createVertexArray()!;
+	gl.bindVertexArray(vao);
+
+	const buf = gl.createBuffer()!;
+	gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+	gl.enableVertexAttribArray(0);
+	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 
 	gl.bindVertexArray(null);
 	return vao;
@@ -339,11 +403,16 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uLightDir = gl.getUniformLocation(program, 'uLightDir')!;
 	const uAmbient = gl.getUniformLocation(program, 'uAmbient')!;
 
+	// Line shader program
+	const lineProgram = linkProgramFromSource(gl, LINE_VS, LINE_FS);
+	const uLineMVP = gl.getUniformLocation(lineProgram, 'uMVP')!;
+	const uLineColor = gl.getUniformLocation(lineProgram, 'uColor')!;
+
 	const bg = hexToRgb(canvasTheme.bg);
 	gl.clearColor(bg[0], bg[1], bg[2], 1);
 	gl.enable(gl.DEPTH_TEST);
 
-	return { gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient, meshes: [] };
+	return { gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient, lineProgram, uLineMVP, uLineColor, meshes: [], axisMeshes: [], gridMesh: null };
 }
 
 /** Build meshes from layers + stack. Call when geometry or stack changes. */
@@ -427,9 +496,48 @@ export function buildMeshes(
 
 		if (allPos.length === 0) continue;
 
-		const vao = createMesh(gl, allPos, allNorm);
-		state.meshes.push({ vao, count: allPos.length / 3, color });
+		const { vao, wireEBO, wireCount } = createMesh(gl, allPos, allNorm);
+		state.meshes.push({ vao, count: allPos.length / 3, wireEBO, wireCount, color });
 	}
+
+	// Build grid at the bottom of the geometry
+	const gridZ = isFinite(minZ) ? minZ - cz : 0;
+	buildGrid(state, xyExtent, gridZ);
+}
+
+function buildGrid(state: GLState, xyExtent: number, z: number): void {
+	const { gl } = state;
+
+	// Clean up old
+	for (const m of state.axisMeshes) gl.deleteVertexArray(m.vao);
+	if (state.gridMesh) gl.deleteVertexArray(state.gridMesh.vao);
+	state.axisMeshes = [];
+	state.gridMesh = null;
+
+	const halfSize = Math.max(xyExtent * 0.6, 50);
+
+	const gridLines: number[] = [];
+	const gridStep = niceStep(halfSize * 2);
+	const gridHalf = Math.ceil(halfSize / gridStep) * gridStep;
+	for (let v = -gridHalf; v <= gridHalf; v += gridStep) {
+		gridLines.push(v, -gridHalf, z, v, gridHalf, z);
+		gridLines.push(-gridHalf, v, z, gridHalf, v, z);
+	}
+	if (gridLines.length > 0) {
+		const vao = createLineMesh(gl, gridLines);
+		state.gridMesh = { vao, count: gridLines.length / 3, color: [0.25, 0.25, 0.25] };
+	}
+}
+
+/** Pick a nice round grid step for a given total extent */
+function niceStep(extent: number): number {
+	const raw = extent / 10;
+	const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+	const norm = raw / mag;
+	if (norm <= 1) return mag;
+	if (norm <= 2) return 2 * mag;
+	if (norm <= 5) return 5 * mag;
+	return 10 * mag;
 }
 
 /** Render one frame */
@@ -438,33 +546,55 @@ export function render3D(
 	camera: Camera,
 	width: number,
 	height: number,
+	wireframe: boolean = false,
 ): void {
 	const { gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient } = state;
 
 	gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	gl.useProgram(program);
 
 	const aspect = width / height || 1;
 	const proj = mat4Perspective(Math.PI / 6, aspect, 0.1, 10000);
 	const eye = cameraEye(camera);
 	const view = mat4LookAt(eye, camera.target as number[], [0, 0, 1]);
 	const vp = mat4Multiply(proj, view);
-	const normalMat = mat3NormalFromMat4(view);
 
-	gl.uniformMatrix4fv(uMVP, false, vp);
-	gl.uniformMatrix3fv(uNormalMat, false, normalMat);
+	// Draw grid and axes first (behind geometry)
+	gl.useProgram(state.lineProgram);
+	gl.uniformMatrix4fv(state.uLineMVP, false, vp);
 
-	// Directional light from upper-right
-	const lx = 0.4, ly = 0.3, lz = 0.8;
-	const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
-	gl.uniform3f(uLightDir, lx / ll, ly / ll, lz / ll);
-	gl.uniform1f(uAmbient, 0.35);
+	if (state.gridMesh) {
+		gl.uniform3f(state.uLineColor, state.gridMesh.color[0], state.gridMesh.color[1], state.gridMesh.color[2]);
+		gl.bindVertexArray(state.gridMesh.vao);
+		gl.drawArrays(gl.LINES, 0, state.gridMesh.count);
+	}
 
-	for (const mesh of state.meshes) {
-		gl.uniform3f(uColor, mesh.color[0], mesh.color[1], mesh.color[2]);
-		gl.bindVertexArray(mesh.vao);
-		gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+	// Draw geometry
+	if (wireframe) {
+		// Wireframe: use line program with edge indices
+		gl.useProgram(state.lineProgram);
+		gl.uniformMatrix4fv(state.uLineMVP, false, vp);
+		for (const mesh of state.meshes) {
+			gl.uniform3f(state.uLineColor, mesh.color[0], mesh.color[1], mesh.color[2]);
+			gl.bindVertexArray(mesh.vao);
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.wireEBO);
+			gl.drawElements(gl.LINES, mesh.wireCount, gl.UNSIGNED_INT, 0);
+		}
+	} else {
+		// Solid: use lit program
+		gl.useProgram(program);
+		const normalMat = mat3NormalFromMat4(view);
+		gl.uniformMatrix4fv(uMVP, false, vp);
+		gl.uniformMatrix3fv(uNormalMat, false, normalMat);
+		const lx = 0.4, ly = 0.3, lz = 0.8;
+		const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
+		gl.uniform3f(uLightDir, lx / ll, ly / ll, lz / ll);
+		gl.uniform1f(uAmbient, 0.5);
+		for (const mesh of state.meshes) {
+			gl.uniform3f(uColor, mesh.color[0], mesh.color[1], mesh.color[2]);
+			gl.bindVertexArray(mesh.vao);
+			gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+		}
 	}
 
 	gl.bindVertexArray(null);
@@ -500,6 +630,10 @@ export function disposeGL(state: GLState): void {
 	const { gl } = state;
 	for (const m of state.meshes) {
 		gl.deleteVertexArray(m.vao);
+		gl.deleteBuffer(m.wireEBO);
 	}
+	for (const m of state.axisMeshes) gl.deleteVertexArray(m.vao);
+	if (state.gridMesh) gl.deleteVertexArray(state.gridMesh.vao);
 	gl.deleteProgram(state.program);
+	gl.deleteProgram(state.lineProgram);
 }

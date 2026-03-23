@@ -2,7 +2,7 @@
 	import '$lib/components/fields.css';
 	import type { SpiralInductorParams, PgsParams, LayerMap } from '$lib/geometry/types';
 	import { buildSpiralInductor, isSpiralValid, addPgs } from '$lib/geometry/spiral';
-	import { createDefaultStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
+	import { create2MetalStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackView from '$lib/components/StackView.svelte';
@@ -21,7 +21,7 @@
 	});
 
 	let pgs = $state<PgsParams>({ enabled: false, D: 150, width: 2, spacing: 1 });
-	let stack = $state(createDefaultStack());
+	let stack = $state(create2MetalStack());
 
 	function set(k: keyof SpiralInductorParams, v: number) { p = { ...p, [k]: v }; }
 	function nud(k: keyof SpiralInductorParams, s: number, mn?: number, mx?: number) { set(k, nudgeValue(p[k] as number, s, mn, mx)); }

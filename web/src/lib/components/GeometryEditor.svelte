@@ -21,6 +21,7 @@
 
 	let activeTab = $state<'params' | 'stack' | 'sim'>('params');
 	let viewMode = $state<'2d' | '3d'>('2d');
+	let wireframe = $state(false);
 	let transitioning = $state(false);
 	let viewer2d: LayoutViewer | undefined = $state();
 	let viewer3d: LayoutViewer3D | undefined = $state();
@@ -111,7 +112,7 @@
 			{#if viewMode === '2d'}
 				<LayoutViewer bind:this={viewer2d} {layers} {renderOpts} />
 			{:else if stack}
-				<LayoutViewer3D bind:this={viewer3d} {layers} {stack}
+				<LayoutViewer3D bind:this={viewer3d} {layers} {stack} {wireframe}
 					colorOverrides={renderOpts?.colorOverrides}
 					visibleLayers={renderOpts?.visibleLayers} />
 			{/if}
@@ -120,11 +121,22 @@
 				<button class="tb" onclick={doZoomOut} title="Zoom out">&minus;</button>
 				<button class="tb" onclick={doReset} title="Fit to view">
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-						<rect x="2" y="2" width="12" height="12" rx="1" />
-						<line x1="8" y1="5" x2="8" y2="11" />
-						<line x1="5" y1="8" x2="11" y2="8" />
+						<polyline points="1,5 1,1 5,1" />
+						<polyline points="11,1 15,1 15,5" />
+						<polyline points="15,11 15,15 11,15" />
+						<polyline points="5,15 1,15 1,11" />
+						<rect x="5" y="5" width="6" height="6" rx="0.5" />
 					</svg>
 				</button>
+				{#if stack && viewMode === '3d'}
+					<button class="tb" class:active-toggle={wireframe} onclick={() => wireframe = !wireframe} title="Toggle wireframe">
+						<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+							<path d="M1 5L8 1L15 5L15 11L8 15L1 11Z" />
+							<path d="M1 5L8 9L15 5" />
+							<path d="M8 9L8 15" />
+						</svg>
+					</button>
+				{/if}
 				{#if stack}
 					<button class="tb view-mode" onclick={toggleView} title="Toggle 2D/3D view">
 						{viewMode === '2d' ? '3D' : '2D'}
@@ -259,6 +271,10 @@
 		background: var(--bg-panel);
 		border-color: var(--accent);
 		color: var(--text);
+	}
+	.tb.active-toggle {
+		border-color: var(--accent);
+		color: var(--accent);
 	}
 	.tb.view-mode {
 		color: var(--accent);

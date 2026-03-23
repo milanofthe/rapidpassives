@@ -1,8 +1,10 @@
 <script lang="ts">
-	import type { SpiralInductorParams, SymmetricInductorParams, SymmetricTransformerParams, LayerMap } from '$lib/geometry/types';
+	import type { LayerMap } from '$lib/geometry/types';
 	import { buildSpiralInductor } from '$lib/geometry/spiral';
 	import { buildSymmetricInductor } from '$lib/geometry/symmetric_inductor';
 	import { buildSymmetricTransformer } from '$lib/geometry/symmetric_transformer';
+	import { buildStackedTransformer } from '$lib/geometry/stacked_transformer';
+	import { buildMomCapacitor } from '$lib/geometry/mom_capacitor';
 	import { fitToView, renderLayers } from '$lib/render/canvas2d';
 	import { onMount } from 'svelte';
 
@@ -20,10 +22,22 @@
 			layers: buildSymmetricInductor({ Dout: 120, N: 2, sides: 8, width: 10, spacing: 3, center_tap: false, via_extent: 6, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
 		},
 		{
-			title: 'Symmetric Transformer',
+			title: 'Interleaved Transformer',
 			href: '/symmetric-transformer',
-			desc: 'Interleaved transformer with configurable winding ratio',
+			desc: 'Laterally interleaved transformer with configurable winding ratio',
 			layers: buildSymmetricTransformer({ Dout: 120, N1: 1, N2: 2, sides: 8, width: 8, spacing: 3, center_tap_primary: false, center_tap_secondary: false, via_extent: 5, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
+		},
+		{
+			title: 'Stacked Transformer',
+			href: '/stacked-transformer',
+			desc: 'Vertically stacked differential transformer on separate metal layers',
+			layers: buildStackedTransformer({ Dout: 120, N1: 2, N2: 2, sides: 8, width: 8, spacing: 3, center_tap_primary: false, center_tap_secondary: false, via_extent: 5, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
+		},
+		{
+			title: 'MOM Capacitor',
+			href: '/mom-capacitor',
+			desc: 'Interdigitated metal-oxide-metal finger capacitor',
+			layers: buildMomCapacitor({ nFingers: 16, fingerLength: 30, fingerWidth: 1, fingerSpacing: 1, busWidth: 3, nLayers: 3, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
 		},
 	];
 
@@ -96,10 +110,9 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		justify-content: center;
 		gap: 32px;
 		padding: 40px;
-		min-height: 0;
+		overflow-y: auto;
 	}
 	.hero {
 		text-align: center;
@@ -124,9 +137,10 @@
 		gap: 16px;
 		flex-wrap: wrap;
 		justify-content: center;
+		max-width: calc(3 * 220px + 2 * 16px);
 	}
 	.card {
-		width: 260px;
+		width: 220px;
 		background: var(--bg-surface);
 		border: 1px solid var(--border-subtle);
 		text-decoration: none;

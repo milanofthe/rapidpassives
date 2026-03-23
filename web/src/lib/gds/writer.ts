@@ -29,9 +29,13 @@ const STRING    = 0x1906;
 const DEFAULT_GDS_LAYERS: Record<LayerName, number> = {
 	windings: 1,
 	crossings: 2,
+	windings_m2: 6,
+	crossings_m1: 7,
+	windings_m4: 8,
 	vias: 3,
 	vias1: 3,
 	vias2: 5,
+	vias3: 9,
 	centertap: 4,
 	pgs: 10,
 };

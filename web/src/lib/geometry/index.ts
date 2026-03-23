@@ -4,5 +4,7 @@ export * from './polygonize';
 export * from './spiral';
 export * from './symmetric_inductor';
 export * from './symmetric_transformer';
+export * from './stacked_transformer';
+export * from './mom_capacitor';
 export * from './merge';
 export * from './utils';
