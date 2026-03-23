@@ -26,14 +26,19 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 	const xShift = -s / 2 * Math.cos(PI / sides);
 	const yShift = -s / 2 * Math.sin(PI / sides);
 
-	// --- Compute outer/inner traces (same as legacy) ---
+	const opposite = params.portSide === 'opposite';
+	// For opposite-side ports: spare one half-turn so the spiral ends on the right side
+	// at a larger inner radius, leaving room for the bridge to cross left
+	const nSections = opposite ? 2 * N - 1 : 2 * N;
+
+	// --- Compute outer/inner traces ---
 	const xOut: number[] = [];
 	const yOut: number[] = [];
 	const xIn: number[] = [];
 	const yIn: number[] = [];
 
 	let r1 = R1, r2 = R2;
-	for (let section = 0; section < 2 * N; section++) {
+	for (let section = 0; section < nSections; section++) {
 		if (section % 2 === 0) {
 			for (const phi of angles) {
 				xOut.push(r1 * Math.cos(phi));
@@ -53,19 +58,24 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 		r2 -= s / 2;
 	}
 
-	// Start connector
+	// For opposite-side: both ports centered at y=0 (no offset needed since ports are on different sides)
+	// For same-side: entry above, exit below (offset by spacing to avoid shorting)
+	const entryYCenter = opposite ? 0 : (width + spacing) / 2;
+	const exitYCenter = opposite ? 0 : -(width + spacing) / 2;
+
+	// Start connector (P1 always enters from right)
 	const xOutStart = [Dout / 2 + width, xOut[0]];
 	const xInStart = [Dout / 2 + width, xIn[0]];
-	const yOutStart = [width + spacing / 2, width + spacing / 2];
-	const yInStart = [spacing / 2, spacing / 2];
+	const yOutStart = [entryYCenter + width / 2, entryYCenter + width / 2];
+	const yInStart = [entryYCenter - width / 2, entryYCenter - width / 2];
 
 	// End connector
 	const xOutEnd = [xOut[xOut.length - 1]];
 	const xInEnd = [xIn[xIn.length - 1]];
-	const yOutEnd = [-spacing / 2];
-	const yInEnd = [-spacing / 2];
+	const yOutEnd = [opposite ? -width / 2 : -spacing / 2];
+	const yInEnd = [opposite ? -width / 2 : -spacing / 2];
 
-	// Full winding polygon (same as legacy)
+	// Full winding polygon
 	const xPoly = [
 		...xOutStart, ...xOut, ...xOutEnd,
 		...[...xInEnd].reverse(), ...[...xIn].reverse(), ...[...xInStart].reverse()
@@ -76,19 +86,18 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 	];
 	const windingPolygon: Polygon = { x: xPoly, y: yPoly };
 
-	// Underpass polygon (same as legacy, or mirrored for opposite-side ports)
+	// Underpass polygon
 	const lastXIn = xIn[xIn.length - 1];
-	const opposite = params.portSide === 'opposite';
+	const lastXOut = xOut[xOut.length - 1];
 	const underpassEndX = opposite ? -(Dout / 2 + width) : Dout / 2 + width;
 	const underpassPolygon: Polygon = {
 		x: [lastXIn, underpassEndX, underpassEndX, lastXIn],
-		y: [-width - spacing / 2, -width - spacing / 2, -spacing / 2, -spacing / 2],
+		y: [exitYCenter - width / 2, exitYCenter - width / 2, exitYCenter + width / 2, exitYCenter + width / 2],
 	};
 
-	// Via polygons (same as legacy)
-	const lastXOut = xOut[xOut.length - 1];
+	// Via polygons
 	const viaCenterX = lastXOut + (lastXIn - lastXOut) / 2;
-	const viaCenterY = -width / 2 - spacing / 2;
+	const viaCenterY = exitYCenter;
 
 	let viaPolys: Polygon[];
 	if (extend > width) {
@@ -117,12 +126,12 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 	}
 
 	// Port 1 node (start of winding, top metal)
-	const p1Node = addNode(Dout / 2 + width, (width + spacing) / 2, 'm3');
+	const p1Node = addNode(Dout / 2 + width, entryYCenter, 'm3');
 
 	// Winding centerline nodes at each octagon vertex
 	let prevNode = p1Node;
 	r1 = R1; r2 = R2;
-	for (let section = 0; section < 2 * N; section++) {
+	for (let section = 0; section < nSections; section++) {
 		for (const phi of angles) {
 			let cx: number, cy: number;
 			if (section % 2 === 0) {
@@ -173,7 +182,7 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 	};
 
 	// Port 2 node (end of underpass, lower metal)
-	const p2Node = addNode(opposite ? -(Dout / 2 + width) : Dout / 2 + width, -width / 2 - spacing / 2, 'm2');
+	const p2Node = addNode(underpassEndX, exitYCenter, 'm2');
 	segments.push({
 		id: `s${sid++}`, fromNode: viaBotNode.id, toNode: p2Node.id,
 		width, layerId: 'm2', pathId: 'underpass', renderLayer: 'crossings',
@@ -190,19 +199,12 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 	};
 
 	// --- Use legacy polygon for winding (exact match guaranteed) ---
-	// The winding is a single complex polygon that the miter algorithm
-	// can't perfectly reproduce due to the start/end connector geometry.
-	// Use polygonOverride on all winding segments, with the actual polygon
-	// only on the first one (the rest are just network topology).
-	// Mark all winding segments with the override on the first segment only.
 	const windingSegs = segments.filter(seg => seg.pathId === 'winding');
 	if (windingSegs.length > 0) {
 		windingSegs[0].polygonOverride = windingPolygon;
-		// Mark remaining winding segments so polygonize skips them for polygon generation
-		// but they stay in the network for the solver
 		for (let i = 1; i < windingSegs.length; i++) {
 			windingSegs[i].pathId = 'winding_topology_only';
-			windingSegs[i].polygonOverride = { x: [], y: [] }; // empty override = no polygon
+			windingSegs[i].polygonOverride = { x: [], y: [] };
 		}
 	}
 
@@ -215,10 +217,23 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 
 export function isSpiralValid(params: SpiralInductorParams): boolean {
 	const { Dout, N, sides, width, spacing, via_spacing, via_width, via_in_metal } = params;
+	const opposite = params.portSide === 'opposite';
 	const extend = 2 * (via_width + via_in_metal) + via_spacing;
 	if (extend > width) return false;
-	const Din = Dout - (N + 1) * (width + spacing);
-	if (Math.abs(Din / 2 * Math.atan(Math.PI / sides)) < width + spacing / 2) return false;
+	if (opposite && N < 2) return false;
+
+	if (opposite) {
+		// Opposite-side: 2*N - 1 sections, underpass centered at y=0
+		const s = (spacing + width) / Math.cos(Math.PI / sides);
+		const R1 = Dout / 2 / Math.cos(Math.PI / sides);
+		const innerR = R1 - (2 * N - 1) * s / 2;
+		if (innerR * Math.sin(Math.PI / sides) < width / 2) return false;
+	} else {
+		// Same-side: original validation
+		const Din = Dout - (N + 1) * (width + spacing);
+		if (Math.abs(Din / 2 * Math.atan(Math.PI / sides)) < width + spacing / 2) return false;
+	}
+
 	return true;
 }
 
