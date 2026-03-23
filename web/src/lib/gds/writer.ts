@@ -27,6 +27,7 @@ const STRING    = 0x1906;
 
 /** Default GDS layer number mapping */
 const DEFAULT_GDS_LAYERS: Record<LayerName, number> = {
+	guard_ring: 11,
 	windings: 1,
 	crossings: 2,
 	windings_m2: 6,

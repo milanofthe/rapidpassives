@@ -53,7 +53,7 @@ export function mergePolygons(polys: Polygon[]): Polygon[] {
 		// touching edges overlap and get merged
 		const inflated = multiPoly.map(p => inflateRing(p, 0.001));
 		const merged = polygonClipping.union(...inflated as [any, ...any[]]);
-		return merged.map(poly => ringsToPolygon(poly));
+		return merged.map(poly => ringToPolygon(poly[0]));
 	} catch {
 		return polys;
 	}
@@ -96,9 +96,8 @@ function inflateRing(rings: [number, number][][], amount: number): [number, numb
 	return [inflated];
 }
 
-/** Convert polygon-clipping result back to Polygon format */
-function ringsToPolygon(rings: [number, number][][]): Polygon {
-	const ring = rings[0];
+/** Convert a single ring to Polygon format */
+function ringToPolygon(ring: [number, number][]): Polygon {
 	const x: number[] = [];
 	const y: number[] = [];
 	const n = ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]

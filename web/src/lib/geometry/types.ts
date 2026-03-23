@@ -5,7 +5,7 @@ export interface Polygon {
 }
 
 /** Layer names used in inductor/transformer layouts */
-export type LayerName = 'windings' | 'crossings' | 'windings_m2' | 'crossings_m1' | 'windings_m4' | 'vias' | 'vias1' | 'vias2' | 'vias3' | 'centertap' | 'pgs';
+export type LayerName = 'guard_ring' | 'windings' | 'crossings' | 'windings_m2' | 'crossings_m1' | 'windings_m4' | 'vias' | 'vias1' | 'vias2' | 'vias3' | 'centertap' | 'pgs';
 
 /** A collection of polygons organized by layer */
 export type LayerMap = Partial<Record<LayerName, Polygon[]>>;
@@ -16,7 +16,7 @@ import { layerColors } from '$lib/theme';
 export const LAYER_COLORS: Record<LayerName, string> = layerColors;
 
 /** Draw order (back to front) */
-export const LAYER_ORDER: LayerName[] = ['pgs', 'centertap', 'crossings_m1', 'crossings', 'windings_m2', 'windings', 'windings_m4', 'vias', 'vias1', 'vias2', 'vias3'];
+export const LAYER_ORDER: LayerName[] = ['guard_ring', 'pgs', 'centertap', 'crossings_m1', 'crossings', 'windings_m2', 'windings', 'windings_m4', 'vias', 'vias1', 'vias2', 'vias3'];
 
 export interface SpiralInductorParams {
 	Dout: number;
@@ -27,6 +27,7 @@ export interface SpiralInductorParams {
 	via_spacing: number;
 	via_width: number;
 	via_in_metal: number;
+	portSide?: 'same' | 'opposite';
 }
 
 export interface SymmetricInductorParams {
@@ -40,6 +41,7 @@ export interface SymmetricInductorParams {
 	via_spacing: number;
 	via_width: number;
 	via_in_metal: number;
+	portSpacing?: number;
 }
 
 export interface SymmetricTransformerParams {
@@ -55,6 +57,7 @@ export interface SymmetricTransformerParams {
 	via_spacing: number;
 	via_width: number;
 	via_in_metal: number;
+	portSpacing?: number;
 }
 
 export interface StackedTransformerParams {
@@ -70,6 +73,7 @@ export interface StackedTransformerParams {
 	via_spacing: number;
 	via_width: number;
 	via_in_metal: number;
+	portSpacing?: number;
 }
 
 export interface MomCapacitorParams {
@@ -82,6 +86,12 @@ export interface MomCapacitorParams {
 	via_spacing: number;
 	via_width: number;
 	via_in_metal: number;
+}
+
+export interface GuardRingParams {
+	enabled: boolean;
+	margin: number;
+	ringWidth: number;
 }
 
 export interface PgsParams {

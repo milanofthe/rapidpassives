@@ -76,6 +76,73 @@ export function pgs4(D: number, w: number, s: number): Polygon[] {
 	return sections;
 }
 
+/** Rectangular guard ring bars (4 non-overlapping bars forming a closed ring). */
+function guardRingBars(bboxW: number, bboxH: number, margin: number, ringWidth: number): Polygon[] {
+	const innerW = bboxW / 2 + margin;
+	const innerH = bboxH / 2 + margin;
+	const outerW = innerW + ringWidth;
+	const outerH = innerH + ringWidth;
+
+	return [
+		// Top bar (full width)
+		{ x: [-outerW, outerW, outerW, -outerW], y: [innerH, innerH, outerH, outerH] },
+		// Bottom bar (full width)
+		{ x: [-outerW, outerW, outerW, -outerW], y: [-outerH, -outerH, -innerH, -innerH] },
+		// Left bar (between top and bottom bars, no corner overlap)
+		{ x: [-outerW, -innerW, -innerW, -outerW], y: [-innerH, -innerH, innerH, innerH] },
+		// Right bar (between top and bottom bars, no corner overlap)
+		{ x: [innerW, outerW, outerW, innerW], y: [-innerH, -innerH, innerH, innerH] },
+	];
+}
+
+/**
+ * Guard ring on specified metal layers, stitched with vias.
+ * Returns a LayerMap — add AFTER mergeLayers to avoid union with winding geometry.
+ * @param metalLayers - metal layer names bottom to top
+ * @param viaLayers - via layer names between adjacent metals (length = metalLayers.length - 1)
+ */
+export function guardRing(
+	bboxW: number, bboxH: number, margin: number, ringWidth: number,
+	viaSpacing: number, viaWidth: number, viaInMetal: number,
+	metalLayers: import('./types').LayerName[],
+	viaLayers: import('./types').LayerName[],
+): Partial<Record<import('./types').LayerName, Polygon[]>> {
+	const bars = guardRingBars(bboxW, bboxH, margin, ringWidth);
+	const result: Partial<Record<import('./types').LayerName, Polygon[]>> = {};
+
+	for (const ml of metalLayers) {
+		result[ml] = [...bars];
+	}
+
+	// Via stitching between adjacent metals
+	const innerW = bboxW / 2 + margin;
+	const innerH = bboxH / 2 + margin;
+	const outerW = innerW + ringWidth;
+	const outerH = innerH + ringWidth;
+	const barW = ringWidth - 2 * viaInMetal;
+
+	if (barW > viaWidth) {
+		for (let i = 0; i < viaLayers.length && i < metalLayers.length - 1; i++) {
+			let viaPolys: Polygon[] = [];
+			const topCy = (innerH + outerH) / 2;
+			const hLen = 2 * outerW - 2 * viaInMetal;
+			if (hLen > 0) {
+				viaPolys = viaPolys.concat(viaGrid(0, topCy, hLen, barW, viaSpacing, viaWidth));
+				viaPolys = viaPolys.concat(viaGrid(0, -topCy, hLen, barW, viaSpacing, viaWidth));
+			}
+			const sideCx = (innerW + outerW) / 2;
+			const vLen = 2 * innerH - 2 * viaInMetal;
+			if (vLen > 0) {
+				viaPolys = viaPolys.concat(viaGrid(-sideCx, 0, barW, vLen, viaSpacing, viaWidth));
+				viaPolys = viaPolys.concat(viaGrid(sideCx, 0, barW, vLen, viaSpacing, viaWidth));
+			}
+			result[viaLayers[i]] = viaPolys;
+		}
+	}
+
+	return result;
+}
+
 /** 45-degree geometric routing for symmetric crossings */
 export function routingGeometric45(
 	w: number, s: number, x0: number, y0: number, extend: number = 0

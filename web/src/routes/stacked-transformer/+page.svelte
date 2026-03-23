@@ -1,8 +1,8 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
-	import type { StackedTransformerParams, PgsParams, LayerMap } from '$lib/geometry/types';
+	import type { StackedTransformerParams, PgsParams, GuardRingParams, LayerMap } from '$lib/geometry/types';
 	import { buildStackedTransformer, isStackedTransformerValid } from '$lib/geometry/stacked_transformer';
-	import { pgs4 } from '$lib/geometry/utils';
+	import { pgs4, guardRing } from '$lib/geometry/utils';
 	import { create4MetalStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
@@ -22,6 +22,7 @@
 	});
 
 	let pgsP = $state<PgsParams>({ enabled: false, D: 270, width: 4, spacing: 2 });
+	let gr = $state<GuardRingParams>({ enabled: false, margin: 10, ringWidth: 5 });
 	let stack = $state(create4MetalStack());
 
 	function set(k: keyof StackedTransformerParams, v: any) { p = { ...p, [k]: v }; }
@@ -32,6 +33,10 @@
 	function nudPgs(k: keyof PgsParams, s: number, mn?: number, mx?: number) { setPgs(k, nudgeValue(pgsP[k] as number, s, mn, mx)); }
 	function inpPgs(k: keyof PgsParams, e: Event) { const v = parseInput(e); if (v !== null) setPgs(k, v); }
 
+	function setGR(k: keyof GuardRingParams, v: any) { gr = { ...gr, [k]: v }; }
+	function nudGR(k: keyof GuardRingParams, s: number, mn?: number, mx?: number) { setGR(k, nudgeValue(gr[k] as number, s, mn, mx)); }
+	function inpGR(k: keyof GuardRingParams, e: Event) { const v = parseInput(e); if (v !== null) setGR(k, v); }
+
 	let result = $derived.by(() => {
 		try { return buildStackedTransformer({ ...p }); } catch { return null; }
 	});
@@ -39,7 +44,13 @@
 		if (!result) return {};
 		const l = { ...result.layers };
 		if (pgsP.enabled) l.pgs = pgs4(pgsP.D, pgsP.width, pgsP.spacing);
-		return mergeLayers(l);
+		const merged = mergeLayers(l);
+		if (gr.enabled) {
+			const bbox = p.Dout + 2 * p.width;
+			const grLayers = guardRing(bbox, bbox, gr.margin, gr.ringWidth, p.via_spacing, p.via_width, p.via_in_metal, ['guard_ring', 'crossings', 'windings', 'windings_m4'], ['vias2', 'vias1', 'vias3']);
+			for (const [k, v] of Object.entries(grLayers)) merged[k as keyof LayerMap] = [...(merged[k as keyof LayerMap] || []), ...v];
+		}
+		return merged;
 	});
 	let valid = $derived(isStackedTransformerValid({ ...p }));
 	let portMarkers = $derived.by(() => {
@@ -68,6 +79,9 @@
 			<div class="param-section"><h4>Secondary (M2)</h4>
 				<div class="f"><span>N2</span><div class="fi"><button onclick={() => nud('N2',-1,1,20)}>-</button><input type="number" value={p.N2} oninput={e => inp('N2',e)}/><button onclick={() => nud('N2',1,1,20)}>+</button><em>turns</em></div></div>
 			</div>
+			<div class="param-section"><h4>Ports</h4>
+				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('portSpacing',-1,0)}>-</button><input type="number" value={p.portSpacing ?? 0} oninput={e => { const v = parseInput(e); set('portSpacing', v && v > 0 ? v : undefined); }}/><button onclick={() => set('portSpacing', (p.portSpacing ?? 0) + 1)}>+</button><em>um</em></div></div>
+			</div>
 			<div class="param-section"><h4>Vias</h4>
 				<div class="f"><span>Extent</span><div class="fi"><button onclick={() => nud('via_extent',-0.5,0.5)}>-</button><input type="number" value={p.via_extent} oninput={e => inp('via_extent',e)}/><button onclick={() => nud('via_extent',0.5,0.5)}>+</button><em>um</em></div></div>
 				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('via_spacing',-0.1,0.1)}>-</button><input type="number" value={p.via_spacing} oninput={e => inp('via_spacing',e)}/><button onclick={() => nud('via_spacing',0.1,0.1)}>+</button><em>um</em></div></div>
@@ -80,6 +94,13 @@
 					<div class="f"><span>Diameter</span><div class="fi"><button onclick={() => nudPgs('D',-1,1)}>-</button><input type="number" value={pgsP.D} oninput={e => inpPgs('D',e)}/><button onclick={() => nudPgs('D',1,1)}>+</button><em>um</em></div></div>
 					<div class="f"><span>Width</span><div class="fi"><button onclick={() => nudPgs('width',-0.5,0.1)}>-</button><input type="number" value={pgsP.width} oninput={e => inpPgs('width',e)}/><button onclick={() => nudPgs('width',0.5,0.1)}>+</button><em>um</em></div></div>
 					<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nudPgs('spacing',-0.5,0.1)}>-</button><input type="number" value={pgsP.spacing} oninput={e => inpPgs('spacing',e)}/><button onclick={() => nudPgs('spacing',0.5,0.1)}>+</button><em>um</em></div></div>
+				{/if}
+			</div>
+			<div class="param-section"><h4>Guard Ring</h4>
+				<div class="f"><span>Enabled</span><div class="fi"><button class="toggle-btn" class:active={gr.enabled} onclick={() => setGR('enabled', !gr.enabled)}>{gr.enabled ? 'ON' : 'OFF'}</button><em></em></div></div>
+				{#if gr.enabled}
+					<div class="f"><span>Margin</span><div class="fi"><button onclick={() => nudGR('margin',-1,1)}>-</button><input type="number" value={gr.margin} oninput={e => inpGR('margin',e)}/><button onclick={() => nudGR('margin',1,1)}>+</button><em>um</em></div></div>
+					<div class="f"><span>Ring Width</span><div class="fi"><button onclick={() => nudGR('ringWidth',-0.5,0.5)}>-</button><input type="number" value={gr.ringWidth} oninput={e => inpGR('ringWidth',e)}/><button onclick={() => nudGR('ringWidth',0.5,0.5)}>+</button><em>um</em></div></div>
 				{/if}
 			</div>
 		</ParamSidebar>

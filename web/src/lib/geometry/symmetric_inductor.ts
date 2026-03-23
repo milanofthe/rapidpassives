@@ -168,7 +168,7 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 	}
 
 	// Ports — use outermost winding nodes near the bottom
-	const portXOffset = center_tap ? spacing + width : (spacing + width) / 2;
+	const portXOffset = params.portSpacing !== undefined ? params.portSpacing / 2 : (center_tap ? spacing + width : (spacing + width) / 2);
 	const portLeft = addNode(-portXOffset, -Dout / 2 - width, 'm3');
 	const portRight = addNode(portXOffset, -Dout / 2 - width, 'm3');
 
@@ -348,13 +348,14 @@ function generateLegacyPolygons(params: SymmetricInductorParams): LayerMap {
 	}
 
 	// Ports
+	const pxo = params.portSpacing !== undefined ? params.portSpacing / 2 : (center_tap ? spacing + width : (spacing + width) / 2);
 	let xPort: number[], yPort: number[];
 	if (center_tap) {
-		xPort = [-sepTotal/2, -spacing - width/2, -spacing - width/2, -spacing - 3*width/2, -spacing - 3*width/2, -sepTotal/2];
+		xPort = [-sepTotal/2, -pxo + width/2, -pxo + width/2, -pxo - width/2, -pxo - width/2, -sepTotal/2];
 		yPort = [-Dout/2 + width, -Dout/2 + width, -Dout/2 - width, -Dout/2 - width, -Dout/2, -Dout/2];
 		polysWindings.push({ x: [-width/2, -width/2, width/2, width/2], y: [-Dout/2 - width, -Dout/2 + width, -Dout/2 + width, -Dout/2 - width] });
 	} else {
-		xPort = [-sepTotal/2, -spacing/2, -spacing/2, -spacing/2 - width, -spacing/2 - width, -sepTotal/2];
+		xPort = [-sepTotal/2, -pxo + width/2, -pxo + width/2, -pxo - width/2, -pxo - width/2, -sepTotal/2];
 		yPort = [-Dout/2 + width, -Dout/2 + width, -Dout/2 - width, -Dout/2 - width, -Dout/2, -Dout/2];
 	}
 	polysWindings.push({ x: xPort, y: yPort });

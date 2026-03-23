@@ -76,10 +76,12 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 	];
 	const windingPolygon: Polygon = { x: xPoly, y: yPoly };
 
-	// Underpass polygon (same as legacy)
+	// Underpass polygon (same as legacy, or mirrored for opposite-side ports)
 	const lastXIn = xIn[xIn.length - 1];
+	const opposite = params.portSide === 'opposite';
+	const underpassEndX = opposite ? -(Dout / 2 + width) : Dout / 2 + width;
 	const underpassPolygon: Polygon = {
-		x: [lastXIn, Dout / 2 + width, Dout / 2 + width, lastXIn],
+		x: [lastXIn, underpassEndX, underpassEndX, lastXIn],
 		y: [-width - spacing / 2, -width - spacing / 2, -spacing / 2, -spacing / 2],
 	};
 
@@ -171,7 +173,7 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 	};
 
 	// Port 2 node (end of underpass, lower metal)
-	const p2Node = addNode(Dout / 2 + width, -width / 2 - spacing / 2, 'm2');
+	const p2Node = addNode(opposite ? -(Dout / 2 + width) : Dout / 2 + width, -width / 2 - spacing / 2, 'm2');
 	segments.push({
 		id: `s${sid++}`, fromNode: viaBotNode.id, toNode: p2Node.id,
 		width, layerId: 'm2', pathId: 'underpass', renderLayer: 'crossings',

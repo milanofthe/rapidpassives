@@ -37,7 +37,7 @@ export interface ProcessStack {
 
 const SUB: StackLayer = { id: 'sub', name: 'Substrate', type: 'substrate', z: 0, thickness: 300, color: '#4a4a5a', gdsLayers: [], visible: true };
 const PGS: StackLayer = { id: 'pgs', name: 'PGS (Poly)', type: 'metal', z: 300.2, thickness: 0.2, rsh: 0.1, color: '#7b5e8a', gdsLayers: ['pgs'], visible: true };
-const M1: StackLayer = { id: 'm1', name: 'Metal 1', type: 'metal', z: 301.0, thickness: 0.5, rsh: 0.05, color: '#6bbf8a', gdsLayers: ['centertap', 'crossings_m1'], visible: true };
+const M1: StackLayer = { id: 'm1', name: 'Metal 1', type: 'metal', z: 301.0, thickness: 0.5, rsh: 0.05, color: '#6bbf8a', gdsLayers: ['centertap', 'crossings_m1', 'guard_ring'], visible: true };
 const VIA12: StackLayer = { id: 'via12', name: 'Via 1-2', type: 'via', z: 301.5, thickness: 0.5, color: '#5a5a62', gdsLayers: ['vias2'], visible: true };
 const M2: StackLayer = { id: 'm2', name: 'Metal 2', type: 'metal', z: 302.0, thickness: 0.5, rsh: 0.03, color: '#d9513c', gdsLayers: ['crossings', 'windings_m2'], visible: true };
 const VIA23: StackLayer = { id: 'via23', name: 'Via 2-3', type: 'via', z: 302.5, thickness: 0.6, color: '#6e6e78', gdsLayers: ['vias', 'vias1'], visible: true };

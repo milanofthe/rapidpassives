@@ -235,8 +235,8 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 	// Port nodes
 	const hasBotCTPort = (center_tap_primary && N1 % 2 === 0) || (center_tap_secondary && N2 % 2 !== 0);
 	const hasTopCTPort = (center_tap_primary && N1 % 2 !== 0) || (center_tap_secondary && N2 % 2 === 0);
-	const botPortX = hasBotCTPort ? spacing + width : (spacing + width) / 2;
-	const topPortX = hasTopCTPort ? spacing + width : (spacing + width) / 2;
+	const botPortX = params.portSpacing !== undefined ? params.portSpacing / 2 : (hasBotCTPort ? spacing + width : (spacing + width) / 2);
+	const topPortX = params.portSpacing !== undefined ? params.portSpacing / 2 : (hasTopCTPort ? spacing + width : (spacing + width) / 2);
 
 	const p1Plus = addN(-botPortX, -Dout / 2 - width, 'm3');
 	const p1Minus = addN(botPortX, -Dout / 2 - width, 'm3');
@@ -381,15 +381,17 @@ function generateLegacyPolygons(
 	// Bottom ports
 	const hasBottomCT = (center_tap_primary && N1%2===0)||(center_tap_secondary && N2%2!==0);
 	const hasTopCT = (center_tap_primary && N1%2!==0)||(center_tap_secondary && N2%2===0);
+	const bpx = params.portSpacing !== undefined ? params.portSpacing / 2 : (hasBottomCT ? spacing + width : (spacing + width) / 2);
+	const tpx = params.portSpacing !== undefined ? params.portSpacing / 2 : (hasTopCT ? spacing + width : (spacing + width) / 2);
 	let xPortB: number[], yPortB: number[];
-	if (hasBottomCT) { xPortB=[-sepTotal/2,-spacing-width/2,-spacing-width/2,-spacing-3*width/2,-spacing-3*width/2,-sepTotal/2]; yPortB=[-Dout/2+width,-Dout/2+width,-Dout/2-width,-Dout/2-width,-Dout/2,-Dout/2]; polysWindings.push({x:[-width/2,-width/2,width/2,width/2],y:[-Dout/2-width,-Dout/2+width,-Dout/2+width,-Dout/2-width]}); }
-	else { xPortB=[-sepTotal/2,-spacing/2,-spacing/2,-spacing/2-width,-spacing/2-width,-sepTotal/2]; yPortB=[-Dout/2+width,-Dout/2+width,-Dout/2-width,-Dout/2-width,-Dout/2,-Dout/2]; }
+	if (hasBottomCT) { xPortB=[-sepTotal/2,-bpx+width/2,-bpx+width/2,-bpx-width/2,-bpx-width/2,-sepTotal/2]; yPortB=[-Dout/2+width,-Dout/2+width,-Dout/2-width,-Dout/2-width,-Dout/2,-Dout/2]; polysWindings.push({x:[-width/2,-width/2,width/2,width/2],y:[-Dout/2-width,-Dout/2+width,-Dout/2+width,-Dout/2-width]}); }
+	else { xPortB=[-sepTotal/2,-bpx+width/2,-bpx+width/2,-bpx-width/2,-bpx-width/2,-sepTotal/2]; yPortB=[-Dout/2+width,-Dout/2+width,-Dout/2-width,-Dout/2-width,-Dout/2,-Dout/2]; }
 	polysWindings.push({x:xPortB,y:yPortB}); polysWindings.push({x:xPortB.map(v=>-v),y:yPortB});
 
 	// Top ports
 	let xPortT: number[], yPortT: number[];
-	if (hasTopCT) { xPortT=[-sepTotal/2,-spacing-width/2,-spacing-width/2,-spacing-3*width/2,-spacing-3*width/2,-sepTotal/2]; yPortT=[-Dout/2+width,-Dout/2+width,-Dout/2-width,-Dout/2-width,-Dout/2,-Dout/2]; polysWindings.push({x:[-width/2,-width/2,width/2,width/2],y:[Dout/2+width,Dout/2-width,Dout/2-width,Dout/2+width]}); }
-	else { xPortT=[-sepTotal/2,-spacing/2,-spacing/2,-spacing/2-width,-spacing/2-width,-sepTotal/2]; yPortT=[-Dout/2+width,-Dout/2+width,-Dout/2-width,-Dout/2-width,-Dout/2,-Dout/2]; }
+	if (hasTopCT) { xPortT=[-sepTotal/2,-tpx+width/2,-tpx+width/2,-tpx-width/2,-tpx-width/2,-sepTotal/2]; yPortT=[-Dout/2+width,-Dout/2+width,-Dout/2-width,-Dout/2-width,-Dout/2,-Dout/2]; polysWindings.push({x:[-width/2,-width/2,width/2,width/2],y:[Dout/2+width,Dout/2-width,Dout/2-width,Dout/2+width]}); }
+	else { xPortT=[-sepTotal/2,-tpx+width/2,-tpx+width/2,-tpx-width/2,-tpx-width/2,-sepTotal/2]; yPortT=[-Dout/2+width,-Dout/2+width,-Dout/2-width,-Dout/2-width,-Dout/2,-Dout/2]; }
 	polysWindings.push({x:xPortT,y:yPortT.map(v=>-v)}); polysWindings.push({x:xPortT.map(v=>-v),y:yPortT.map(v=>-v)});
 
 	// Vias

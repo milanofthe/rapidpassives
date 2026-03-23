@@ -51,6 +51,7 @@ export const canvas = {
 // --- Layer colors ---
 
 export const layerColors = {
+	guard_ring:    '#4a9ec2',
 	windings:      '#e8944a',
 	crossings:     '#d9513c',
 	windings_m2:   '#c94a3a',

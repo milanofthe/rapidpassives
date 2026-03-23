@@ -29,6 +29,7 @@ export function buildStackedTransformer(params: StackedTransformerParams): Geome
 		crossingLayer: 'windings',
 		viaLayer: 'vias3',
 		portSide: 'bottom',
+		portSpacing: params.portSpacing,
 	});
 
 	// Secondary (M2): winding on M2, crossings on M1, vias on Via12
@@ -41,6 +42,7 @@ export function buildStackedTransformer(params: StackedTransformerParams): Geome
 		crossingLayer: 'crossings_m1',
 		viaLayer: 'vias2',
 		portSide: 'top',
+		portSpacing: params.portSpacing,
 	});
 
 	// Merge layers
@@ -90,6 +92,7 @@ interface WindingConfig {
 	crossingLayer: LayerName;
 	viaLayer: LayerName;
 	portSide: 'top' | 'bottom';
+	portSpacing?: number;
 }
 
 /**
@@ -229,13 +232,14 @@ function buildWindingPolygons(cfg: WindingConfig): { layers: LayerMap; network: 
 	}
 
 	// Ports — always built at the bottom
+	const pxo = cfg.portSpacing !== undefined ? cfg.portSpacing / 2 : (center_tap ? spacing + width : (spacing + width) / 2);
 	let xPort: number[], yPort: number[];
 	if (center_tap) {
-		xPort = [-sepTotal/2, -spacing - width/2, -spacing - width/2, -spacing - 3*width/2, -spacing - 3*width/2, -sepTotal/2];
+		xPort = [-sepTotal/2, -pxo + width/2, -pxo + width/2, -pxo - width/2, -pxo - width/2, -sepTotal/2];
 		yPort = [-Dout/2 + width, -Dout/2 + width, -Dout/2 - width, -Dout/2 - width, -Dout/2, -Dout/2];
 		polysWinding.push({ x: [-width/2, -width/2, width/2, width/2], y: [-Dout/2 - width, -Dout/2 + width, -Dout/2 + width, -Dout/2 - width] });
 	} else {
-		xPort = [-sepTotal/2, -spacing/2, -spacing/2, -spacing/2 - width, -spacing/2 - width, -sepTotal/2];
+		xPort = [-sepTotal/2, -pxo + width/2, -pxo + width/2, -pxo - width/2, -pxo - width/2, -sepTotal/2];
 		yPort = [-Dout/2 + width, -Dout/2 + width, -Dout/2 - width, -Dout/2 - width, -Dout/2, -Dout/2];
 	}
 	polysWinding.push({ x: xPort, y: yPort });
@@ -264,7 +268,7 @@ function buildWindingPolygons(cfg: WindingConfig): { layers: LayerMap; network: 
 
 	// Build minimal network for port markers
 	const metalId = windingLayer === 'windings_m4' ? 'm4' : 'm2';
-	const portXOffset = center_tap ? spacing + width : (spacing + width) / 2;
+	const portXOffset = pxo;
 	const portMarkerY = portSide === 'bottom' ? -Dout / 2 - width : Dout / 2 + width;
 	const nodes: ConductorNode[] = [
 		{ id: `${metalId}_pl`, x: -portXOffset, y: portMarkerY, layerId: metalId },
