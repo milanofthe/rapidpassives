@@ -168,7 +168,8 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 	}
 
 	// Ports — use outermost winding nodes near the bottom
-	const portXOffset = params.portSpacing !== undefined ? params.portSpacing / 2 : (center_tap ? spacing + width : (spacing + width) / 2);
+	const ps = params.portSpacing ?? spacing;
+	const portXOffset = center_tap ? ps + width : (ps + width) / 2;
 	const portLeft = addNode(-portXOffset, -Dout / 2 - width, 'm3');
 	const portRight = addNode(portXOffset, -Dout / 2 - width, 'm3');
 
@@ -348,7 +349,8 @@ function generateLegacyPolygons(params: SymmetricInductorParams): LayerMap {
 	}
 
 	// Ports
-	const pxo = params.portSpacing !== undefined ? params.portSpacing / 2 : (center_tap ? spacing + width : (spacing + width) / 2);
+	const ps2 = params.portSpacing ?? spacing;
+	const pxo = center_tap ? ps2 + width : (ps2 + width) / 2;
 	let xPort: number[], yPort: number[];
 	if (center_tap) {
 		xPort = [-sepTotal/2, -pxo + width/2, -pxo + width/2, -pxo - width/2, -pxo - width/2, -sepTotal/2];

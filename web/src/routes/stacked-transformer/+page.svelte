@@ -80,7 +80,7 @@
 				<div class="f"><span>N2</span><div class="fi"><button onclick={() => nud('N2',-1,1,20)}>-</button><input type="number" value={p.N2} oninput={e => inp('N2',e)}/><button onclick={() => nud('N2',1,1,20)}>+</button><em>turns</em></div></div>
 			</div>
 			<div class="param-section"><h4>Ports</h4>
-				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('portSpacing',-1,0)}>-</button><input type="number" value={p.portSpacing ?? 0} oninput={e => { const v = parseInput(e); set('portSpacing', v && v > 0 ? v : undefined); }}/><button onclick={() => set('portSpacing', (p.portSpacing ?? 0) + 1)}>+</button><em>um</em></div></div>
+				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => set('portSpacing', Math.max(0, (p.portSpacing ?? p.spacing) - 1) || undefined)}>-</button><input type="number" value={p.portSpacing ?? ''} placeholder="auto" oninput={e => { const v = parseInput(e); set('portSpacing', v && v > 0 ? v : undefined); }}/><button onclick={() => set('portSpacing', (p.portSpacing ?? p.spacing) + 1)}>+</button><em>um</em></div></div>
 			</div>
 			<div class="param-section"><h4>Vias</h4>
 				<div class="f"><span>Extent</span><div class="fi"><button onclick={() => nud('via_extent',-0.5,0.5)}>-</button><input type="number" value={p.via_extent} oninput={e => inp('via_extent',e)}/><button onclick={() => nud('via_extent',0.5,0.5)}>+</button><em>um</em></div></div>

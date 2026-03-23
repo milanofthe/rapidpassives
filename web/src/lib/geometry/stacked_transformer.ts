@@ -232,7 +232,8 @@ function buildWindingPolygons(cfg: WindingConfig): { layers: LayerMap; network: 
 	}
 
 	// Ports — always built at the bottom
-	const pxo = cfg.portSpacing !== undefined ? cfg.portSpacing / 2 : (center_tap ? spacing + width : (spacing + width) / 2);
+	const ps = cfg.portSpacing ?? spacing;
+	const pxo = center_tap ? ps + width : (ps + width) / 2;
 	let xPort: number[], yPort: number[];
 	if (center_tap) {
 		xPort = [-sepTotal/2, -pxo + width/2, -pxo + width/2, -pxo - width/2, -pxo - width/2, -sepTotal/2];
