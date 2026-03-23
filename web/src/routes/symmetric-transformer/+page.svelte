@@ -53,7 +53,7 @@
 	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack), ports: portMarkers });
 </script>
 
-<GeometryEditor {layers} {valid} {renderOpts}>
+<GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
 			<div class="param-section"><h4>Geometry</h4>

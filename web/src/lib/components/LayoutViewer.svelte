@@ -6,6 +6,10 @@
 
 	let { layers, renderOpts }: { layers: LayerMap; renderOpts?: RenderOptions } = $props();
 
+	export function zoomIn() { zoomBy(1.3); }
+	export function zoomOut() { zoomBy(1 / 1.3); }
+	export function resetView() { autoFit(); }
+
 	let canvas: HTMLCanvasElement;
 	let container: HTMLDivElement;
 	let view: ViewState = { offsetX: 0, offsetY: 0, scale: 1 };
@@ -109,6 +113,18 @@
 
 	function onDblClick() {
 		autoFit();
+	}
+
+	function zoomBy(factor: number) {
+		if (!canvas) return;
+		const { w, h } = getSize();
+		const cx = w / 2, cy = h / 2;
+		view = {
+			scale: view.scale * factor,
+			offsetX: cx - (cx - view.offsetX) * factor,
+			offsetY: cy - (cy - view.offsetY) * factor,
+		};
+		render();
 	}
 
 	onMount(() => {

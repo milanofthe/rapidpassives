@@ -1,12 +1,14 @@
 <script lang="ts">
 	import type { LayerMap } from '$lib/geometry/types';
 	import type { RenderOptions } from '$lib/render/canvas2d';
+	import type { ProcessStack } from '$lib/stack/types';
 	import type { SimulationResult } from '$lib/solver/peec';
 	import LayoutViewer from './LayoutViewer.svelte';
+	import LayoutViewer3D from './LayoutViewer3D.svelte';
 	import ResultsPanel from './ResultsPanel.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult }: {
+	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack }: {
 		layers: LayerMap;
 		sidebar: Snippet;
 		stackPanel?: Snippet;
@@ -14,9 +16,30 @@
 		valid?: boolean;
 		renderOpts?: RenderOptions;
 		simResult?: SimulationResult | null;
+		stack?: ProcessStack;
 	} = $props();
 
 	let activeTab = $state<'params' | 'stack' | 'sim'>('params');
+	let viewMode = $state<'2d' | '3d'>('2d');
+	let transitioning = $state(false);
+	let viewer2d: LayoutViewer | undefined = $state();
+	let viewer3d: LayoutViewer3D | undefined = $state();
+
+	function doZoomIn() { viewMode === '2d' ? viewer2d?.zoomIn() : viewer3d?.zoomIn(); }
+	function doZoomOut() { viewMode === '2d' ? viewer2d?.zoomOut() : viewer3d?.zoomOut(); }
+	function doReset() { viewMode === '2d' ? viewer2d?.resetView() : viewer3d?.resetView(); }
+
+	function toggleView() {
+		transitioning = true;
+		// Let the fade-out start, then swap after the CSS transition
+		setTimeout(() => {
+			viewMode = viewMode === '2d' ? '3d' : '2d';
+			// The fade-in happens because transitioning goes false after a frame
+			requestAnimationFrame(() => {
+				transitioning = false;
+			});
+		}, 200);
+	}
 
 	// Resizable sidebar
 	let sidebarWidth = $state(280);
@@ -84,8 +107,30 @@
 		{#if !valid}
 			<div class="invalid-bar">Invalid geometry — parameters cause clipping or overlap</div>
 		{/if}
-		<div class="viewer-pane">
-			<LayoutViewer {layers} {renderOpts} />
+		<div class="viewer-pane" class:transitioning>
+			{#if viewMode === '2d'}
+				<LayoutViewer bind:this={viewer2d} {layers} {renderOpts} />
+			{:else if stack}
+				<LayoutViewer3D bind:this={viewer3d} {layers} {stack}
+					colorOverrides={renderOpts?.colorOverrides}
+					visibleLayers={renderOpts?.visibleLayers} />
+			{/if}
+			<div class="viewer-toolbar">
+				<button class="tb" onclick={doZoomIn} title="Zoom in">+</button>
+				<button class="tb" onclick={doZoomOut} title="Zoom out">&minus;</button>
+				<button class="tb" onclick={doReset} title="Fit to view">
+					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+						<rect x="2" y="2" width="12" height="12" rx="1" />
+						<line x1="8" y1="5" x2="8" y2="11" />
+						<line x1="5" y1="8" x2="11" y2="8" />
+					</svg>
+				</button>
+				{#if stack}
+					<button class="tb view-mode" onclick={toggleView} title="Toggle 2D/3D view">
+						{viewMode === '2d' ? '3D' : '2D'}
+					</button>
+				{/if}
+			</div>
 		</div>
 		{#if simResult}
 			<div
@@ -181,6 +226,46 @@
 		flex: 1;
 		position: relative;
 		min-height: 0;
+		transition: opacity 0.2s ease;
+	}
+	.viewer-pane.transitioning {
+		opacity: 0;
+	}
+	.viewer-toolbar {
+		position: absolute;
+		top: 10px;
+		right: 10px;
+		z-index: 10;
+		display: flex;
+		gap: 2px;
+	}
+	.tb {
+		width: 28px;
+		height: 28px;
+		border: 1px solid var(--border);
+		background: var(--bg-surface);
+		color: var(--text-muted);
+		font-family: var(--font-mono);
+		font-size: 14px;
+		font-weight: 600;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		transition: background 0.15s, border-color 0.15s, color 0.15s;
+	}
+	.tb:hover {
+		background: var(--bg-panel);
+		border-color: var(--accent);
+		color: var(--text);
+	}
+	.tb.view-mode {
+		color: var(--accent);
+		font-size: var(--fs-xs);
+		font-weight: 700;
+		width: 32px;
+		letter-spacing: 0.5px;
 	}
 	.results-pane {
 		flex-shrink: 0;
