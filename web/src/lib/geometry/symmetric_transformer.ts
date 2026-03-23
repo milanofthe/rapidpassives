@@ -402,6 +402,7 @@ function generateLegacyPolygons(
 
 export function isSymmetricTransformerValid(params: SymmetricTransformerParams): boolean {
 	const { Dout, N1, N2, sides, width, spacing, center_tap_primary, center_tap_secondary, via_extent } = params;
+	if (sides % 4 !== 0) return false;
 	const N = N1 + N2;
 	if (center_tap_secondary && center_tap_primary && N % 2 !== 0) return false;
 	const h = width + spacing + (Math.SQRT2 - 1) * (2 * spacing + width);
