@@ -62,13 +62,11 @@
 				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('width',-0.5,0.1)}>-</button><input type="number" value={p.width} oninput={e => inp('width',e)}/><button onclick={() => nud('width',0.5,0.1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('spacing',-0.5,0.1)}>-</button><input type="number" value={p.spacing} oninput={e => inp('spacing',e)}/><button onclick={() => nud('spacing',0.5,0.1)}>+</button><em>um</em></div></div>
 			</div>
-			<div class="param-section"><h4>Primary (M3)</h4>
+			<div class="param-section"><h4>Primary (M4)</h4>
 				<div class="f"><span>N1</span><div class="fi"><button onclick={() => nud('N1',-1,1,20)}>-</button><input type="number" value={p.N1} oninput={e => inp('N1',e)}/><button onclick={() => nud('N1',1,1,20)}>+</button><em>turns</em></div></div>
-				<div class="f"><span>Center Tap</span><div class="fi"><button class="toggle-btn" class:active={p.center_tap_primary} onclick={() => set('center_tap_primary', !p.center_tap_primary)}>{p.center_tap_primary ? 'ON' : 'OFF'}</button><em></em></div></div>
 			</div>
 			<div class="param-section"><h4>Secondary (M2)</h4>
 				<div class="f"><span>N2</span><div class="fi"><button onclick={() => nud('N2',-1,1,20)}>-</button><input type="number" value={p.N2} oninput={e => inp('N2',e)}/><button onclick={() => nud('N2',1,1,20)}>+</button><em>turns</em></div></div>
-				<div class="f"><span>Center Tap</span><div class="fi"><button class="toggle-btn" class:active={p.center_tap_secondary} onclick={() => set('center_tap_secondary', !p.center_tap_secondary)}>{p.center_tap_secondary ? 'ON' : 'OFF'}</button><em></em></div></div>
 			</div>
 			<div class="param-section"><h4>Vias</h4>
 				<div class="f"><span>Extent</span><div class="fi"><button onclick={() => nud('via_extent',-0.5,0.5)}>-</button><input type="number" value={p.via_extent} oninput={e => inp('via_extent',e)}/><button onclick={() => nud('via_extent',0.5,0.5)}>+</button><em>um</em></div></div>

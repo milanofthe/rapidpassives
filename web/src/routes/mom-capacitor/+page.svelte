@@ -1,8 +1,7 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
-	import type { MomCapacitorParams, PgsParams, LayerMap } from '$lib/geometry/types';
+	import type { MomCapacitorParams, LayerMap } from '$lib/geometry/types';
 	import { buildMomCapacitor, isMomCapacitorValid } from '$lib/geometry/mom_capacitor';
-	import { pgs4 } from '$lib/geometry/utils';
 	import { createDefaultStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
@@ -16,30 +15,23 @@
 	}
 
 	let p = $state<MomCapacitorParams>({
-		nFingers: 20, fingerLength: 40, fingerWidth: 1, fingerSpacing: 1,
+		nFingers: 21, fingerLength: 40, fingerWidth: 1, fingerSpacing: 1,
 		busWidth: 4, nLayers: 3,
 		via_spacing: 0.8, via_width: 1, via_in_metal: 0.45,
 	});
 
-	let pgsP = $state<PgsParams>({ enabled: false, D: 60, width: 4, spacing: 2 });
 	let stack = $state(createDefaultStack());
 
 	function set(k: keyof MomCapacitorParams, v: any) { p = { ...p, [k]: v }; }
 	function nud(k: keyof MomCapacitorParams, s: number, mn?: number, mx?: number) { set(k, nudgeValue(p[k] as number, s, mn, mx)); }
 	function inp(k: keyof MomCapacitorParams, e: Event) { const v = parseInput(e); if (v !== null) set(k, v); }
 
-	function setPgs(k: keyof PgsParams, v: any) { pgsP = { ...pgsP, [k]: v }; }
-	function nudPgs(k: keyof PgsParams, s: number, mn?: number, mx?: number) { setPgs(k, nudgeValue(pgsP[k] as number, s, mn, mx)); }
-	function inpPgs(k: keyof PgsParams, e: Event) { const v = parseInput(e); if (v !== null) setPgs(k, v); }
-
 	let result = $derived.by(() => {
 		try { return buildMomCapacitor({ ...p }); } catch { return null; }
 	});
 	let layers = $derived.by<LayerMap>(() => {
 		if (!result) return {};
-		const l = { ...result.layers };
-		if (pgsP.enabled) l.pgs = pgs4(pgsP.D, pgsP.width, pgsP.spacing);
-		return mergeLayers(l);
+		return mergeLayers({ ...result.layers });
 	});
 	let valid = $derived(isMomCapacitorValid({ ...p }));
 	let portMarkers = $derived.by(() => {
@@ -70,14 +62,6 @@
 				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('via_spacing',-0.1,0.1)}>-</button><input type="number" value={p.via_spacing} oninput={e => inp('via_spacing',e)}/><button onclick={() => nud('via_spacing',0.1,0.1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('via_width',-0.1,0.1)}>-</button><input type="number" value={p.via_width} oninput={e => inp('via_width',e)}/><button onclick={() => nud('via_width',0.1,0.1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>In Metal</span><div class="fi"><button onclick={() => nud('via_in_metal',-0.05,0)}>-</button><input type="number" value={p.via_in_metal} oninput={e => inp('via_in_metal',e)}/><button onclick={() => nud('via_in_metal',0.05,0)}>+</button><em>um</em></div></div>
-			</div>
-			<div class="param-section"><h4>PGS</h4>
-				<div class="f"><span>Enabled</span><div class="fi"><button class="toggle-btn" class:active={pgsP.enabled} onclick={() => setPgs('enabled', !pgsP.enabled)}>{pgsP.enabled ? 'ON' : 'OFF'}</button><em></em></div></div>
-				{#if pgsP.enabled}
-					<div class="f"><span>Diameter</span><div class="fi"><button onclick={() => nudPgs('D',-1,1)}>-</button><input type="number" value={pgsP.D} oninput={e => inpPgs('D',e)}/><button onclick={() => nudPgs('D',1,1)}>+</button><em>um</em></div></div>
-					<div class="f"><span>Width</span><div class="fi"><button onclick={() => nudPgs('width',-0.5,0.1)}>-</button><input type="number" value={pgsP.width} oninput={e => inpPgs('width',e)}/><button onclick={() => nudPgs('width',0.5,0.1)}>+</button><em>um</em></div></div>
-					<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nudPgs('spacing',-0.5,0.1)}>-</button><input type="number" value={pgsP.spacing} oninput={e => inpPgs('spacing',e)}/><button onclick={() => nudPgs('spacing',0.5,0.1)}>+</button><em>um</em></div></div>
-				{/if}
 			</div>
 		</ParamSidebar>
 	{/snippet}

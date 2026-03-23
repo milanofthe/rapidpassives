@@ -290,11 +290,13 @@ export function isStackedTransformerValid(params: StackedTransformerParams): boo
 	const tanA = Math.tan(Math.PI / sides);
 	const h = width + spacing + (Math.SQRT2 - 1) * (2 * spacing + width);
 
+	// Center taps not supported — CT routing conflicts with winding metal on intermediate layers
+	if (center_tap_primary || center_tap_secondary) return false;
+
 	// Validate each winding independently
-	for (const [N, hasCT] of [[N1, center_tap_primary], [N2, center_tap_secondary]] as [number, boolean][]) {
+	for (const N of [N1, N2]) {
 		if (N < 1) return false;
-		let q = 2 * width + spacing;
-		if (hasCT) q += width + spacing;
+		const q = 2 * width + spacing;
 		const d2 = Dout / 2 - (N - 1) * (spacing + width);
 		const d1 = Dout / 2 - (N - 1) * spacing - N * width;
 		if (d1 <= 0) return false;

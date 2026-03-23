@@ -37,7 +37,7 @@
 			title: 'MOM Capacitor',
 			href: '/mom-capacitor',
 			desc: 'Interdigitated metal-oxide-metal finger capacitor',
-			layers: buildMomCapacitor({ nFingers: 16, fingerLength: 30, fingerWidth: 1, fingerSpacing: 1, busWidth: 3, nLayers: 3, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
+			layers: buildMomCapacitor({ nFingers: 15, fingerLength: 30, fingerWidth: 1, fingerSpacing: 1, busWidth: 3, nLayers: 3, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
 		},
 	];
 
