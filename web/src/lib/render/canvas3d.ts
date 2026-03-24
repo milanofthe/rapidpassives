@@ -893,13 +893,26 @@ export function render3D(
 }
 
 /** Compute a good initial camera distance to fit all geometry */
-export function fitCamera(layers: LayerMap, stack: ProcessStack): Camera {
+export function fitCamera(layers: LayerMap, stack: ProcessStack, instancedScene?: InstancedSceneData | null): Camera {
 	let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+	// Bounds from flat LayerMap
 	for (const polys of Object.values(layers)) {
 		if (!polys) continue;
 		for (const p of polys) {
 			for (const v of p.x) { minX = Math.min(minX, v); maxX = Math.max(maxX, v); }
 			for (const v of p.y) { minY = Math.min(minY, v); maxY = Math.max(maxY, v); }
+		}
+	}
+
+	// Bounds from instanced scene (use instance transform tx,ty)
+	if (instancedScene) {
+		for (const transforms of Object.values(instancedScene.cellInstances)) {
+			for (let i = 0; i < transforms.length; i += 6) {
+				const tx = transforms[i + 4], ty = transforms[i + 5];
+				if (tx < minX) minX = tx; if (tx > maxX) maxX = tx;
+				if (ty < minY) minY = ty; if (ty > maxY) maxY = ty;
+			}
 		}
 	}
 	const xyExtent = Math.max(

@@ -24,7 +24,7 @@
 		renderFrame();
 	}
 	export function resetView() {
-		camera = fitCamera(layers, stack);
+		camera = fitCamera(layers, stack, instancedScene);
 		if (orthoBlend > 0.5) {
 			camera = { ...camera, phi: Math.PI / 2 - 0.05, theta: 0 };
 		}
@@ -226,7 +226,7 @@
 	}
 
 	function onDblClick() {
-		camera = fitCamera(layers, stack);
+		camera = fitCamera(layers, stack, instancedScene);
 		if (orthoBlend > 0.5) {
 			camera = { ...camera, phi: Math.PI / 2 - 0.05, theta: 0 };
 		}
@@ -238,7 +238,7 @@
 		glState = initGL(canvas);
 		if (!glState) return;
 
-		camera = fitCamera(layers, stack);
+		camera = fitCamera(layers, stack, instancedScene);
 		if (ortho) {
 			camera = { ...camera, phi: Math.PI / 2 - 0.05, theta: 0 };
 			orthoBlend = 1;
