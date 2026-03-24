@@ -11,31 +11,31 @@
 	const cards = [
 		{
 			title: 'Spiral Inductor',
-			href: '/spiral',
+			href: '/generator/spiral',
 			desc: 'Single-ended spiral with underpass routing',
 			layers: buildSpiralInductor({ Dout: 80, N: 2, sides: 8, width: 8, spacing: 4, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
 		},
 		{
 			title: 'Symmetric Inductor',
-			href: '/symmetric-inductor',
+			href: '/generator/symmetric-inductor',
 			desc: 'Differential symmetric inductor with optional center tap',
 			layers: buildSymmetricInductor({ Dout: 120, N: 2, sides: 8, width: 10, spacing: 3, center_tap: false, via_extent: 6, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
 		},
 		{
 			title: 'Interleaved Transformer',
-			href: '/symmetric-transformer',
+			href: '/generator/symmetric-transformer',
 			desc: 'Laterally interleaved transformer with configurable winding ratio',
 			layers: buildSymmetricTransformer({ Dout: 120, N1: 1, N2: 2, sides: 8, width: 8, spacing: 3, center_tap_primary: false, center_tap_secondary: false, via_extent: 5, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
 		},
 		{
 			title: 'Stacked Transformer',
-			href: '/stacked-transformer',
+			href: '/generator/stacked-transformer',
 			desc: 'Vertically stacked differential transformer on separate metal layers',
 			layers: buildStackedTransformer({ Dout: 120, N1: 2, N2: 2, sides: 8, width: 8, spacing: 3, center_tap_primary: false, center_tap_secondary: false, via_extent: 5, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
 		},
 		{
 			title: 'MOM Capacitor',
-			href: '/mom-capacitor',
+			href: '/generator/mom-capacitor',
 			desc: 'Interdigitated metal-oxide-metal finger capacitor',
 			layers: buildMomCapacitor({ nFingers: 15, fingerLength: 30, fingerWidth: 1, fingerSpacing: 1, busWidth: 3, nLayers: 3, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
 		},
@@ -48,13 +48,13 @@
 		const rect = canvas.parentElement!.getBoundingClientRect();
 		const size = Math.round(Math.min(rect.width, rect.height));
 		if (size <= 0) return;
-		const dpr = window.devicePixelRatio || 1;
-		canvas.width = Math.round(size * dpr);
-		canvas.height = Math.round(size * dpr);
+		const scale = (window.devicePixelRatio || 1) * 2;
+		canvas.width = Math.round(size * scale);
+		canvas.height = Math.round(size * scale);
 		canvas.style.width = size + 'px';
 		canvas.style.height = size + 'px';
 		const ctx = canvas.getContext('2d')!;
-		ctx.scale(dpr, dpr);
+		ctx.scale(scale, scale);
 		const view = fitToView(size, size, layers);
 		renderLayers(ctx, layers, view, null, undefined, size, size);
 	}
@@ -72,6 +72,8 @@
 			<h1>RapidPassives</h1>
 			<p>Browser-based RFIC passive layout generator. Configure geometry, preview in real time, and export production-ready GDS-II.</p>
 		</div>
+		<hr class="divider" />
+		<h2 class="section-heading">Generators</h2>
 		<div class="cards">
 			{#each cards as card, i}
 				<a class="card" href={card.href}>
@@ -89,6 +91,25 @@
 			<span class="pill">Real-time Preview</span>
 			<span class="pill">GDS Export</span>
 			<span class="pill">Process Stack</span>
+		</div>
+		<hr class="divider" />
+		<h2 class="section-heading">Viewer</h2>
+		<a
+			class="dropcard"
+			href="/viewer"
+		>
+			<svg width="32" height="32" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+				<rect x="8" y="6" width="32" height="36" rx="2" />
+				<path d="M18 24L24 30L30 24" />
+				<path d="M24 16V30" />
+			</svg>
+			<div class="dropcard-text">
+				<p>Import and visualize GDS-II files in 2D and 3D</p>
+			</div>
+		</a>
+		<div class="features">
+			<span class="pill">GDS Import</span>
+			<span class="pill">2D / 3D</span>
 			<span class="pill">No Install</span>
 		</div>
 	</div>
@@ -132,12 +153,26 @@
 		font-family: var(--font-mono);
 		line-height: 1.5;
 	}
+	.section-heading {
+		font-size: var(--fs-md);
+		font-family: var(--font-mono);
+		font-weight: 700;
+		letter-spacing: 2px;
+		text-transform: uppercase;
+		color: var(--accent);
+		text-align: center;
+	}
+	.divider {
+		width: calc(100% + 80px);
+		margin: 0 -40px;
+		border: none;
+		border-top: 1px solid var(--border);
+	}
 	.cards {
 		display: flex;
 		gap: 16px;
 		flex-wrap: wrap;
 		justify-content: center;
-		max-width: calc(3 * 220px + 2 * 16px);
 	}
 	.card {
 		width: 220px;
@@ -182,6 +217,30 @@
 		color: var(--text-dim);
 		line-height: 1.4;
 		font-family: var(--font-mono);
+	}
+	.dropcard {
+		width: 100%;
+		max-width: 600px;
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		padding: 20px 24px;
+		border: 1px solid var(--border-subtle);
+		background: var(--bg-surface);
+		text-decoration: none;
+		transition: border-color 0.15s, transform 0.15s;
+		color: var(--text-dim);
+	}
+	.dropcard:hover {
+		border-color: var(--accent);
+		transform: translateY(-2px);
+		color: var(--accent);
+	}
+	.dropcard-text p {
+		font-size: var(--fs-xs);
+		color: var(--text-dim);
+		font-family: var(--font-mono);
+		line-height: 1.4;
 	}
 	.features {
 		display: flex;

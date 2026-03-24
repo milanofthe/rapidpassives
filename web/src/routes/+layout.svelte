@@ -4,15 +4,17 @@
 
 	let { children } = $props();
 
-	const tabs = [
-		{ href: '/spiral', label: 'Spiral Inductor' },
-		{ href: '/symmetric-inductor', label: 'Symmetric Inductor' },
-		{ href: '/symmetric-transformer', label: 'Interleaved Transformer' },
-		{ href: '/stacked-transformer', label: 'Stacked Transformer' },
-		{ href: '/mom-capacitor', label: 'MOM Capacitor' },
+	const generators = [
+		{ href: '/generator/spiral', label: 'Spiral' },
+		{ href: '/generator/symmetric-inductor', label: 'Symmetric' },
+		{ href: '/generator/symmetric-transformer', label: 'Interleaved' },
+		{ href: '/generator/stacked-transformer', label: 'Stacked' },
+		{ href: '/generator/mom-capacitor', label: 'MOM Cap' },
 	];
 
-	const isEditor = $derived(tabs.some(t => page.url.pathname === t.href));
+	const isGenerator = $derived(generators.some(t => page.url.pathname === t.href));
+	const isViewer = $derived(page.url.pathname === '/viewer');
+	const isEditor = $derived(isGenerator || isViewer);
 </script>
 
 <div class="app">
@@ -21,15 +23,14 @@
 			<img src="/favicon.svg" alt="RapidPassives" class="logo" />
 		</a>
 		{#if isEditor}
+			<span class="nav-sep"></span>
 			<nav class="tabs">
-				{#each tabs as tab}
-					<a
-						href={tab.href}
-						class="tab"
-						class:active={page.url.pathname === tab.href}
-					>{tab.label}</a>
+				{#each generators as tab}
+					<a href={tab.href} class="tab" class:active={page.url.pathname === tab.href}>{tab.label}</a>
 				{/each}
 			</nav>
+			<span class="nav-sep"></span>
+			<a href="/viewer" class="tab" class:active={isViewer}>Viewer</a>
 		{/if}
 	</header>
 	<main>
@@ -83,6 +84,12 @@
 	}
 	.tab.active {
 		color: var(--accent);
+	}
+	.nav-sep {
+		width: 1px;
+		height: 100%;
+		background: var(--border);
+		flex-shrink: 0;
 	}
 	main {
 		flex: 1;
