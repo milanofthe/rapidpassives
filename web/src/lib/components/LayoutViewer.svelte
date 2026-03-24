@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { LayerMap, LayerName } from '$lib/geometry/types';
-	import { fitToView, renderLayers, hitTest, type ViewState, type RenderOptions } from '$lib/render/canvas2d';
 	import { LAYER_COLORS } from '$lib/geometry/types';
+	import { fitToView, type ViewState, type RenderOptions } from '$lib/render/canvas2d';
+	import { initGL2D, disposeGL2D, buildMeshes2D, render2DGL, type GL2DState } from '$lib/render/canvas2d_gl';
 
-	let { layers, renderOpts }: { layers: LayerMap; renderOpts?: RenderOptions } = $props();
+	let { layers, renderOpts, wireframe = false }: { layers: LayerMap; renderOpts?: RenderOptions; wireframe?: boolean } = $props();
 
 	export function zoomIn() { zoomBy(1.3); }
 	export function zoomOut() { zoomBy(1 / 1.3); }
@@ -12,12 +13,13 @@
 
 	let canvas: HTMLCanvasElement;
 	let container: HTMLDivElement;
+	let glState: GL2DState | null = null;
 	let view: ViewState = { offsetX: 0, offsetY: 0, scale: 1 };
 	let isDragging = false;
 	let lastMouse = { x: 0, y: 0 };
 	let cursorWorld = $state({ x: 0, y: 0 });
-	let hovered = $state<{ layer: LayerName; index: number } | null>(null);
 	let mounted = false;
+	let needsRebuild = true;
 
 	function getSize(): { w: number; h: number } {
 		if (!container) return { w: 0, h: 0 };
@@ -34,24 +36,28 @@
 		if (canvas.width !== bw || canvas.height !== bh) {
 			canvas.width = bw;
 			canvas.height = bh;
+			canvas.style.width = w + 'px';
+			canvas.style.height = h + 'px';
 		}
 		return { w, h };
 	}
 
 	function render() {
-		if (!canvas) return;
+		if (!glState || !canvas) return;
 		const { w, h } = syncCanvas();
 		if (w <= 0 || h <= 0) return;
-		const dpr = window.devicePixelRatio || 1;
-		const ctx = canvas.getContext('2d');
-		if (!ctx) return;
-		ctx.save();
-		ctx.scale(dpr, dpr);
-		// Tell the renderer the CSS dimensions, not the backing store dimensions
-		canvas.style.width = w + 'px';
-		canvas.style.height = h + 'px';
-		renderLayers(ctx, layers, view, hovered, renderOpts, w, h);
-		ctx.restore();
+
+		if (needsRebuild) {
+			needsRebuild = false;
+			buildMeshes2D(glState, layers, renderOpts?.colorOverrides, renderOpts?.visibleLayers, () => {
+				if (mounted && glState) {
+					const { w, h } = getSize();
+					if (w > 0 && h > 0) render2DGL(glState!, view.offsetX, view.offsetY, view.scale, w, h);
+				}
+			});
+		}
+
+		render2DGL(glState, view.offsetX, view.offsetY, view.scale, w, h, wireframe);
 	}
 
 	function autoFit() {
@@ -98,12 +104,6 @@
 			view = { ...view, offsetX: view.offsetX + dx, offsetY: view.offsetY + dy };
 			lastMouse = { x: e.clientX, y: e.clientY };
 			render();
-		} else {
-			const hit = hitTest(layers, view, mx, my, renderOpts);
-			if (hit?.layer !== hovered?.layer || hit?.index !== hovered?.index) {
-				hovered = hit;
-				render();
-			}
 		}
 	}
 
@@ -129,6 +129,9 @@
 
 	onMount(() => {
 		mounted = true;
+		glState = initGL2D(canvas);
+		if (!glState) return;
+
 		const ro = new ResizeObserver(() => {
 			if (mounted) {
 				syncCanvas();
@@ -136,18 +139,23 @@
 			}
 		});
 		ro.observe(container);
-		// Initial fit after layout settles
 		requestAnimationFrame(() => autoFit());
-		return () => ro.disconnect();
+
+		return () => {
+			mounted = false;
+			ro.disconnect();
+			if (glState) disposeGL2D(glState);
+		};
 	});
 
-	// Only auto-fit when geometry structurally changes (not on every re-render)
+	// Rebuild meshes when geometry changes
 	let lastLayerKey = '';
 	$effect(() => {
 		const key = Object.keys(layers).map(k => `${k}:${(layers as any)[k]?.length ?? 0}`).join(',');
-		if (mounted && canvas) {
+		if (mounted && glState) {
 			if (key !== lastLayerKey) {
 				lastLayerKey = key;
+				needsRebuild = true;
 				autoFit();
 			} else {
 				render();
@@ -157,9 +165,15 @@
 
 	$effect(() => {
 		renderOpts;
-		if (mounted && canvas) {
+		if (mounted && glState) {
+			needsRebuild = true;
 			render();
 		}
+	});
+
+	$effect(() => {
+		wireframe;
+		if (mounted && glState) render();
 	});
 </script>
 
@@ -175,9 +189,6 @@
 	<div class="hud">
 		<span class="coord">x {cursorWorld.x.toFixed(1)}</span>
 		<span class="coord">y {cursorWorld.y.toFixed(1)}</span>
-		{#if hovered}
-			<span class="layer-tag" style="color: {renderOpts?.colorOverrides?.[hovered.layer] ?? LAYER_COLORS[hovered.layer] ?? 'var(--accent)'}">{hovered.layer}</span>
-		{/if}
 	</div>
 </div>
 
@@ -204,8 +215,5 @@
 		color: var(--text-dim);
 		background: var(--canvas-bg);
 		padding: 3px 8px;
-	}
-	.layer-tag {
-		font-weight: 600;
 	}
 </style>

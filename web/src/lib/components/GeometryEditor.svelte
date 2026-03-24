@@ -3,7 +3,6 @@
 	import type { RenderOptions } from '$lib/render/canvas2d';
 	import type { ProcessStack } from '$lib/stack/types';
 	import type { SimulationResult } from '$lib/solver/peec';
-	import LayoutViewer from './LayoutViewer.svelte';
 	import LayoutViewer3D from './LayoutViewer3D.svelte';
 	import ResultsPanel from './ResultsPanel.svelte';
 	import type { Snippet } from 'svelte';
@@ -22,24 +21,14 @@
 	let activeTab = $state<'params' | 'stack' | 'sim'>('params');
 	let viewMode = $state<'2d' | '3d'>('2d');
 	let wireframe = $state(false);
-	let transitioning = $state(false);
-	let viewer2d: LayoutViewer | undefined = $state();
-	let viewer3d: LayoutViewer3D | undefined = $state();
+	let viewer: LayoutViewer3D | undefined = $state();
 
-	function doZoomIn() { viewMode === '2d' ? viewer2d?.zoomIn() : viewer3d?.zoomIn(); }
-	function doZoomOut() { viewMode === '2d' ? viewer2d?.zoomOut() : viewer3d?.zoomOut(); }
-	function doReset() { viewMode === '2d' ? viewer2d?.resetView() : viewer3d?.resetView(); }
+	function doZoomIn() { viewer?.zoomIn(); }
+	function doZoomOut() { viewer?.zoomOut(); }
+	function doReset() { viewer?.resetView(); }
 
 	function toggleView() {
-		transitioning = true;
-		// Let the fade-out start, then swap after the CSS transition
-		setTimeout(() => {
-			viewMode = viewMode === '2d' ? '3d' : '2d';
-			// The fade-in happens because transitioning goes false after a frame
-			requestAnimationFrame(() => {
-				transitioning = false;
-			});
-		}, 200);
+		viewMode = viewMode === '2d' ? '3d' : '2d';
 	}
 
 	// Resizable sidebar
@@ -79,15 +68,19 @@
 
 <div class="workspace" bind:this={workspaceEl}>
 	<aside class="sidebar" style="width: {sidebarWidth}px; min-width: {sidebarWidth}px;">
-		<div class="sidebar-tabs">
-			<button class="stab" class:active={activeTab === 'params'} onclick={() => activeTab = 'params'}>Params</button>
-			{#if stackPanel}
-				<button class="stab" class:active={activeTab === 'stack'} onclick={() => activeTab = 'stack'}>Stack</button>
-			{/if}
-			{#if simPanel}
-				<button class="stab" class:active={activeTab === 'sim'} onclick={() => activeTab = 'sim'}>Sim</button>
-			{/if}
-		</div>
+		{#if stackPanel || simPanel}
+			<div class="sidebar-tabs">
+				<button class="stab" class:active={activeTab === 'params'} onclick={() => activeTab = 'params'}>Params</button>
+				{#if stackPanel}
+					<span class="stab-sep"></span>
+					<button class="stab" class:active={activeTab === 'stack'} onclick={() => activeTab = 'stack'}>Stack</button>
+				{/if}
+				{#if simPanel}
+					<span class="stab-sep"></span>
+					<button class="stab" class:active={activeTab === 'sim'} onclick={() => activeTab = 'sim'}>Sim</button>
+				{/if}
+			</div>
+		{/if}
 		<div class="sidebar-content">
 			{#if activeTab === 'params'}
 				{@render sidebar()}
@@ -108,11 +101,10 @@
 		{#if !valid}
 			<div class="invalid-bar">Invalid geometry — parameters cause clipping or overlap</div>
 		{/if}
-		<div class="viewer-pane" class:transitioning>
-			{#if viewMode === '2d'}
-				<LayoutViewer bind:this={viewer2d} {layers} {renderOpts} />
-			{:else if stack}
-				<LayoutViewer3D bind:this={viewer3d} {layers} {stack} {wireframe}
+		<div class="viewer-pane">
+			{#if stack}
+				<LayoutViewer3D bind:this={viewer} {layers} {stack} {wireframe}
+					ortho={viewMode === '2d'}
 					colorOverrides={renderOpts?.colorOverrides}
 					visibleLayers={renderOpts?.visibleLayers} />
 			{/if}
@@ -128,15 +120,13 @@
 						<rect x="5" y="5" width="6" height="6" rx="0.5" />
 					</svg>
 				</button>
-				{#if stack && viewMode === '3d'}
-					<button class="tb" class:active-toggle={wireframe} onclick={() => wireframe = !wireframe} title="Toggle wireframe">
-						<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
-							<path d="M1 5L8 1L15 5L15 11L8 15L1 11Z" />
-							<path d="M1 5L8 9L15 5" />
-							<path d="M8 9L8 15" />
-						</svg>
-					</button>
-				{/if}
+				<button class="tb" class:active-toggle={wireframe} onclick={() => wireframe = !wireframe} title="Toggle wireframe">
+					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+						<path d="M1 5L8 1L15 5L15 11L8 15L1 11Z" />
+						<path d="M1 5L8 9L15 5" />
+						<path d="M8 9L8 15" />
+					</svg>
+				</button>
 				{#if stack}
 					<button class="tb view-mode" onclick={toggleView} title="Toggle 2D/3D view">
 						{viewMode === '2d' ? '3D' : '2D'}
@@ -215,6 +205,12 @@
 	.stab.active {
 		color: var(--accent);
 	}
+	.stab-sep {
+		width: 1px;
+		height: 100%;
+		background: var(--border);
+		flex-shrink: 0;
+	}
 	.sidebar-content {
 		flex: 1;
 		overflow-y: auto;
@@ -238,10 +234,6 @@
 		flex: 1;
 		position: relative;
 		min-height: 0;
-		transition: opacity 0.2s ease;
-	}
-	.viewer-pane.transitioning {
-		opacity: 0;
 	}
 	.viewer-toolbar {
 		position: absolute;
