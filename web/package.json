@@ -16,6 +16,7 @@
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@types/earcut": "^3.0.0",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
 		"tsx": "^4.21.0",
@@ -23,6 +24,8 @@
 		"vite": "^7.3.1"
 	},
 	"dependencies": {
+		"earcut": "^3.0.2",
+		"gdsii": "^0.1.0",
 		"plotly.js-dist-min": "^3.4.0",
 		"polygon-clipping": "^0.15.7"
 	}
