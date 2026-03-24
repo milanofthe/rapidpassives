@@ -245,11 +245,15 @@
 					for (const key of Object.keys(meshes)) gdsLayerNums.add(Number(key));
 				}
 				const sortedKeys = [...gdsLayerNums].sort((a, b) => a - b);
+				// Ensure all GDS layers are mapped to LayerName slots
+				for (const gdsNum of sortedKeys) {
+					if (!GDS_TO_LAYER[gdsNum]) assignGenericLayer(gdsNum);
+				}
 				const infos: GdsLayerInfo[] = sortedKeys.map((gdsNum, i) => ({
 					gdsNum,
 					color: PALETTE[i % PALETTE.length],
 					visible: true,
-					polyCount: 0, // not meaningful for instanced
+					polyCount: 0,
 					thickness: 0.5,
 				}));
 				gdsLayers = infos;
@@ -412,7 +416,7 @@
 		</div>
 	</div>
 {:else}
-	<GeometryEditor {layers} {renderOpts} {stack} {instancedScene}>
+	<GeometryEditor {layers} {renderOpts} {stack} {instancedScene} gdsLayerMap={GDS_TO_LAYER}>
 		{#snippet sidebar()}
 			<div class="panel">
 				<div class="file-info">

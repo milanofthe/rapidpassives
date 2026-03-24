@@ -644,6 +644,8 @@ export function buildInstancedMeshes(
 	stack: ProcessStack,
 	colorOverrides?: Record<string, string>,
 	onDone?: () => void,
+	/** Map GDS layer number → LayerName used in the stack */
+	gdsLayerMap?: Record<number, string>,
 ): void {
 	const { gl } = state;
 
@@ -654,23 +656,17 @@ export function buildInstancedMeshes(
 	for (const m of state.meshes) gl.deleteVertexArray(m.vao);
 	state.meshes = [];
 
-	// Build GDS layer → stack z/color mapping
-	// For instanced scene, we use GDS layer numbers directly as keys
-	const DEFAULT_GDS_LAYERS: Record<number, string> = {
-		1: 'windings', 2: 'crossings', 3: 'vias', 4: 'centertap',
-		5: 'vias2', 6: 'windings_m2', 7: 'crossings_m1', 8: 'windings_m4',
-		9: 'vias3', 10: 'pgs', 11: 'guard_ring',
-	};
-
-	// Map GDS layer number → z/thickness from stack
+	// Map GDS layer number → z/thickness/color from stack
 	const layerZMap = new Map<number, { z: number; thickness: number; color: string }>();
 	for (const sl of stack.layers) {
 		if (sl.type === 'substrate') continue;
 		for (const glName of sl.gdsLayers) {
-			// Find the GDS layer number for this LayerName
-			for (const [num, name] of Object.entries(DEFAULT_GDS_LAYERS)) {
-				if (name === glName) {
-					layerZMap.set(Number(num), { z: sl.z, thickness: sl.thickness, color: sl.color });
+			// Find the GDS layer number for this LayerName via the provided mapping
+			if (gdsLayerMap) {
+				for (const [num, name] of Object.entries(gdsLayerMap)) {
+					if (name === glName) {
+						layerZMap.set(Number(num), { z: sl.z, thickness: sl.thickness, color: sl.color });
+					}
 				}
 			}
 		}
@@ -725,7 +721,8 @@ export function buildInstancedMeshes(
 			if (!zInfo) continue;
 			if (vertBuf.length === 0) continue;
 
-			const colorHex = colorOverrides?.[DEFAULT_GDS_LAYERS[gdsLayer] ?? ''] ?? zInfo.color ?? '#888888';
+			const layerName = gdsLayerMap?.[gdsLayer] ?? '';
+			const colorHex = colorOverrides?.[layerName] ?? zInfo.color ?? '#888888';
 			const color = hexToRgb(colorHex);
 
 			const zBot = zInfo.z - cz;

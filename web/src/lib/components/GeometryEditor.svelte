@@ -8,7 +8,7 @@
 	import ResultsPanel from './ResultsPanel.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, instancedScene }: {
+	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, instancedScene, gdsLayerMap }: {
 		layers: LayerMap;
 		sidebar: Snippet;
 		stackPanel?: Snippet;
@@ -18,6 +18,7 @@
 		simResult?: SimulationResult | null;
 		stack?: ProcessStack;
 		instancedScene?: InstancedSceneData | null;
+		gdsLayerMap?: Record<number, string>;
 	} = $props();
 
 	let activeTab = $state<'params' | 'stack' | 'sim'>('params');
@@ -109,7 +110,7 @@
 					ortho={viewMode === '2d'}
 					colorOverrides={renderOpts?.colorOverrides}
 					visibleLayers={renderOpts?.visibleLayers}
-					{instancedScene} />
+					{instancedScene} {gdsLayerMap} />
 			{/if}
 			<div class="viewer-toolbar">
 				<button class="tb" onclick={doZoomIn} title="Zoom in">+</button>

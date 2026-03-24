@@ -4,7 +4,7 @@
 	import type { ProcessStack } from '$lib/stack/types';
 	import { initGL, buildMeshes, buildInstancedMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera, type InstancedSceneData } from '$lib/render/canvas3d';
 
-	let { layers, stack, colorOverrides, visibleLayers, wireframe = false, ortho = false, instancedScene }: {
+	let { layers, stack, colorOverrides, visibleLayers, wireframe = false, ortho = false, instancedScene, gdsLayerMap }: {
 		layers: LayerMap;
 		stack: ProcessStack;
 		colorOverrides?: Record<string, string>;
@@ -12,6 +12,7 @@
 		wireframe?: boolean;
 		ortho?: boolean;
 		instancedScene?: InstancedSceneData | null;
+		gdsLayerMap?: Record<number, string>;
 	} = $props();
 
 	export function zoomIn() {
@@ -81,7 +82,7 @@
 				}
 			};
 			if (instancedScene) {
-				buildInstancedMeshes(glState, instancedScene, stack, colorOverrides, onBatch);
+				buildInstancedMeshes(glState, instancedScene, stack, colorOverrides, onBatch, gdsLayerMap);
 			} else {
 				buildMeshes(glState, layers, stack, colorOverrides, visibleLayers, onBatch);
 			}
