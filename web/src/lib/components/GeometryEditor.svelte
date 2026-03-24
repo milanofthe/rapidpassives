@@ -3,11 +3,12 @@
 	import type { RenderOptions } from '$lib/render/canvas2d';
 	import type { ProcessStack } from '$lib/stack/types';
 	import type { SimulationResult } from '$lib/solver/peec';
+	import type { InstancedSceneData } from '$lib/render/canvas3d';
 	import LayoutViewer3D from './LayoutViewer3D.svelte';
 	import ResultsPanel from './ResultsPanel.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack }: {
+	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, instancedScene }: {
 		layers: LayerMap;
 		sidebar: Snippet;
 		stackPanel?: Snippet;
@@ -16,6 +17,7 @@
 		renderOpts?: RenderOptions;
 		simResult?: SimulationResult | null;
 		stack?: ProcessStack;
+		instancedScene?: InstancedSceneData | null;
 	} = $props();
 
 	let activeTab = $state<'params' | 'stack' | 'sim'>('params');
@@ -106,7 +108,8 @@
 				<LayoutViewer3D bind:this={viewer} {layers} {stack} {wireframe}
 					ortho={viewMode === '2d'}
 					colorOverrides={renderOpts?.colorOverrides}
-					visibleLayers={renderOpts?.visibleLayers} />
+					visibleLayers={renderOpts?.visibleLayers}
+					{instancedScene} />
 			{/if}
 			<div class="viewer-toolbar">
 				<button class="tb" onclick={doZoomIn} title="Zoom in">+</button>

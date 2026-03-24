@@ -2,16 +2,16 @@
 	import { onMount } from 'svelte';
 	import type { LayerMap, LayerName } from '$lib/geometry/types';
 	import type { ProcessStack } from '$lib/stack/types';
-	import { initGL, buildMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera } from '$lib/render/canvas3d';
+	import { initGL, buildMeshes, buildInstancedMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera, type InstancedSceneData } from '$lib/render/canvas3d';
 
-	let { layers, stack, colorOverrides, visibleLayers, wireframe = false, ortho = false }: {
+	let { layers, stack, colorOverrides, visibleLayers, wireframe = false, ortho = false, instancedScene }: {
 		layers: LayerMap;
 		stack: ProcessStack;
 		colorOverrides?: Record<string, string>;
 		visibleLayers?: Set<LayerName>;
 		wireframe?: boolean;
-		/** When true, renders in orthographic top-down (2D mode) */
 		ortho?: boolean;
+		instancedScene?: InstancedSceneData | null;
 	} = $props();
 
 	export function zoomIn() {
@@ -74,12 +74,17 @@
 
 		if (needsRebuild) {
 			needsRebuild = false;
-			buildMeshes(glState, layers, stack, colorOverrides, visibleLayers, () => {
+			const onBatch = () => {
 				if (mounted && glState && canvas) {
 					const { w, h } = syncCanvas();
 					if (w > 0 && h > 0) render3D(glState!, camera, w, h, wireframe, orthoBlend);
 				}
-			});
+			};
+			if (instancedScene) {
+				buildInstancedMeshes(glState, instancedScene, stack, colorOverrides, onBatch);
+			} else {
+				buildMeshes(glState, layers, stack, colorOverrides, visibleLayers, onBatch);
+			}
 		}
 
 		render3D(glState, camera, w, h, wireframe, orthoBlend);
@@ -255,9 +260,10 @@
 		};
 	});
 
-	// Rebuild meshes when geometry changes (preserve camera)
+	// Rebuild meshes when geometry or instanced scene changes
 	$effect(() => {
 		layers;
+		instancedScene;
 		if (mounted && glState) {
 			needsRebuild = true;
 			renderFrame();

@@ -3,8 +3,8 @@
 	import type { Polygon, LayerName, LayerMap } from '$lib/geometry/types';
 	import type { ProcessStack, StackLayer } from '$lib/stack/types';
 	import type { RenderOptions } from '$lib/render/canvas2d';
-	import { readGdsInWorker } from '$lib/gds/reader';
-	// Merge happens in the worker — no main-thread merge needed
+	import { readGdsInWorker, type GdsWorkerResult } from '$lib/gds/reader';
+	import { type InstancedSceneData } from '$lib/render/canvas3d';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -77,6 +77,7 @@
 	let loadProgress = $state(0);
 	let loadPolyCount = $state(0);
 	let loadPhase = $state('');
+	let instancedScene = $state<InstancedSceneData | null>(null);
 
 	// Drag reorder state
 	let dragIdx = $state<number | null>(null);
@@ -224,14 +225,39 @@
 				}
 			}
 
-			const scaled = await readGdsInWorker(bytes, (p) => {
+			const result = await readGdsInWorker(bytes, (p) => {
 				loadPolyCount = p.polygonCount;
-				loadProgress = p.phase === 'done' ? 1 : p.phase === 'scaling' ? 0.8 : p.phase === 'flattening' ? 0.4 : 0.1;
-				const phaseNames: Record<string, string> = { parsing: 'Parsing records...', flattening: 'Flattening cells...', scaling: 'Scaling coordinates...', merging: 'Merging polygons...', done: 'Done' };
+				const phaseNames: Record<string, string> = {
+					parsing: 'Parsing records...', flattening: 'Flattening cells...',
+					scaling: 'Scaling coordinates...', merging: 'Merging polygons...',
+					'building hierarchy': 'Analyzing hierarchy...', triangulating: 'Triangulating...',
+					done: 'Done',
+				};
 				loadPhase = phaseNames[p.phase] ?? p.phase;
+				loadProgress = p.phase === 'done' ? 1 : p.phase === 'triangulating' ? 0.6 : p.phase === 'scaling' ? 0.8 : p.phase === 'flattening' ? 0.4 : 0.1;
 			});
 
-			updateLayerState(scaled);
+			if (result.mode === 'instanced') {
+				instancedScene = { cellMeshes: result.cellMeshes, cellInstances: result.cellInstances };
+				// Build layer info from the cell meshes (collect unique GDS layer numbers)
+				const gdsLayerNums = new Set<number>();
+				for (const meshes of Object.values(result.cellMeshes)) {
+					for (const key of Object.keys(meshes)) gdsLayerNums.add(Number(key));
+				}
+				const sortedKeys = [...gdsLayerNums].sort((a, b) => a - b);
+				const infos: GdsLayerInfo[] = sortedKeys.map((gdsNum, i) => ({
+					gdsNum,
+					color: PALETTE[i % PALETTE.length],
+					visible: true,
+					polyCount: 0, // not meaningful for instanced
+					thickness: 0.5,
+				}));
+				gdsLayers = infos;
+			} else {
+				instancedScene = null;
+				updateLayerState(result.polygons);
+			}
+
 			loading = false;
 		} catch (e: any) {
 			error = `Parse error: ${e.message}`;
@@ -386,7 +412,7 @@
 		</div>
 	</div>
 {:else}
-	<GeometryEditor {layers} {renderOpts} {stack}>
+	<GeometryEditor {layers} {renderOpts} {stack} {instancedScene}>
 		{#snippet sidebar()}
 			<div class="panel">
 				<div class="file-info">

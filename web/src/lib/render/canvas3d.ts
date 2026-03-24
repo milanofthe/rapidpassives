@@ -45,6 +45,13 @@ interface LineMesh {
 	color: [number, number, number];
 }
 
+interface InstancedMesh {
+	vao: WebGLVertexArrayObject;
+	vertCount: number;
+	instanceCount: number;
+	color: [number, number, number];
+}
+
 interface GLState {
 	gl: WebGL2RenderingContext;
 	program: WebGLProgram;
@@ -53,10 +60,17 @@ interface GLState {
 	uColor: WebGLUniformLocation;
 	uLightDir: WebGLUniformLocation;
 	uAmbient: WebGLUniformLocation;
+	instProgram: WebGLProgram;
+	uInstMVP: WebGLUniformLocation;
+	uInstColor: WebGLUniformLocation;
+	uInstLightDir: WebGLUniformLocation;
+	uInstAmbient: WebGLUniformLocation;
+	uInstTopFace: WebGLUniformLocation;
 	lineProgram: WebGLProgram;
 	uLineMVP: WebGLUniformLocation;
 	uLineColor: WebGLUniformLocation;
 	meshes: Mesh[];
+	instancedMeshes: InstancedMesh[];
 	axisMeshes: LineMesh[];
 	gridMesh: LineMesh | null;
 }
@@ -76,6 +90,37 @@ void main() {
 }`;
 
 const FS = `#version 300 es
+precision highp float;
+in vec3 vNormal;
+uniform vec3 uColor;
+uniform vec3 uLightDir;
+uniform float uAmbient;
+out vec4 fragColor;
+void main() {
+	float diff = max(dot(normalize(vNormal), uLightDir), 0.0);
+	vec3 lit = uColor * (uAmbient + (1.0 - uAmbient) * diff);
+	fragColor = vec4(lit, 1.0);
+}`;
+
+// Instanced shader: 2D vertex positions + per-instance 2D affine transform + Z extrusion
+const INST_VS = `#version 300 es
+precision highp float;
+layout(location=0) in vec2 aPos;          // per-vertex: triangle x,y in cell-local coords
+layout(location=1) in vec4 aInstRow0;     // per-instance: [a, b, tx, zBottom]
+layout(location=2) in vec4 aInstRow1;     // per-instance: [c, d, ty, zTop]
+uniform mat4 uMVP;
+uniform float uTopFace;                   // 1.0 for top face pass, 0.0 for bottom
+out vec3 vNormal;
+void main() {
+	// Apply 2D affine: x' = a*x + b*y + tx, y' = c*x + d*y + ty
+	float wx = aInstRow0.x * aPos.x + aInstRow0.y * aPos.y + aInstRow0.z;
+	float wy = aInstRow1.x * aPos.x + aInstRow1.y * aPos.y + aInstRow1.z;
+	float z = mix(aInstRow1.w, aInstRow0.w, uTopFace); // bottom or top
+	gl_Position = uMVP * vec4(wx, wy, z, 1.0);
+	vNormal = vec3(0.0, 0.0, uTopFace > 0.5 ? 1.0 : -1.0);
+}`;
+
+const INST_FS = `#version 300 es
 precision highp float;
 in vec3 vNormal;
 uniform vec3 uColor;
@@ -408,7 +453,20 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	gl.clearColor(bg[0], bg[1], bg[2], 1);
 	gl.enable(gl.DEPTH_TEST);
 
-	return { gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient, lineProgram, uLineMVP, uLineColor, meshes: [], axisMeshes: [], gridMesh: null };
+	// Instanced shader program
+	const instProgram = linkProgramFromSource(gl, INST_VS, INST_FS);
+	const uInstMVP = gl.getUniformLocation(instProgram, 'uMVP')!;
+	const uInstColor = gl.getUniformLocation(instProgram, 'uColor')!;
+	const uInstLightDir = gl.getUniformLocation(instProgram, 'uLightDir')!;
+	const uInstAmbient = gl.getUniformLocation(instProgram, 'uAmbient')!;
+	const uInstTopFace = gl.getUniformLocation(instProgram, 'uTopFace')!;
+
+	return {
+		gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient,
+		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace,
+		lineProgram, uLineMVP, uLineColor,
+		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null,
+	};
 }
 
 /** Build meshes from layers + stack. Call when geometry or stack changes. */
@@ -566,6 +624,167 @@ function niceStep(extent: number): number {
 	return 10 * mag;
 }
 
+// ─── Instanced mesh building ─────────────────────────────────────────
+
+export interface InstancedSceneData {
+	/** cellName → { gdsLayer → Float32Array of triangulated 2D verts [x,y,x,y,...] } */
+	cellMeshes: Record<string, Record<number, Float32Array>>;
+	/** cellName → flat array of affine transforms [a,b,c,d,tx,ty, ...] */
+	cellInstances: Record<string, number[]>;
+}
+
+/**
+ * Build GPU meshes from instanced scene data.
+ * Each unique cell's triangulated polygons are uploaded once per layer,
+ * with per-instance transform buffers for drawArraysInstanced.
+ */
+export function buildInstancedMeshes(
+	state: GLState,
+	sceneData: InstancedSceneData,
+	stack: ProcessStack,
+	colorOverrides?: Record<string, string>,
+	onDone?: () => void,
+): void {
+	const { gl } = state;
+
+	// Clean up old instanced meshes
+	for (const m of state.instancedMeshes) gl.deleteVertexArray(m.vao);
+	state.instancedMeshes = [];
+	// Also clean regular meshes
+	for (const m of state.meshes) gl.deleteVertexArray(m.vao);
+	state.meshes = [];
+
+	// Build GDS layer → stack z/color mapping
+	// For instanced scene, we use GDS layer numbers directly as keys
+	const DEFAULT_GDS_LAYERS: Record<number, string> = {
+		1: 'windings', 2: 'crossings', 3: 'vias', 4: 'centertap',
+		5: 'vias2', 6: 'windings_m2', 7: 'crossings_m1', 8: 'windings_m4',
+		9: 'vias3', 10: 'pgs', 11: 'guard_ring',
+	};
+
+	// Map GDS layer number → z/thickness from stack
+	const layerZMap = new Map<number, { z: number; thickness: number; color: string }>();
+	for (const sl of stack.layers) {
+		if (sl.type === 'substrate') continue;
+		for (const glName of sl.gdsLayers) {
+			// Find the GDS layer number for this LayerName
+			for (const [num, name] of Object.entries(DEFAULT_GDS_LAYERS)) {
+				if (name === glName) {
+					layerZMap.set(Number(num), { z: sl.z, thickness: sl.thickness, color: sl.color });
+				}
+			}
+		}
+	}
+
+	// Compute geometry center for the scene
+	let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+	for (const [cellName, meshes] of Object.entries(sceneData.cellMeshes)) {
+		const transforms = sceneData.cellInstances[cellName];
+		if (!transforms) continue;
+		for (const buf of Object.values(meshes)) {
+			for (let i = 0; i < buf.length; i += 2) {
+				// Just sample first instance to estimate bounds
+				const x = transforms[0] * buf[i] + transforms[1] * buf[i + 1] + transforms[2];
+				const y = transforms[3] * buf[i] + transforms[4] * buf[i + 1] + transforms[5]; // FIXME: wrong indices
+			}
+		}
+	}
+	// Simpler: use transforms tx,ty to estimate bounds
+	for (const transforms of Object.values(sceneData.cellInstances)) {
+		for (let i = 0; i < transforms.length; i += 6) {
+			const tx = transforms[i + 4], ty = transforms[i + 5];
+			if (tx < minX) minX = tx; if (tx > maxX) maxX = tx;
+			if (ty < minY) minY = ty; if (ty > maxY) maxY = ty;
+		}
+	}
+	const cx = isFinite(minX) ? (minX + maxX) / 2 : 0;
+	const cy = isFinite(minY) ? (minY + maxY) / 2 : 0;
+	const xyExtent = Math.max(isFinite(maxX) ? maxX - minX : 1, isFinite(maxY) ? maxY - minY : 1);
+
+	let minZ = Infinity, maxZ = -Infinity;
+	for (const sl of stack.layers) {
+		if (sl.type === 'substrate') continue;
+		minZ = Math.min(minZ, sl.z);
+		maxZ = Math.max(maxZ, sl.z + sl.thickness);
+	}
+	const cz = isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
+
+	// Build grid
+	const gridZ = isFinite(minZ) ? minZ - cz : 0;
+	buildGrid(state, xyExtent, gridZ);
+
+	// Create instanced meshes per cell per GDS layer
+	for (const [cellName, meshes] of Object.entries(sceneData.cellMeshes)) {
+		const transforms = sceneData.cellInstances[cellName];
+		if (!transforms || transforms.length === 0) continue;
+		const instanceCount = transforms.length / 6;
+
+		for (const [gdsLayerStr, vertBuf] of Object.entries(meshes)) {
+			const gdsLayer = Number(gdsLayerStr);
+			const zInfo = layerZMap.get(gdsLayer);
+			if (!zInfo) continue;
+			if (vertBuf.length === 0) continue;
+
+			const colorHex = colorOverrides?.[DEFAULT_GDS_LAYERS[gdsLayer] ?? ''] ?? zInfo.color ?? '#888888';
+			const color = hexToRgb(colorHex);
+
+			const zBot = zInfo.z - cz;
+			const zTop = zInfo.z + zInfo.thickness - cz;
+
+			// Build instance buffer: pack transforms with z values
+			// Per instance: [a, b, tx-cx, zBot, c, d, ty-cy, zTop] → 2 vec4s
+			const instData = new Float32Array(instanceCount * 8);
+			for (let i = 0; i < instanceCount; i++) {
+				const si = i * 6;
+				instData[i * 8 + 0] = transforms[si + 0]; // a
+				instData[i * 8 + 1] = transforms[si + 1]; // b
+				instData[i * 8 + 2] = transforms[si + 4] - cx; // tx - cx
+				instData[i * 8 + 3] = zBot;
+				instData[i * 8 + 4] = transforms[si + 2]; // c
+				instData[i * 8 + 5] = transforms[si + 3]; // d
+				instData[i * 8 + 6] = transforms[si + 5] - cy; // ty - cy
+				instData[i * 8 + 7] = zTop;
+			}
+
+			const vao = gl.createVertexArray()!;
+			gl.bindVertexArray(vao);
+
+			// Vertex buffer (2D positions)
+			const vertBufGL = gl.createBuffer()!;
+			gl.bindBuffer(gl.ARRAY_BUFFER, vertBufGL);
+			gl.bufferData(gl.ARRAY_BUFFER, vertBuf, gl.STATIC_DRAW);
+			gl.enableVertexAttribArray(0);
+			gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+			// Instance buffer
+			const instBufGL = gl.createBuffer()!;
+			gl.bindBuffer(gl.ARRAY_BUFFER, instBufGL);
+			gl.bufferData(gl.ARRAY_BUFFER, instData, gl.STATIC_DRAW);
+
+			// aInstRow0 (location 1): vec4 at offset 0, stride 32
+			gl.enableVertexAttribArray(1);
+			gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 0);
+			gl.vertexAttribDivisor(1, 1);
+
+			// aInstRow1 (location 2): vec4 at offset 16, stride 32
+			gl.enableVertexAttribArray(2);
+			gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16);
+			gl.vertexAttribDivisor(2, 1);
+
+			gl.bindVertexArray(null);
+
+			state.instancedMeshes.push({
+				vao,
+				vertCount: vertBuf.length / 2,
+				instanceCount,
+				color,
+			});
+		}
+	}
+
+	onDone?.();
+}
+
 /** Render one frame */
 export function render3D(
 	state: GLState,
@@ -644,6 +863,32 @@ export function render3D(
 			gl.uniform3f(uColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
 			gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+		}
+	}
+
+	// Draw instanced meshes (from GDS import)
+	if (state.instancedMeshes.length > 0 && !wireframe) {
+		gl.useProgram(state.instProgram);
+		gl.uniformMatrix4fv(state.uInstMVP, false, vp);
+		const lx = 0.4, ly = 0.3, lz = 0.8;
+		const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
+		gl.uniform3f(state.uInstLightDir, lx / ll, ly / ll, lz / ll);
+		gl.uniform1f(state.uInstAmbient, 0.5 + 0.5 * orthoBlend);
+
+		// Draw top faces
+		gl.uniform1f(state.uInstTopFace, 1.0);
+		for (const mesh of state.instancedMeshes) {
+			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
+			gl.bindVertexArray(mesh.vao);
+			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
+		}
+
+		// Draw bottom faces
+		gl.uniform1f(state.uInstTopFace, 0.0);
+		for (const mesh of state.instancedMeshes) {
+			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
+			gl.bindVertexArray(mesh.vao);
+			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
 		}
 	}
 

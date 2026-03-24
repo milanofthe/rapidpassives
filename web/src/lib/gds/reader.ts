@@ -396,6 +396,121 @@ export function flattenGds(data: GdsData): Map<number, Polygon[]> {
 	return result;
 }
 
+/**
+ * A 2D affine transform: [a, b, c, d, tx, ty]
+ * Maps (x,y) → (a*x + b*y + tx, c*x + d*y + ty)
+ */
+export type Affine2D = [number, number, number, number, number, number];
+
+/** Scene with instanced cell data — avoids flattening millions of polygons */
+export interface InstancedScene {
+	/** Cells that have their own polygons, keyed by cell name */
+	cells: Map<string, { polygons: Map<number, Polygon[]> }>;
+	/** For each cell name, list of global transforms at which to draw it */
+	instances: Map<string, Affine2D[]>;
+	/** Units for scaling */
+	userUnit: number;
+}
+
+function affineIdentity(): Affine2D { return [1, 0, 0, 1, 0, 0]; }
+
+function affineCompose(parent: Affine2D, ox: number, oy: number, mag: number, angleDeg: number, reflect: boolean): Affine2D {
+	const rad = angleDeg * Math.PI / 180;
+	const cosA = Math.cos(rad) * mag;
+	const sinA = Math.sin(rad) * mag;
+	// Child local transform
+	let a = cosA, b = -sinA, c = sinA, d = cosA;
+	if (reflect) { b = sinA; d = -cosA; } // reflect Y before rotate
+	// Compose with parent: P * (R * v + t)
+	const [pa, pb, pc, pd, ptx, pty] = parent;
+	return [
+		pa * a + pb * c,
+		pa * b + pb * d,
+		pc * a + pd * c,
+		pc * b + pd * d,
+		pa * ox + pb * oy + ptx,
+		pc * ox + pd * oy + pty,
+	];
+}
+
+/** Build an instanced scene from parsed GDS data without flattening polygons */
+export function buildInstancedScene(data: GdsData): InstancedScene {
+	const cellMap = new Map<string, GdsCell>();
+	for (const cell of data.cells) cellMap.set(cell.name, cell);
+
+	const referenced = new Set<string>();
+	for (const cell of data.cells) {
+		for (const sr of cell.srefs) referenced.add(sr.sname);
+		for (const ar of cell.arefs) referenced.add(ar.sname);
+	}
+	const topCells = data.cells.filter(c => !referenced.has(c.name));
+	const topCell = topCells.length > 0 ? topCells[topCells.length - 1] : data.cells[data.cells.length - 1];
+
+	const cells = new Map<string, { polygons: Map<number, Polygon[]> }>();
+	const instances = new Map<string, Affine2D[]>();
+
+	// Register all cells that have polygons
+	for (const cell of data.cells) {
+		if (cell.polygons.size > 0) {
+			cells.set(cell.name, { polygons: cell.polygons });
+			instances.set(cell.name, []);
+		}
+	}
+
+	if (!topCell) return { cells, instances, userUnit: data.units.userUnit };
+
+	// Walk hierarchy, collecting composed transforms
+	const visited = new Set<string>();
+
+	function walk(cell: GdsCell, transform: Affine2D) {
+		// Record this transform for the cell's own polygons
+		if (cell.polygons.size > 0) {
+			instances.get(cell.name)!.push(transform);
+		}
+
+		// SREFs
+		for (const sr of cell.srefs) {
+			const child = cellMap.get(sr.sname);
+			if (!child) continue;
+			const key = `${sr.sname}@${transform[4] + sr.xy[0]},${transform[5] + sr.xy[1]}`;
+			if (visited.has(key)) continue;
+			visited.add(key);
+
+			const childReflect = !!(sr.strans & 0x8000);
+			const childTransform = affineCompose(transform, sr.xy[0], sr.xy[1], sr.mag, sr.angle, childReflect);
+			walk(child, childTransform);
+
+			visited.delete(key);
+		}
+
+		// AREFs
+		for (const ar of cell.arefs) {
+			const child = cellMap.get(ar.sname);
+			if (!child || ar.xy.length < 3) continue;
+
+			const [refX, refY] = ar.xy[0];
+			const colDx = (ar.xy[1][0] - refX) / ar.columns;
+			const colDy = (ar.xy[1][1] - refY) / ar.columns;
+			const rowDx = (ar.xy[2][0] - refX) / ar.rows;
+			const rowDy = (ar.xy[2][1] - refY) / ar.rows;
+			const childReflect = !!(ar.strans & 0x8000);
+
+			for (let col = 0; col < ar.columns; col++) {
+				for (let row = 0; row < ar.rows; row++) {
+					const ex = refX + col * colDx + row * rowDx;
+					const ey = refY + col * colDy + row * rowDy;
+					const childTransform = affineCompose(transform, ex, ey, ar.mag, ar.angle, childReflect);
+					walk(child, childTransform);
+				}
+			}
+		}
+	}
+
+	walk(topCell, affineIdentity());
+
+	return { cells, instances, userUnit: data.units.userUnit };
+}
+
 /** Convert GDS integer coordinates to user units (typically microns) */
 export function scalePolygons(polys: Map<number, Polygon[]>, userUnit: number): Map<number, Polygon[]> {
 	const result = new Map<number, Polygon[]>();
@@ -410,18 +525,23 @@ export function scalePolygons(polys: Map<number, Polygon[]>, userUnit: number): 
 
 /** Progress callback for streaming parse */
 export interface GdsProgress {
-	phase: 'parsing' | 'flattening' | 'scaling' | 'done';
+	phase: string;
 	polygonCount: number;
 }
 
+/** Result from worker — either flat polygons or instanced scene data */
+export type GdsWorkerResult =
+	| { mode: 'flat'; polygons: Map<number, Polygon[]> }
+	| { mode: 'instanced'; cellMeshes: Record<string, Record<number, Float32Array>>; cellInstances: Record<string, number[]> };
+
 /**
- * Parse and merge a GDS file in a Web Worker so the UI stays responsive.
- * Falls back to synchronous on the main thread if workers fail.
+ * Parse a GDS file in a Web Worker. Automatically picks flat or instanced
+ * mode based on estimated flattened polygon count.
  */
 export function readGdsInWorker(
 	bytes: Uint8Array,
 	onProgress: (p: GdsProgress) => void,
-): Promise<Map<number, Polygon[]>> {
+): Promise<GdsWorkerResult> {
 	return new Promise((resolve, reject) => {
 		let worker: Worker;
 		try {
@@ -434,15 +554,23 @@ export function readGdsInWorker(
 		worker.onmessage = (e) => {
 			const msg = e.data;
 			if (msg.type === 'progress') {
-				onProgress({ phase: msg.phase, polygonCount: 0 });
+				onProgress({ phase: msg.phase, polygonCount: msg.polygonCount ?? 0 });
 			} else if (msg.type === 'done') {
 				worker.terminate();
-				const result = new Map<number, Polygon[]>();
+				const polygons = new Map<number, Polygon[]>();
 				for (const [key, polys] of Object.entries(msg.layers)) {
-					result.set(Number(key), polys as Polygon[]);
+					polygons.set(Number(key), polys as Polygon[]);
 				}
 				onProgress({ phase: 'done', polygonCount: msg.polygonCount });
-				resolve(result);
+				resolve({ mode: 'flat', polygons });
+			} else if (msg.type === 'done-instanced') {
+				worker.terminate();
+				onProgress({ phase: 'done', polygonCount: msg.polygonCount });
+				resolve({
+					mode: 'instanced',
+					cellMeshes: msg.cellMeshes,
+					cellInstances: msg.cellInstances,
+				});
 			} else if (msg.type === 'error') {
 				worker.terminate();
 				reject(new Error(msg.message));
@@ -460,8 +588,8 @@ export function readGdsInWorker(
 	});
 }
 
-/** Synchronous fallback if worker fails */
-function readGdsFallback(bytes: Uint8Array, onProgress: (p: GdsProgress) => void): Map<number, Polygon[]> {
+/** Synchronous fallback — always flat mode */
+function readGdsFallback(bytes: Uint8Array, onProgress: (p: GdsProgress) => void): GdsWorkerResult {
 	console.warn('GDS: running synchronous fallback (UI will freeze)');
 	onProgress({ phase: 'parsing', polygonCount: 0 });
 	const data = readGds(bytes);
@@ -469,14 +597,8 @@ function readGdsFallback(bytes: Uint8Array, onProgress: (p: GdsProgress) => void
 	const flat = flattenGds(data);
 	onProgress({ phase: 'scaling', polygonCount: 0 });
 	const scaled = scalePolygons(flat, data.units.userUnit);
-	// Merge to reduce polygon count
-	onProgress({ phase: 'merging', polygonCount: 0 });
-	const result = new Map<number, Polygon[]>();
-	for (const [layer, polys] of scaled) {
-		result.set(layer, polys.length > 1 ? mergePolygons(polys) : polys);
-	}
-	onProgress({ phase: 'done', polygonCount: countPolygons(result) });
-	return result;
+	onProgress({ phase: 'done', polygonCount: countPolygons(scaled) });
+	return { mode: 'flat', polygons: scaled };
 }
 
 function countPolygons(m: Map<number, Polygon[]>): number {
