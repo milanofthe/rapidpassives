@@ -89,6 +89,8 @@ export interface RenderOptions {
 	colorOverrides?: Record<string, string>;
 	visibleLayers?: Set<LayerName>;
 	ports?: PortMarker[];
+	/** Custom display names for layers (e.g. GDS layer numbers) */
+	layerLabels?: Record<string, string>;
 }
 
 /** Render all layers to a canvas context */
@@ -113,6 +115,12 @@ export function renderLayers(
 	drawGrid(ctx, view, width, height);
 	drawCrosshair(ctx, view, width, height);
 
+	// Viewport bounds in world coordinates for culling
+	const worldLeft = -view.offsetX / view.scale;
+	const worldRight = (width - view.offsetX) / view.scale;
+	const worldTop = view.offsetY / view.scale;
+	const worldBottom = (view.offsetY - height) / view.scale;
+
 	// Layers back to front
 	for (const layerName of LAYER_ORDER) {
 		if (opts?.visibleLayers && !opts.visibleLayers.has(layerName)) continue;
@@ -120,14 +128,54 @@ export function renderLayers(
 		if (!polys || polys.length === 0) continue;
 
 		const baseColor = opts?.colorOverrides?.[layerName] ?? LAYER_COLORS[layerName] ?? '#888';
+
+		ctx.fillStyle = baseColor;
+		ctx.beginPath();
+		let highlightIdx = -1;
+		let batchCount = 0;
+
 		for (let pi = 0; pi < polys.length; pi++) {
+			const poly = polys[pi];
+			if (poly.x.length < 2) continue;
+
+			// Bounding box for culling and LOD
+			let pMinX = Infinity, pMaxX = -Infinity, pMinY = Infinity, pMaxY = -Infinity;
+			for (let i = 0; i < poly.x.length; i++) {
+				const px = poly.x[i], py = poly.y[i];
+				if (px < pMinX) pMinX = px;
+				if (px > pMaxX) pMaxX = px;
+				if (py < pMinY) pMinY = py;
+				if (py > pMaxY) pMaxY = py;
+			}
+			// Skip polygons entirely outside the viewport
+			if (pMaxX < worldLeft || pMinX > worldRight || pMaxY < worldBottom || pMinY > worldTop) continue;
+			// Skip polygons smaller than ~1px on screen (sub-pixel LOD)
+			const screenW = (pMaxX - pMinX) * view.scale;
+			const screenH = (pMaxY - pMinY) * view.scale;
+			if (screenW < 1 && screenH < 1) continue;
+
 			const isHighlighted = highlight && highlight.layer === layerName && highlight.index === pi;
 			if (isHighlighted) {
-				ctx.fillStyle = brighten(baseColor, canvasTheme.highlightBrighten);
-			} else {
-				ctx.fillStyle = baseColor;
+				highlightIdx = pi;
+				continue;
 			}
-			drawPolygon(ctx, polys[pi], view);
+
+			addPolygonToPath(ctx, poly, view);
+			batchCount++;
+
+			// Flush path every 5000 polygons to avoid Canvas2D choking on huge paths
+			if (batchCount >= 5000) {
+				ctx.fill();
+				ctx.beginPath();
+				batchCount = 0;
+			}
+		}
+		ctx.fill();
+
+		// Draw highlighted polygon on top with brightened color
+		if (highlightIdx >= 0) {
+			ctx.fillStyle = brighten(baseColor, canvasTheme.highlightBrighten);
+			drawPolygon(ctx, polys[highlightIdx], view);
 		}
 	}
 
@@ -156,14 +204,20 @@ function brighten(hex: string, amount: number): string {
 	return `rgb(${Math.min(255, r + (255 - r) * amount)}, ${Math.min(255, g + (255 - g) * amount)}, ${Math.min(255, b + (255 - b) * amount)})`;
 }
 
+/** Add polygon vertices to the current path (no beginPath/fill) */
+function addPolygonToPath(ctx: CanvasRenderingContext2D, poly: Polygon, view: ViewState): void {
+	const s = view.scale, ox = view.offsetX, oy = view.offsetY;
+	ctx.moveTo(poly.x[0] * s + ox, -poly.y[0] * s + oy);
+	for (let i = 1; i < poly.x.length; i++) {
+		ctx.lineTo(poly.x[i] * s + ox, -poly.y[i] * s + oy);
+	}
+	ctx.closePath();
+}
+
 function drawPolygon(ctx: CanvasRenderingContext2D, poly: Polygon, view: ViewState): void {
 	if (poly.x.length < 2) return;
 	ctx.beginPath();
-	ctx.moveTo(poly.x[0] * view.scale + view.offsetX, -poly.y[0] * view.scale + view.offsetY);
-	for (let i = 1; i < poly.x.length; i++) {
-		ctx.lineTo(poly.x[i] * view.scale + view.offsetX, -poly.y[i] * view.scale + view.offsetY);
-	}
-	ctx.closePath();
+	addPolygonToPath(ctx, poly, view);
 	ctx.fill();
 }
 
