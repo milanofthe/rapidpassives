@@ -30,6 +30,7 @@
 		loading = true;
 		loadProgress = 0;
 		loadPolyCount = 0;
+		loadPhase = 'Fetching file...';
 		fileName = url.split('/').pop() || 'remote.gds';
 		error = '';
 
@@ -75,6 +76,7 @@
 	let loading = $state(false);
 	let loadProgress = $state(0);
 	let loadPolyCount = $state(0);
+	let loadPhase = $state('');
 
 	// Drag reorder state
 	let dragIdx = $state<number | null>(null);
@@ -201,6 +203,7 @@
 		loading = true;
 		loadProgress = 0;
 		loadPolyCount = 0;
+		loadPhase = 'Reading file...';
 
 		const reader = new FileReader();
 		reader.onload = async () => {
@@ -224,6 +227,8 @@
 			const scaled = await readGdsInWorker(bytes, (p) => {
 				loadPolyCount = p.polygonCount;
 				loadProgress = p.phase === 'done' ? 1 : p.phase === 'scaling' ? 0.8 : p.phase === 'flattening' ? 0.4 : 0.1;
+				const phaseNames: Record<string, string> = { parsing: 'Parsing records...', flattening: 'Flattening cells...', scaling: 'Scaling coordinates...', merging: 'Merging polygons...', done: 'Done' };
+				loadPhase = phaseNames[p.phase] ?? p.phase;
 			});
 
 			updateLayerState(scaled);
@@ -354,12 +359,15 @@
 			tabindex="0"
 		>
 			{#if loading}
-				<div class="loading-indicator">
-					<div class="progress-bar">
-						<div class="progress-fill" style="width: {Math.round(loadProgress * 100)}%"></div>
-					</div>
-					<p class="loading-text">Processing {loadPolyCount.toLocaleString()} polygons...</p>
-				</div>
+				<svg class="border-spinner" viewBox="0 0 400 280">
+					<rect x="1" y="1" width="398" height="278" rx="0" fill="none"
+						stroke="var(--accent)" stroke-width="2"
+						stroke-dasharray="{2 * (398 + 278)}"
+						stroke-dashoffset="{2 * (398 + 278) * (1 - loadProgress)}"
+					/>
+				</svg>
+				<p class="loading-phase">{loadPhase}</p>
+				<p class="loading-text">{loadPolyCount > 0 ? `${loadPolyCount.toLocaleString()} polygons` : ''}</p>
 			{:else}
 				<div class="dropzone-icon">
 					<svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -389,16 +397,7 @@
 					<span>{gdsLayers.length} layers</span>
 					<span class="sep">/</span>
 					<span>{totalPolygons.toLocaleString()} polygons</span>
-					{#if loading}
-						<span class="sep">/</span>
-						<span class="loading-badge">{Math.round(loadProgress * 100)}%</span>
-					{/if}
 				</div>
-				{#if loading}
-					<div class="progress-bar sidebar-progress">
-						<div class="progress-fill" style="width: {Math.round(loadProgress * 100)}%"></div>
-					</div>
-				{/if}
 
 				<h4 class="section-label">Layers</h4>
 				<p class="hint">Drag to reorder stack. Click to toggle visibility.</p>
@@ -505,31 +504,30 @@
 		cursor: pointer;
 	}
 	.dropzone.loading {
-		border-color: var(--accent);
+		border-color: transparent;
 		pointer-events: none;
 	}
-	.loading-indicator {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 12px;
-		width: 80%;
+	.border-spinner {
+		position: absolute;
+		inset: -1px;
+		width: calc(100% + 2px);
+		height: calc(100% + 2px);
+		pointer-events: none;
 	}
-	.progress-bar {
-		width: 100%;
-		height: 3px;
-		background: var(--border);
-		overflow: hidden;
+	.border-spinner rect {
+		transition: stroke-dashoffset 0.3s ease;
 	}
-	.progress-fill {
-		height: 100%;
-		background: var(--accent);
-		transition: width 0.2s ease;
+	.loading-phase {
+		font-size: var(--fs-sm);
+		font-family: var(--font-mono);
+		font-weight: 600;
+		color: var(--accent);
 	}
 	.loading-text {
 		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
-		color: var(--text-muted);
+		color: var(--text-dim);
+		min-height: 14px;
 	}
 	.dropzone-error {
 		font-size: var(--fs-xs);
@@ -590,13 +588,6 @@
 	}
 	.sep {
 		color: var(--border);
-	}
-	.loading-badge {
-		color: var(--accent);
-		font-weight: 600;
-	}
-	.sidebar-progress {
-		flex-shrink: 0;
 	}
 	.section-label {
 		font-size: var(--fs-xs);
