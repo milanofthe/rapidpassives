@@ -3,6 +3,7 @@
  * No dependencies beyond browser WebGL2.
  */
 
+import earcut from 'earcut';
 import type { LayerMap, LayerName, Polygon } from '$lib/geometry/types';
 import { LAYER_COLORS, LAYER_ORDER } from '$lib/geometry/types';
 import type { ProcessStack } from '$lib/stack/types';
@@ -143,128 +144,111 @@ function hexToRgb(hex: string): [number, number, number] {
 	return [r, g, b];
 }
 
-// ─── Ear-clip triangulation (simple polygons) ────────────────────────
+// ─── Triangulation (earcut — robust for complex polygons) ────────────
 
-function earClip(xs: number[], ys: number[]): number[] {
-	const n = xs.length;
+function triangulate(xs: number[], ys: number[]): number[] {
+	// Remove duplicate consecutive vertices
+	const cx: number[] = [];
+	const cy: number[] = [];
+	const idxMap: number[] = []; // maps cleaned index back to original
+	for (let i = 0; i < xs.length; i++) {
+		const px = xs[i], py = ys[i];
+		if (cx.length > 0 && Math.abs(px - cx[cx.length - 1]) < 1e-10 && Math.abs(py - cy[cy.length - 1]) < 1e-10) continue;
+		cx.push(px);
+		cy.push(py);
+		idxMap.push(i);
+	}
+	// Also check first vs last
+	if (cx.length > 1 && Math.abs(cx[0] - cx[cx.length - 1]) < 1e-10 && Math.abs(cy[0] - cy[cy.length - 1]) < 1e-10) {
+		cx.pop();
+		cy.pop();
+		idxMap.pop();
+	}
+
+	const n = cx.length;
 	if (n < 3) return [];
 
-	// Build index list
-	const indices: number[] = [];
-	for (let i = 0; i < n; i++) indices.push(i);
-
-	// Ensure CCW winding
+	// Check polygon has nonzero area
 	let area = 0;
 	for (let i = 0; i < n; i++) {
 		const j = (i + 1) % n;
-		area += xs[i] * ys[j] - xs[j] * ys[i];
+		area += cx[i] * cy[j] - cx[j] * cy[i];
 	}
-	if (area < 0) indices.reverse();
+	if (Math.abs(area) < 1e-20) return [];
 
-	const triangles: number[] = [];
-	let idx = [...indices];
-
-	let safety = idx.length * 3;
-	while (idx.length > 3 && safety-- > 0) {
-		let earFound = false;
-		const len = idx.length;
-		for (let i = 0; i < len; i++) {
-			const prev = idx[(i - 1 + len) % len];
-			const curr = idx[i];
-			const next = idx[(i + 1) % len];
-
-			// Check if convex
-			const cross =
-				(xs[curr] - xs[prev]) * (ys[next] - ys[prev]) -
-				(ys[curr] - ys[prev]) * (xs[next] - xs[prev]);
-			if (cross <= 0) continue;
-
-			// Check no other vertex inside this triangle
-			let isEar = true;
-			for (let j = 0; j < len; j++) {
-				const p = idx[j];
-				if (p === prev || p === curr || p === next) continue;
-				if (pointInTriangle(xs[p], ys[p], xs[prev], ys[prev], xs[curr], ys[curr], xs[next], ys[next])) {
-					isEar = false;
-					break;
-				}
-			}
-			if (isEar) {
-				triangles.push(prev, curr, next);
-				idx.splice(i, 1);
-				earFound = true;
-				break;
-			}
-		}
-		if (!earFound) break;
+	// Pack into flat coordinate array for earcut
+	const coords = new Float64Array(n * 2);
+	for (let i = 0; i < n; i++) {
+		coords[i * 2] = cx[i];
+		coords[i * 2 + 1] = cy[i];
 	}
-	if (idx.length === 3) {
-		triangles.push(idx[0], idx[1], idx[2]);
-	}
-	return triangles;
-}
 
-function pointInTriangle(
-	px: number, py: number,
-	ax: number, ay: number, bx: number, by: number, cx: number, cy: number,
-): boolean {
-	const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
-	const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
-	const d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
-	const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-	const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-	return !(hasNeg && hasPos);
+	const tris = earcut(coords as unknown as number[]);
+
+	// Map back to original indices
+	const result = new Array(tris.length);
+	for (let i = 0; i < tris.length; i++) {
+		result[i] = idxMap[tris[i]];
+	}
+	return result;
 }
 
 // ─── Mesh building ───────────────────────────────────────────────────
 
-/** Extrude a 2D polygon into a 3D slab and return positions + normals */
-function extrudePolygon(poly: Polygon, zBottom: number, zTop: number): { positions: number[]; normals: number[] } {
-	const positions: number[] = [];
-	const normals: number[] = [];
+/** Extrude a 2D polygon into a 3D slab, appending directly to output arrays.
+ *  ox/oy are subtracted from polygon coordinates (centering offset). */
+function extrudePolygon(
+	poly: Polygon, zBottom: number, zTop: number,
+	ox: number, oy: number,
+	outPos: number[], outNorm: number[],
+): void {
 	const { x, y } = poly;
 	const n = x.length;
 
-	// Triangulate top and bottom faces
-	const tris = earClip(x, y);
+	const tris = triangulate(x, y);
+	if (tris.length === 0) return;
 
-	// Top face (normal +Z)
+	// Top face (+Z)
 	for (let i = 0; i < tris.length; i += 3) {
 		const a = tris[i], b = tris[i + 1], c = tris[i + 2];
-		positions.push(x[a], y[a], zTop, x[b], y[b], zTop, x[c], y[c], zTop);
-		normals.push(0, 0, 1, 0, 0, 1, 0, 0, 1);
+		outPos.push(
+			x[a] - ox, y[a] - oy, zTop,
+			x[b] - ox, y[b] - oy, zTop,
+			x[c] - ox, y[c] - oy, zTop,
+		);
+		outNorm.push(0, 0, 1, 0, 0, 1, 0, 0, 1);
 	}
 
-	// Bottom face (normal -Z, reversed winding)
+	// Bottom face (-Z, reversed winding)
 	for (let i = 0; i < tris.length; i += 3) {
 		const a = tris[i], b = tris[i + 1], c = tris[i + 2];
-		positions.push(x[a], y[a], zBottom, x[c], y[c], zBottom, x[b], y[b], zBottom);
-		normals.push(0, 0, -1, 0, 0, -1, 0, 0, -1);
+		outPos.push(
+			x[a] - ox, y[a] - oy, zBottom,
+			x[c] - ox, y[c] - oy, zBottom,
+			x[b] - ox, y[b] - oy, zBottom,
+		);
+		outNorm.push(0, 0, -1, 0, 0, -1, 0, 0, -1);
 	}
 
 	// Side faces
 	for (let i = 0; i < n; i++) {
 		const j = (i + 1) % n;
-		const dx = x[j] - x[i];
-		const dy = y[j] - y[i];
+		const xi = x[i] - ox, yi = y[i] - oy;
+		const xj = x[j] - ox, yj = y[j] - oy;
+		const dx = xj - xi, dy = yj - yi;
 		const len = Math.sqrt(dx * dx + dy * dy);
 		if (len < 1e-10) continue;
-		// Outward normal in XY plane
-		const nx = dy / len;
-		const ny = -dx / len;
+		const nx = dy / len, ny = -dx / len;
 
-		// Two triangles for each side quad
-		positions.push(
-			x[i], y[i], zBottom, x[j], y[j], zBottom, x[j], y[j], zTop,
-			x[i], y[i], zBottom, x[j], y[j], zTop, x[i], y[i], zTop,
+		outPos.push(
+			xi, yi, zBottom, xj, yj, zBottom, xj, yj, zTop,
+			xi, yi, zBottom, xj, yj, zTop, xi, yi, zTop,
 		);
-		normals.push(
+		outNorm.push(
 			nx, ny, 0, nx, ny, 0, nx, ny, 0,
 			nx, ny, 0, nx, ny, 0, nx, ny, 0,
 		);
 	}
-
-	return { positions, normals };
 }
 
 function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: number[]): { vao: WebGLVertexArrayObject; wireEBO: WebGLBuffer; wireCount: number } {
@@ -325,6 +309,18 @@ type Mat4 = Float32Array;
 function mat4Identity(): Mat4 {
 	const m = new Float32Array(16);
 	m[0] = m[5] = m[10] = m[15] = 1;
+	return m;
+}
+
+function mat4Ortho(left: number, right: number, bottom: number, top: number, near: number, far: number): Mat4 {
+	const m = new Float32Array(16);
+	m[0] = 2 / (right - left);
+	m[5] = 2 / (top - bottom);
+	m[10] = -2 / (far - near);
+	m[12] = -(right + left) / (right - left);
+	m[13] = -(top + bottom) / (top - bottom);
+	m[14] = -(far + near) / (far - near);
+	m[15] = 1;
 	return m;
 }
 
@@ -416,13 +412,31 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 }
 
 /** Build meshes from layers + stack. Call when geometry or stack changes. */
+/** Incremental build token — cancel previous build when a new one starts */
+let buildGeneration = 0;
+
 export function buildMeshes(
 	state: GLState,
 	layers: LayerMap,
 	stack: ProcessStack,
 	colorOverrides?: Record<string, string>,
 	visibleLayers?: Set<LayerName>,
+	onBatch?: () => void,
 ): void {
+	// Start async build — increments generation to cancel any in-flight build
+	const gen = ++buildGeneration;
+	buildMeshesAsync(state, layers, stack, colorOverrides, visibleLayers, gen, onBatch);
+}
+
+async function buildMeshesAsync(
+	state: GLState,
+	layers: LayerMap,
+	stack: ProcessStack,
+	colorOverrides: Record<string, string> | undefined,
+	visibleLayers: Set<LayerName> | undefined,
+	gen: number,
+	onBatch?: () => void,
+): Promise<void> {
 	const { gl } = state;
 
 	// Clean up old meshes
@@ -462,13 +476,17 @@ export function buildMeshes(
 		minZ = Math.min(minZ, sl.z);
 		maxZ = Math.max(maxZ, sl.z + sl.thickness);
 	}
-	const zRange = isFinite(minZ) ? maxZ - minZ : 1;
 	const cz = isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
 
-	// Use real physical Z values — no artificial scaling
-	const zScale = 1;
+	// Build grid first so something renders immediately
+	const gridZ = isFinite(minZ) ? minZ - cz : 0;
+	buildGrid(state, xyExtent, gridZ);
+
+	// Process layers incrementally
+	let lastYield = performance.now();
 
 	for (const layerName of LAYER_ORDER) {
+		if (gen !== buildGeneration) return; // cancelled
 		if (visibleLayers && !visibleLayers.has(layerName)) continue;
 		const polys = layers[layerName];
 		if (!polys || polys.length === 0) continue;
@@ -479,30 +497,38 @@ export function buildMeshes(
 		const colorHex = colorOverrides?.[layerName] ?? LAYER_COLORS[layerName] ?? '#888888';
 		const color = hexToRgb(colorHex);
 
-		// Batch all polygons of this layer into one mesh
-		const allPos: number[] = [];
-		const allNorm: number[] = [];
+		const zBot = zInfo.z - cz;
+		const zTop = zInfo.z + zInfo.thickness - cz;
 
-		for (const poly of polys) {
-			const zBot = (zInfo.z - cz) * zScale;
-			const zTop = (zInfo.z + zInfo.thickness - cz) * zScale;
-			const { positions, normals } = extrudePolygon(
-				{ x: poly.x.map(v => v - cx), y: poly.y.map(v => v - cy) },
-				zBot, zTop,
-			);
-			allPos.push(...positions);
-			allNorm.push(...normals);
+		// Process polygons in batches, writing directly into shared arrays
+		let allPos: number[] = [];
+		let allNorm: number[] = [];
+
+		for (let pi = 0; pi < polys.length; pi++) {
+			extrudePolygon(polys[pi], zBot, zTop, cx, cy, allPos, allNorm);
+
+			// Yield every ~30ms to keep UI responsive, flush current batch as a mesh
+			const now = performance.now();
+			if (now - lastYield > 30 && pi < polys.length - 1) {
+				if (gen !== buildGeneration) return;
+				if (allPos.length > 0) {
+					const { vao, wireEBO, wireCount } = createMesh(gl, allPos, allNorm);
+					state.meshes.push({ vao, count: allPos.length / 3, wireEBO, wireCount, color });
+					allPos = [];
+					allNorm = [];
+				}
+				lastYield = now;
+				await new Promise(r => requestAnimationFrame(r));
+				onBatch?.();
+			}
 		}
 
-		if (allPos.length === 0) continue;
-
-		const { vao, wireEBO, wireCount } = createMesh(gl, allPos, allNorm);
-		state.meshes.push({ vao, count: allPos.length / 3, wireEBO, wireCount, color });
+		if (allPos.length > 0) {
+			if (gen !== buildGeneration) return;
+			const { vao, wireEBO, wireCount } = createMesh(gl, allPos, allNorm);
+			state.meshes.push({ vao, count: allPos.length / 3, wireEBO, wireCount, color });
+		}
 	}
-
-	// Build grid at the bottom of the geometry
-	const gridZ = isFinite(minZ) ? minZ - cz : 0;
-	buildGrid(state, xyExtent, gridZ);
 }
 
 function buildGrid(state: GLState, xyExtent: number, z: number): void {
@@ -547,6 +573,8 @@ export function render3D(
 	width: number,
 	height: number,
 	wireframe: boolean = false,
+	/** 0 = full perspective (3D), 1 = full orthographic (2D top-down) */
+	orthoBlend: number = 0,
 ): void {
 	const { gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient } = state;
 
@@ -554,7 +582,28 @@ export function render3D(
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	const aspect = width / height || 1;
-	const proj = mat4Perspective(Math.PI / 6, aspect, 0.1, 10000);
+	const near = Math.max(0.01, camera.distance * 0.01);
+	const far = camera.distance * 10;
+
+	let proj: Mat4;
+	if (orthoBlend >= 0.999) {
+		// Pure orthographic
+		const halfH = camera.distance * Math.tan(Math.PI / 12); // match perspective FOV extent
+		const halfW = halfH * aspect;
+		proj = mat4Ortho(-halfW, halfW, -halfH, halfH, near, far);
+	} else if (orthoBlend <= 0.001) {
+		// Pure perspective
+		proj = mat4Perspective(Math.PI / 6, aspect, near, far);
+	} else {
+		// Blend: interpolate between perspective and ortho
+		const perspProj = mat4Perspective(Math.PI / 6, aspect, near, far);
+		const halfH = camera.distance * Math.tan(Math.PI / 12);
+		const halfW = halfH * aspect;
+		const orthoProj = mat4Ortho(-halfW, halfW, -halfH, halfH, near, far);
+		proj = new Float32Array(16) as Mat4;
+		for (let i = 0; i < 16; i++) proj[i] = perspProj[i] * (1 - orthoBlend) + orthoProj[i] * orthoBlend;
+	}
+
 	const eye = cameraEye(camera);
 	const view = mat4LookAt(eye, camera.target as number[], [0, 0, 1]);
 	const vp = mat4Multiply(proj, view);
@@ -589,7 +638,8 @@ export function render3D(
 		const lx = 0.4, ly = 0.3, lz = 0.8;
 		const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
 		gl.uniform3f(uLightDir, lx / ll, ly / ll, lz / ll);
-		gl.uniform1f(uAmbient, 0.5);
+		// Flat shading in ortho (2D) mode, lit shading in perspective (3D)
+		gl.uniform1f(uAmbient, 0.5 + 0.5 * orthoBlend);
 		for (const mesh of state.meshes) {
 			gl.uniform3f(uColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
@@ -614,14 +664,26 @@ export function fitCamera(layers: LayerMap, stack: ProcessStack): Camera {
 		isFinite(maxX) ? maxX - minX : 1,
 		isFinite(maxY) ? maxY - minY : 1,
 	);
+
+	// Center on geometry midpoint including z from the stack
+	const cx = isFinite(minX) ? (minX + maxX) / 2 : 0;
+	const cy = isFinite(minY) ? (minY + maxY) / 2 : 0;
+	let minZ = Infinity, maxZ = -Infinity;
+	for (const sl of stack.layers) {
+		if (sl.gdsLayers.length === 0 && sl.type === 'substrate') continue;
+		minZ = Math.min(minZ, sl.z);
+		maxZ = Math.max(maxZ, sl.z + sl.thickness);
+	}
+	const cz = isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
+
 	// FOV is PI/6, so distance = extent / (2 * tan(fov/2)) with padding
 	const halfFov = Math.PI / 12;
 	const distance = (xyExtent / 2) / Math.tan(halfFov) * 1.3;
 	return {
-		theta: -Math.PI / 4,
-		phi: Math.PI / 5,
+		theta: Math.PI / 4,
+		phi: Math.PI / 4,
 		distance,
-		target: [0, 0, 0],
+		target: [0, 0, 0], // geometry is centered to origin by buildMeshes
 	};
 }
 
