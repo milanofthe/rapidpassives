@@ -7,15 +7,43 @@
 	// Merge happens in the worker — no main-thread merge needed
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 
 	onMount(() => {
+		// Check for pending file from landing page drop
 		const pending = (window as any).__gdsPendingFile as File | undefined;
 		if (pending) {
 			delete (window as any).__gdsPendingFile;
 			sessionStorage.removeItem('gds-pending');
 			handleFile(pending);
+			return;
+		}
+
+		// Check for ?url= query parameter
+		const gdsUrl = page.url.searchParams.get('url');
+		if (gdsUrl) {
+			fetchFromUrl(gdsUrl);
 		}
 	});
+
+	async function fetchFromUrl(url: string) {
+		loading = true;
+		loadProgress = 0;
+		loadPolyCount = 0;
+		fileName = url.split('/').pop() || 'remote.gds';
+		error = '';
+
+		try {
+			const resp = await fetch(url);
+			if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+			const bytes = new Uint8Array(await resp.arrayBuffer());
+			await loadBytes(bytes);
+		} catch (e: any) {
+			error = `Fetch error: ${e.message}`;
+			loading = false;
+			console.error(e);
+		}
+	}
 
 	/** Color palette for arbitrary GDS layers */
 	const PALETTE = [
@@ -176,32 +204,35 @@
 
 		const reader = new FileReader();
 		reader.onload = async () => {
-			try {
-				const bytes = new Uint8Array(reader.result as ArrayBuffer);
-
-				// Reset slot tracking
-				usedSlots.clear();
-				for (const key of Object.keys(GDS_TO_LAYER)) {
-					const num = Number(key);
-					if (![1,2,3,4,5,6,7,8,9,10,11].includes(num)) {
-						delete GDS_TO_LAYER[num];
-					}
-				}
-
-				const scaled = await readGdsInWorker(bytes, (p) => {
-					loadPolyCount = p.polygonCount;
-					loadProgress = p.phase === 'done' ? 1 : p.phase === 'scaling' ? 0.8 : p.phase === 'flattening' ? 0.4 : 0.1;
-				});
-
-				updateLayerState(scaled);
-				loading = false;
-			} catch (e: any) {
-				error = `Parse error: ${e.message}`;
-				loading = false;
-				console.error(e);
-			}
+			const bytes = new Uint8Array(reader.result as ArrayBuffer);
+			await loadBytes(bytes);
 		};
 		reader.readAsArrayBuffer(file);
+	}
+
+	async function loadBytes(bytes: Uint8Array) {
+		try {
+			// Reset slot tracking
+			usedSlots.clear();
+			for (const key of Object.keys(GDS_TO_LAYER)) {
+				const num = Number(key);
+				if (![1,2,3,4,5,6,7,8,9,10,11].includes(num)) {
+					delete GDS_TO_LAYER[num];
+				}
+			}
+
+			const scaled = await readGdsInWorker(bytes, (p) => {
+				loadPolyCount = p.polygonCount;
+				loadProgress = p.phase === 'done' ? 1 : p.phase === 'scaling' ? 0.8 : p.phase === 'flattening' ? 0.4 : 0.1;
+			});
+
+			updateLayerState(scaled);
+			loading = false;
+		} catch (e: any) {
+			error = `Parse error: ${e.message}`;
+			loading = false;
+			console.error(e);
+		}
 	}
 
 	function updateLayerState(scaled: Map<number, Polygon[]>) {
