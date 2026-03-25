@@ -331,9 +331,9 @@
 	}
 
 	let selectedPreset = $state('');
+	let presetOpen = $state(false);
 
-	function onPresetChange(e: Event) {
-		const id = (e.target as HTMLSelectElement).value;
+	function applyPresetById(id: string) {
 		selectedPreset = id;
 		if (!id || !instancedScene) return;
 		const preset = PRESETS[id];
@@ -476,12 +476,23 @@
 				</div>
 
 				<h4 class="section-label">Process</h4>
-				<select class="preset-select" value={selectedPreset} onchange={onPresetChange}>
-					<option value="">No preset</option>
-					{#each PRESET_LIST as p}
-						<option value={p.id}>{p.name}</option>
-					{/each}
-				</select>
+				<div class="preset-dropdown">
+					<button class="preset-btn" onclick={() => presetOpen = !presetOpen}>
+						{selectedPreset ? PRESETS[selectedPreset]?.name : 'No preset'}
+						<svg width="8" height="5" viewBox="0 0 8 5" fill="currentColor"><path d="M0 0L4 5L8 0Z"/></svg>
+					</button>
+					{#if presetOpen}
+						<div class="preset-menu">
+							<button class="preset-option" class:active={!selectedPreset} onclick={() => { selectedPreset = ''; presetOpen = false; }}>No preset</button>
+							{#each PRESET_LIST as p}
+								<button class="preset-option" class:active={selectedPreset === p.id} onclick={() => { applyPresetById(p.id); presetOpen = false; }}>
+									<span>{p.name}</span>
+									<span class="preset-desc">{p.description}</span>
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div class="layermap-drop" ondrop={onLayerMapDrop} ondragover={(e) => e.preventDefault()}>
 					<span>Drop .lyp / .csv / .json layermap</span>
@@ -668,7 +679,10 @@
 		letter-spacing: 1px;
 		margin-top: 4px;
 	}
-	.preset-select {
+	.preset-dropdown {
+		position: relative;
+	}
+	.preset-btn {
 		width: 100%;
 		padding: 5px 8px;
 		font-size: var(--fs-xs);
@@ -677,10 +691,49 @@
 		border: 1px solid var(--input-border);
 		color: var(--text-muted);
 		cursor: pointer;
+		text-align: left;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		transition: border-color 0.15s;
 	}
-	.preset-select:focus {
-		border-color: var(--input-focus);
-		outline: none;
+	.preset-btn:hover {
+		border-color: var(--accent);
+	}
+	.preset-menu {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		right: 0;
+		z-index: 20;
+		background: var(--bg-surface);
+		border: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+	}
+	.preset-option {
+		padding: 6px 8px;
+		font-size: var(--fs-xs);
+		font-family: var(--font-mono);
+		color: var(--text-muted);
+		background: none;
+		border: none;
+		text-align: left;
+		cursor: pointer;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		transition: background 0.1s;
+	}
+	.preset-option:hover {
+		background: var(--accent-dim);
+	}
+	.preset-option.active {
+		color: var(--accent);
+	}
+	.preset-desc {
+		font-size: 9px;
+		color: var(--text-dim);
 	}
 	.layermap-drop {
 		padding: 8px;
