@@ -484,6 +484,9 @@
 			class="dropzone"
 			class:dragover={dragOver}
 			class:loading
+			ondrop={onDrop}
+			ondragover={onDragOver}
+			ondragleave={onDragLeave}
 			role="button"
 			tabindex="0"
 		>
