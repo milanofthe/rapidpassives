@@ -971,7 +971,7 @@ export function render3D(
 		const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
 		gl.uniform3f(uLightDir, lx / ll, ly / ll, lz / ll);
 		// Flat shading in ortho (2D) mode, lit shading in perspective (3D)
-		gl.uniform1f(uAmbient, 0.7 + 0.3 * orthoBlend);
+		gl.uniform1f(uAmbient, 0.85 + 0.15 * orthoBlend);
 		for (const mesh of state.meshes) {
 			gl.uniform3f(uColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
@@ -986,7 +986,7 @@ export function render3D(
 		const lx = 0.4, ly = 0.3, lz = 0.8;
 		const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
 		gl.uniform3f(state.uInstLightDir, lx / ll, ly / ll, lz / ll);
-		gl.uniform1f(state.uInstAmbient, 0.7 + 0.3 * orthoBlend);
+		gl.uniform1f(state.uInstAmbient, 0.85 + 0.15 * orthoBlend);
 
 		// Draw top faces
 		gl.uniform1f(state.uInstTopFace, 1.0);
@@ -1010,7 +1010,7 @@ export function render3D(
 		gl.useProgram(state.instSideProgram);
 		gl.uniformMatrix4fv(state.uInstSideMVP, false, vp);
 		gl.uniform3f(state.uInstSideLightDir, lx / ll, ly / ll, lz / ll);
-		gl.uniform1f(state.uInstSideAmbient, 0.7 + 0.3 * orthoBlend);
+		gl.uniform1f(state.uInstSideAmbient, 0.85 + 0.15 * orthoBlend);
 		for (const mesh of state.instancedMeshes) {
 			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
 			if (!mesh.sideVao || !mesh.sideVertCount) continue;
