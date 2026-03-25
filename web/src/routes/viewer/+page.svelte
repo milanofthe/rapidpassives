@@ -98,25 +98,17 @@
 	// Set of visible GDS layer numbers for render-time filtering (no mesh rebuild)
 	let visibleGdsLayers = $derived(new Set(gdsLayers.filter(l => l.visible).map(l => l.gdsNum)));
 
-	function buildViewerStack(): ProcessStack {
-		return {
-			name: 'GDS Import',
-			layers: [
-				{ id: 'sub', name: 'Substrate', type: 'substrate', z: 0, thickness: 0, color: '#4a4a5a', gdsLayers: [], visible: true },
-			],
-			substrateThickness: 0,
-			oxideEr: 4.0,
-			substrateRho: 10,
-			substrateEr: 11.7,
-		};
-	}
-
-	// Rebuild stack when layers change
-	$effect(() => {
-		if (gdsLayers.length > 0) {
-			stack = buildViewerStack();
-		}
+	let stack = $state<ProcessStack>({
+		name: 'GDS Import',
+		layers: [
+			{ id: 'sub', name: 'Substrate', type: 'substrate', z: 0, thickness: 0, color: '#4a4a5a', gdsLayers: [], visible: true },
+		],
+		substrateThickness: 0,
+		oxideEr: 4.0,
+		substrateRho: 10,
+		substrateEr: 11.7,
 	});
+
 
 	function handleFile(file: File) {
 		error = '';
