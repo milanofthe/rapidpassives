@@ -64,6 +64,12 @@
 	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack), ports: portMarkers });
 </script>
 
+<svelte:head>
+	<title>Stacked Transformer Generator — RapidPassives</title>
+	<meta name="description" content="Generate vertically stacked differential transformer layouts on separate metal layers. Real-time preview and GDS-II export." />
+	<link rel="canonical" href="https://rapidpassives.org/generator/stacked-transformer" />
+</svelte:head>
+
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>

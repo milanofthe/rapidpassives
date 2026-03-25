@@ -472,6 +472,12 @@
 	let loaded = $derived(gdsLayers.length > 0);
 </script>
 
+<svelte:head>
+	<title>GDS-II Viewer — RapidPassives</title>
+	<meta name="description" content="Import and visualize GDS-II layout files in 2D and 3D. No installation required." />
+	<link rel="canonical" href="https://rapidpassives.org/viewer" />
+</svelte:head>
+
 {#if !loaded}
 	<div class="dropzone-page">
 		<div

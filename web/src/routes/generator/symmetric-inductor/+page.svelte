@@ -64,6 +64,12 @@
 	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack), ports: portMarkers });
 </script>
 
+<svelte:head>
+	<title>Symmetric Inductor Generator — RapidPassives</title>
+	<meta name="description" content="Generate differential symmetric inductor layouts with optional center tap. Real-time preview and GDS-II export." />
+	<link rel="canonical" href="https://rapidpassives.org/generator/symmetric-inductor" />
+</svelte:head>
+
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>

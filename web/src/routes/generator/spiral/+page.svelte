@@ -64,6 +64,12 @@
 	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack), ports: portMarkers });
 </script>
 
+<svelte:head>
+	<title>Spiral Inductor Generator — RapidPassives</title>
+	<meta name="description" content="Generate spiral inductor layouts with configurable geometry. Real-time preview and GDS-II export." />
+	<link rel="canonical" href="https://rapidpassives.org/generator/spiral" />
+</svelte:head>
+
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>

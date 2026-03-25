@@ -65,6 +65,12 @@
 	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack), ports: portMarkers });
 </script>
 
+<svelte:head>
+	<title>MOM Capacitor Generator — RapidPassives</title>
+	<meta name="description" content="Generate interdigitated metal-oxide-metal finger capacitor layouts. Real-time preview and GDS-II export." />
+	<link rel="canonical" href="https://rapidpassives.org/generator/mom-capacitor" />
+</svelte:head>
+
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>

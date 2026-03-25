@@ -64,6 +64,12 @@
 	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack), ports: portMarkers });
 </script>
 
+<svelte:head>
+	<title>Interleaved Transformer Generator — RapidPassives</title>
+	<meta name="description" content="Generate laterally interleaved transformer layouts with configurable winding ratio. Real-time preview and GDS-II export." />
+	<link rel="canonical" href="https://rapidpassives.org/generator/symmetric-transformer" />
+</svelte:head>
+
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
