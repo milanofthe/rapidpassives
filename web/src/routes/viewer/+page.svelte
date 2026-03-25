@@ -216,14 +216,18 @@
 
 	async function loadBytes(bytes: Uint8Array) {
 		try {
-			// Reset slot tracking
+			// Full reset of layer mapping and state
 			usedSlots.clear();
-			for (const key of Object.keys(GDS_TO_LAYER)) {
-				const num = Number(key);
-				if (![1,2,3,4,5,6,7,8,9,10,11].includes(num)) {
-					delete GDS_TO_LAYER[num];
-				}
-			}
+			for (const key of Object.keys(GDS_TO_LAYER)) delete GDS_TO_LAYER[Number(key)];
+			// Restore defaults
+			Object.assign(GDS_TO_LAYER, {
+				1: 'windings', 2: 'crossings', 3: 'vias', 4: 'centertap',
+				5: 'vias2', 6: 'windings_m2', 7: 'crossings_m1', 8: 'windings_m4',
+				9: 'vias3', 10: 'pgs', 11: 'guard_ring',
+			} as Record<number, LayerName>);
+			gdsLayers = [];
+			rawPolygons = new Map();
+			instancedScene = null;
 
 			const result = await readGdsInWorker(bytes, (p) => {
 				loadPolyCount = p.polygonCount;
