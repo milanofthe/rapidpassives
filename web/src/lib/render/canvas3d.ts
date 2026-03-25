@@ -50,6 +50,8 @@ interface InstancedMesh {
 	vertCount: number;
 	instanceCount: number;
 	color: [number, number, number];
+	sideVao?: WebGLVertexArrayObject;
+	sideVertCount?: number;
 }
 
 interface GLState {
@@ -66,6 +68,11 @@ interface GLState {
 	uInstLightDir: WebGLUniformLocation;
 	uInstAmbient: WebGLUniformLocation;
 	uInstTopFace: WebGLUniformLocation;
+	instSideProgram: WebGLProgram;
+	uInstSideMVP: WebGLUniformLocation;
+	uInstSideColor: WebGLUniformLocation;
+	uInstSideLightDir: WebGLUniformLocation;
+	uInstSideAmbient: WebGLUniformLocation;
 	lineProgram: WebGLProgram;
 	uLineMVP: WebGLUniformLocation;
 	uLineColor: WebGLUniformLocation;
@@ -118,6 +125,27 @@ void main() {
 	float z = mix(aInstRow1.w, aInstRow0.w, uTopFace); // bottom or top
 	gl_Position = uMVP * vec4(wx, wy, z, 1.0);
 	vNormal = vec3(0.0, 0.0, uTopFace > 0.5 ? 1.0 : -1.0);
+}`;
+
+// Instanced side wall shader: 3D vertices (x,y,zFlag,nx,ny) + per-instance 2D affine + z
+const INST_SIDE_VS = `#version 300 es
+precision highp float;
+layout(location=0) in vec2 aPos;          // per-vertex: edge vertex x,y
+layout(location=3) in float aZFlag;       // per-vertex: 0=bottom, 1=top
+layout(location=4) in vec2 aNormalXY;     // per-vertex: outward normal in XY
+layout(location=1) in vec4 aInstRow0;     // per-instance: [a, b, tx, zBottom]
+layout(location=2) in vec4 aInstRow1;     // per-instance: [c, d, ty, zTop]
+uniform mat4 uMVP;
+out vec3 vNormal;
+void main() {
+	float wx = aInstRow0.x * aPos.x + aInstRow0.y * aPos.y + aInstRow0.z;
+	float wy = aInstRow1.x * aPos.x + aInstRow1.y * aPos.y + aInstRow1.z;
+	float z = mix(aInstRow1.w, aInstRow0.w, aZFlag);
+	gl_Position = uMVP * vec4(wx, wy, z, 1.0);
+	// Transform normal by the instance rotation (ignore translation)
+	float tnx = aInstRow0.x * aNormalXY.x + aInstRow0.y * aNormalXY.y;
+	float tny = aInstRow1.x * aNormalXY.x + aInstRow1.y * aNormalXY.y;
+	vNormal = normalize(vec3(tnx, tny, 0.0));
 }`;
 
 const INST_FS = `#version 300 es
@@ -461,9 +489,17 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uInstAmbient = gl.getUniformLocation(instProgram, 'uAmbient')!;
 	const uInstTopFace = gl.getUniformLocation(instProgram, 'uTopFace')!;
 
+	// Instanced side wall shader
+	const instSideProgram = linkProgramFromSource(gl, INST_SIDE_VS, INST_FS);
+	const uInstSideMVP = gl.getUniformLocation(instSideProgram, 'uMVP')!;
+	const uInstSideColor = gl.getUniformLocation(instSideProgram, 'uColor')!;
+	const uInstSideLightDir = gl.getUniformLocation(instSideProgram, 'uLightDir')!;
+	const uInstSideAmbient = gl.getUniformLocation(instSideProgram, 'uAmbient')!;
+
 	return {
 		gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient,
 		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace,
+		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient,
 		lineProgram, uLineMVP, uLineColor,
 		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null,
 	};
@@ -629,6 +665,8 @@ function niceStep(extent: number): number {
 export interface InstancedSceneData {
 	/** cellName → { gdsLayer → Float32Array of triangulated 2D verts [x,y,x,y,...] } */
 	cellMeshes: Record<string, Record<number, Float32Array>>;
+	/** cellName → { gdsLayer → Float32Array of edge pairs [x1,y1,x2,y2,...] } */
+	cellEdges: Record<string, Record<number, Float32Array>>;
 	/** cellName → flat array of affine transforms [a,b,c,d,tx,ty, ...] */
 	cellInstances: Record<string, number[]>;
 }
@@ -770,11 +808,76 @@ export function buildInstancedMeshes(
 
 			gl.bindVertexArray(null);
 
+			// Build side wall VAO from edge data
+			const edgeBuf = sceneData.cellEdges?.[cellName]?.[gdsLayer];
+			let sideVao: WebGLVertexArrayObject | undefined;
+			let sideVertCount = 0;
+
+			if (edgeBuf && edgeBuf.length >= 4) {
+				// Each edge: [x1,y1,x2,y2] → 2 triangles (6 verts) with (x,y) + zFlag + (nx,ny)
+				const edgeCount = edgeBuf.length / 4;
+				// Per vertex: x, y, zFlag, nx, ny = 5 floats
+				const sideData = new Float32Array(edgeCount * 6 * 5);
+				let si = 0;
+				for (let ei = 0; ei < edgeBuf.length; ei += 4) {
+					const x0 = edgeBuf[ei], y0 = edgeBuf[ei + 1];
+					const x1 = edgeBuf[ei + 2], y1 = edgeBuf[ei + 3];
+					const dx = x1 - x0, dy = y1 - y0;
+					const len = Math.sqrt(dx * dx + dy * dy);
+					if (len < 1e-10) continue;
+					const nx = dy / len, ny = -dx / len;
+					// Two triangles: (x0,y0,bot), (x1,y1,bot), (x1,y1,top), (x0,y0,bot), (x1,y1,top), (x0,y0,top)
+					const verts = [
+						x0, y0, 0, nx, ny,
+						x1, y1, 0, nx, ny,
+						x1, y1, 1, nx, ny,
+						x0, y0, 0, nx, ny,
+						x1, y1, 1, nx, ny,
+						x0, y0, 1, nx, ny,
+					];
+					sideData.set(verts, si);
+					si += 30;
+				}
+
+				if (si > 0) {
+					const trimmed = si < sideData.length ? sideData.subarray(0, si) : sideData;
+					sideVao = gl.createVertexArray()!;
+					gl.bindVertexArray(sideVao);
+
+					const sideBufGL = gl.createBuffer()!;
+					gl.bindBuffer(gl.ARRAY_BUFFER, sideBufGL);
+					gl.bufferData(gl.ARRAY_BUFFER, trimmed, gl.STATIC_DRAW);
+					// aPos (location 0): vec2 at offset 0, stride 20
+					gl.enableVertexAttribArray(0);
+					gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 20, 0);
+					// aZFlag (location 3): float at offset 8
+					gl.enableVertexAttribArray(3);
+					gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 20, 8);
+					// aNormalXY (location 4): vec2 at offset 12
+					gl.enableVertexAttribArray(4);
+					gl.vertexAttribPointer(4, 2, gl.FLOAT, false, 20, 12);
+
+					// Same instance buffer
+					gl.bindBuffer(gl.ARRAY_BUFFER, instBufGL);
+					gl.enableVertexAttribArray(1);
+					gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 0);
+					gl.vertexAttribDivisor(1, 1);
+					gl.enableVertexAttribArray(2);
+					gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16);
+					gl.vertexAttribDivisor(2, 1);
+
+					gl.bindVertexArray(null);
+					sideVertCount = si / 5;
+				}
+			}
+
 			state.instancedMeshes.push({
 				vao,
 				vertCount: vertBuf.length / 2,
 				instanceCount,
 				color,
+				sideVao,
+				sideVertCount,
 			});
 		}
 	}
@@ -894,6 +997,18 @@ export function render3D(
 			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
 			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
+		}
+
+		// Draw side walls
+		gl.useProgram(state.instSideProgram);
+		gl.uniformMatrix4fv(state.uInstSideMVP, false, vp);
+		gl.uniform3f(state.uInstSideLightDir, lx / ll, ly / ll, lz / ll);
+		gl.uniform1f(state.uInstSideAmbient, 0.7 + 0.3 * orthoBlend);
+		for (const mesh of state.instancedMeshes) {
+			if (!mesh.sideVao || !mesh.sideVertCount) continue;
+			gl.uniform3f(state.uInstSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
+			gl.bindVertexArray(mesh.sideVao);
+			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.sideVertCount, mesh.instanceCount);
 		}
 	}
 

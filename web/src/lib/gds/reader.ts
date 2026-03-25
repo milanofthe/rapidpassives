@@ -531,6 +531,7 @@ export interface GdsProgress {
 /** Result from worker — always instanced */
 export interface GdsWorkerResult {
 	cellMeshes: Record<string, Record<number, Float32Array>>;
+	cellEdges: Record<string, Record<number, Float32Array>>;
 	cellInstances: Record<string, number[]>;
 	polygonCount: number;
 }
@@ -561,6 +562,7 @@ export function readGdsInWorker(
 				onProgress({ phase: 'done', polygonCount: msg.polygonCount });
 				resolve({
 					cellMeshes: msg.cellMeshes,
+					cellEdges: msg.cellEdges,
 					cellInstances: msg.cellInstances,
 					polygonCount: msg.polygonCount,
 				});

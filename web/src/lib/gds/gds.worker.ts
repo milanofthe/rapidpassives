@@ -69,6 +69,7 @@ self.onmessage = (e: MessageEvent) => {
 		self.postMessage({ type: 'progress', phase: 'triangulating' });
 
 		const cellMeshes: Record<string, Record<number, Float32Array>> = {};
+		const cellEdges: Record<string, Record<number, Float32Array>> = {};
 		const cellInstances: Record<string, number[]> = {};
 		const transferables: ArrayBuffer[] = [];
 		let totalTriVerts = 0;
@@ -78,6 +79,7 @@ self.onmessage = (e: MessageEvent) => {
 			if (!instances || instances.length === 0) continue;
 
 			const meshes: Record<number, Float32Array> = {};
+			const edges: Record<number, Float32Array> = {};
 			for (const [layerNum, polys] of cellData.polygons) {
 				const buf = triangulatePolygons(polys, scene.userUnit);
 				if (buf.length > 0) {
@@ -85,10 +87,29 @@ self.onmessage = (e: MessageEvent) => {
 					transferables.push(buf.buffer);
 					totalTriVerts += buf.length / 2;
 				}
+				// Pack polygon edges for side wall generation
+				const edgeVerts: number[] = [];
+				for (const poly of polys) {
+					const n = poly.x.length;
+					if (n < 3) continue;
+					for (let i = 0; i < n; i++) {
+						const j = (i + 1) % n;
+						edgeVerts.push(
+							poly.x[i] * scene.userUnit, poly.y[i] * scene.userUnit,
+							poly.x[j] * scene.userUnit, poly.y[j] * scene.userUnit,
+						);
+					}
+				}
+				if (edgeVerts.length > 0) {
+					const ebuf = new Float32Array(edgeVerts);
+					edges[layerNum] = ebuf;
+					transferables.push(ebuf.buffer);
+				}
 			}
 
 			if (Object.keys(meshes).length > 0) {
 				cellMeshes[cellName] = meshes;
+				cellEdges[cellName] = edges;
 				const packed = new Float32Array(instances.length * 6);
 				for (let i = 0; i < instances.length; i++) {
 					const t = instances[i];
@@ -111,6 +132,7 @@ self.onmessage = (e: MessageEvent) => {
 		self.postMessage({
 			type: 'done',
 			cellMeshes,
+			cellEdges,
 			cellInstances,
 			polygonCount: totalTriVerts / 2,
 		}, transferables);

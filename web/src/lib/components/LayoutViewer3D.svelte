@@ -24,11 +24,37 @@
 		renderFrame();
 	}
 	export function resetView() {
-		camera = fitCamera(layers, stack, instancedScene);
+		const target = fitCamera(layers, stack, instancedScene);
 		if (orthoBlend > 0.5) {
-			camera = { ...camera, phi: Math.PI / 2 - 0.05, theta: 0 };
+			target.phi = Math.PI / 2 - 0.05;
+			target.theta = 0;
 		}
-		renderFrame();
+		animateCamera(target, 300);
+	}
+
+	function animateCamera(target: Camera, durationMs: number) {
+		const start = { ...camera };
+		const startTime = performance.now();
+		const id = ++animId;
+
+		function tick() {
+			if (!mounted || id !== animId) return;
+			const t = Math.min(1, (performance.now() - startTime) / durationMs);
+			const e = 1 - Math.pow(1 - t, 3); // ease-out cubic
+			camera = {
+				theta: start.theta + (target.theta - start.theta) * e,
+				phi: start.phi + (target.phi - start.phi) * e,
+				distance: start.distance + (target.distance - start.distance) * e,
+				target: [
+					start.target[0] + (target.target[0] - start.target[0]) * e,
+					start.target[1] + (target.target[1] - start.target[1]) * e,
+					start.target[2] + (target.target[2] - start.target[2]) * e,
+				],
+			};
+			renderFrame();
+			if (t < 1) requestAnimationFrame(tick);
+		}
+		requestAnimationFrame(tick);
 	}
 
 	export function pan(dx: number, dy: number) {
@@ -278,11 +304,7 @@
 	}
 
 	function onDblClick() {
-		camera = fitCamera(layers, stack, instancedScene);
-		if (orthoBlend > 0.5) {
-			camera = { ...camera, phi: Math.PI / 2 - 0.05, theta: 0 };
-		}
-		renderFrame();
+		resetView();
 	}
 
 	onMount(() => {

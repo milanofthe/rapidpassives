@@ -229,7 +229,7 @@
 				loadProgress = p.phase === 'done' ? 1 : p.phase === 'triangulating' ? 0.6 : 0.2;
 			});
 
-			instancedScene = { cellMeshes: result.cellMeshes, cellInstances: result.cellInstances };
+			instancedScene = { cellMeshes: result.cellMeshes, cellEdges: result.cellEdges, cellInstances: result.cellInstances };
 
 			// Build layer info from the cell meshes
 			const gdsLayerNums = new Set<number>();
