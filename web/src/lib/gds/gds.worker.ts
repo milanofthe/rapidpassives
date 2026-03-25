@@ -14,7 +14,9 @@ async function initWasm(): Promise<boolean> {
 	if (wasmFailed) return false;
 	try {
 		const mod = await import('../../../../wasm/pkg/gds_wasm.js');
-		await mod.default();
+		// Pass the .wasm URL explicitly — needed in worker context
+		const wasmUrl = new URL('../../../../wasm/pkg/gds_wasm_bg.wasm', import.meta.url);
+		await mod.default(wasmUrl);
 		wasmModule = mod;
 		return true;
 	} catch (e) {
