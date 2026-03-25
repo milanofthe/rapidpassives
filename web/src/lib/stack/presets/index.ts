@@ -95,11 +95,45 @@ const SG13G2: ProcessPreset = {
 	],
 };
 
+// ─── GF180MCU ────────────────────────────────────────────────────────
+// GlobalFoundries 180nm MCU CMOS — up to 6 metal layers
+// Sources: gf180mcu-pdk.readthedocs.io DRM section 4.3 + 5.1 + 7.15/7.16
+// Metal1-5: ~310nm thick (from Rsh=90mΩ/sq, Al ρ≈2.8µΩ·cm)
+// MetalTop variants: 6KÅ, 9KÅ, 11KÅ, 30KÅ
+// Using 5-metal + 9KÅ MetalTop as default (most common for analog)
+
+const GF180MCU: ProcessPreset = {
+	name: 'GF180MCU',
+	description: 'GlobalFoundries 180nm CMOS — 5M + thick top metal',
+	layers: [
+		// Poly
+		{ gds: 30,  datatype: 0, name: 'Poly2',     type: 'poly',  z: -0.18, thickness: 0.18,  color: '#c94a3a' },
+		// Metal 1
+		{ gds: 34,  datatype: 0, name: 'Metal1',    type: 'metal', z: 0.00,  thickness: 0.31,  color: '#4a9ec2' },
+		{ gds: 35,  datatype: 0, name: 'Via1',      type: 'via',   z: 0.31,  thickness: 0.50,  color: '#5a5a62' },
+		// Metal 2
+		{ gds: 36,  datatype: 0, name: 'Metal2',    type: 'metal', z: 0.81,  thickness: 0.31,  color: '#e8944a' },
+		{ gds: 38,  datatype: 0, name: 'Via2',      type: 'via',   z: 1.12,  thickness: 0.50,  color: '#6e6e78' },
+		// Metal 3
+		{ gds: 42,  datatype: 0, name: 'Metal3',    type: 'metal', z: 1.62,  thickness: 0.31,  color: '#d9513c' },
+		{ gds: 40,  datatype: 0, name: 'Via3',      type: 'via',   z: 1.93,  thickness: 0.50,  color: '#6e6e78' },
+		// Metal 4
+		{ gds: 46,  datatype: 0, name: 'Metal4',    type: 'metal', z: 2.43,  thickness: 0.31,  color: '#7b5e8a' },
+		{ gds: 41,  datatype: 0, name: 'Via4',      type: 'via',   z: 2.74,  thickness: 0.50,  color: '#7a7a84' },
+		// Metal 5
+		{ gds: 81,  datatype: 0, name: 'Metal5',    type: 'metal', z: 3.24,  thickness: 0.31,  color: '#c4c46b' },
+		{ gds: 82,  datatype: 0, name: 'Via5',      type: 'via',   z: 3.55,  thickness: 0.70,  color: '#7a7a84' },
+		// MetalTop (9KÅ variant)
+		{ gds: 53,  datatype: 0, name: 'MetalTop',  type: 'metal', z: 4.25,  thickness: 0.90,  color: '#f0b86a' },
+	],
+};
+
 // ─── Preset registry ─────────────────────────────────────────────────
 
 export const PRESETS: Record<string, ProcessPreset> = {
 	sky130: SKY130,
 	sg13g2: SG13G2,
+	gf180mcu: GF180MCU,
 };
 
 export const PRESET_LIST = Object.entries(PRESETS).map(([id, p]) => ({ id, name: p.name, description: p.description }));
