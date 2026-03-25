@@ -34,36 +34,29 @@ function processWithWasm(bytes: Uint8Array): {
 } {
 	const raw = wasmModule!.process_gds(bytes);
 
+	// WASM returns Float32Array values directly — just need to remap layer keys to numbers
 	const cellMeshes: Record<string, Record<number, Float32Array>> = {};
 	const cellEdges: Record<string, Record<number, Float32Array>> = {};
-	const cellInstances: Record<string, Float32Array> = {};
-	let polygonCount = 0;
 
-	if (raw.cellMeshes) {
-		for (const [cellName, layers] of Object.entries(raw.cellMeshes as Record<string, Record<string, number[]>>)) {
-			cellMeshes[cellName] = {};
-			for (const [layer, arr] of Object.entries(layers)) {
-				const buf = new Float32Array(arr);
-				cellMeshes[cellName][Number(layer)] = buf;
-				polygonCount += buf.length / 2;
-			}
+	for (const [cellName, layers] of Object.entries(raw.cellMeshes ?? {})) {
+		cellMeshes[cellName] = {};
+		for (const [layer, arr] of Object.entries(layers as Record<string, Float32Array>)) {
+			cellMeshes[cellName][Number(layer)] = arr;
 		}
 	}
-	if (raw.cellEdges) {
-		for (const [cellName, layers] of Object.entries(raw.cellEdges as Record<string, Record<string, number[]>>)) {
-			cellEdges[cellName] = {};
-			for (const [layer, arr] of Object.entries(layers)) {
-				cellEdges[cellName][Number(layer)] = new Float32Array(arr);
-			}
-		}
-	}
-	if (raw.cellInstances) {
-		for (const [cellName, arr] of Object.entries(raw.cellInstances as Record<string, number[]>)) {
-			cellInstances[cellName] = new Float32Array(arr);
+	for (const [cellName, layers] of Object.entries(raw.cellEdges ?? {})) {
+		cellEdges[cellName] = {};
+		for (const [layer, arr] of Object.entries(layers as Record<string, Float32Array>)) {
+			cellEdges[cellName][Number(layer)] = arr;
 		}
 	}
 
-	return { cellMeshes, cellEdges, cellInstances, polygonCount: raw.polygonCount ?? polygonCount };
+	return {
+		cellMeshes,
+		cellEdges,
+		cellInstances: raw.cellInstances ?? {},
+		polygonCount: raw.polygonCount ?? 0,
+	};
 }
 
 // ─── JS fallback path ────────────────────────────────────────────────
