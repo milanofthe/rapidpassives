@@ -335,38 +335,85 @@
 
 	function applyPresetById(id: string) {
 		selectedPreset = id;
-		if (!id || !instancedScene) return;
-		const preset = PRESETS[id];
-		if (!preset) return;
+		if (!instancedScene) return;
 
-		// Collect GDS layer numbers present in the loaded file
-		const gdsLayersInFile = new Set<number>();
-		for (const meshes of Object.values(instancedScene.cellMeshes)) {
-			for (const key of Object.keys(meshes)) gdsLayersInFile.add(Number(key));
-		}
+		// Show loading
+		loading = true;
+		loadPhase = id ? `Applying ${PRESETS[id]?.name ?? id}...` : 'Resetting layers...';
 
-		const applied = applyPreset(preset, gdsLayersInFile);
+		// Defer to let UI show loading state
+		requestAnimationFrame(() => {
+			if (!id) {
+				// Reset to generic stack
+				resetToGenericStack();
+			} else {
+				const preset = PRESETS[id];
+				if (!preset) { loading = false; return; }
 
-		// Update layer mapping
+				const gdsLayersInFile = new Set<number>();
+				for (const meshes of Object.values(instancedScene!.cellMeshes)) {
+					for (const key of Object.keys(meshes)) gdsLayersInFile.add(Number(key));
+				}
+
+				const applied = applyPreset(preset, gdsLayersInFile);
+
+				for (const key of Object.keys(GDS_TO_LAYER)) delete GDS_TO_LAYER[Number(key)];
+				Object.assign(GDS_TO_LAYER, applied.gdsLayerMap);
+
+				const infos: GdsLayerInfo[] = [];
+				for (const sl of applied.stack.layers) {
+					if (sl.type === 'substrate') continue;
+					const gdsNum = Number(sl.id.replace(/^preset_|^generic_/, ''));
+					const info = applied.layerInfo.get(gdsNum);
+					infos.push({
+						gdsNum,
+						color: info?.color ?? sl.color,
+						visible: sl.visible,
+						polyCount: 0,
+						thickness: info?.thickness ?? sl.thickness,
+					});
+				}
+				gdsLayers = infos;
+				stack = applied.stack;
+				// Update labels from preset
+				layerMapNames = new Map(applied.layerInfo.entries()
+					.map(([gds, info]) => [gds, info.name] as [number, string]));
+			}
+
+			loading = false;
+		});
+	}
+
+	function resetToGenericStack() {
+		if (!instancedScene) return;
+
+		// Reset layer mapping
 		for (const key of Object.keys(GDS_TO_LAYER)) delete GDS_TO_LAYER[Number(key)];
-		Object.assign(GDS_TO_LAYER, applied.gdsLayerMap);
+		Object.assign(GDS_TO_LAYER, {
+			1: 'windings', 2: 'crossings', 3: 'vias', 4: 'centertap',
+			5: 'vias2', 6: 'windings_m2', 7: 'crossings_m1', 8: 'windings_m4',
+			9: 'vias3', 10: 'pgs', 11: 'guard_ring',
+		} as Record<number, LayerName>);
+		usedSlots.clear();
+		layerMapNames = new Map();
 
-		// Update gdsLayers with preset info
-		const infos: GdsLayerInfo[] = [];
-		for (const sl of applied.stack.layers) {
-			if (sl.type === 'substrate') continue;
-			const gdsNum = Number(sl.id.replace(/^preset_|^generic_/, ''));
-			const info = applied.layerInfo.get(gdsNum);
-			infos.push({
-				gdsNum,
-				color: info?.color ?? sl.color,
-				visible: sl.visible,
-				polyCount: 0,
-				thickness: info?.thickness ?? sl.thickness,
-			});
+		// Rebuild generic layer list
+		const gdsLayerNums = new Set<number>();
+		for (const meshes of Object.values(instancedScene.cellMeshes)) {
+			for (const key of Object.keys(meshes)) gdsLayerNums.add(Number(key));
 		}
-		gdsLayers = infos;
-		stack = applied.stack;
+		const sortedKeys = [...gdsLayerNums].sort((a, b) => a - b);
+		for (const gdsNum of sortedKeys) {
+			if (!GDS_TO_LAYER[gdsNum]) assignGenericLayer(gdsNum);
+		}
+		gdsLayers = sortedKeys.map((gdsNum, i) => ({
+			gdsNum,
+			color: PALETTE[i % PALETTE.length],
+			visible: true,
+			polyCount: 0,
+			thickness: 0.5,
+		}));
+		stack = buildViewerStack();
 	}
 
 	function onLayerMapDrop(e: DragEvent) {

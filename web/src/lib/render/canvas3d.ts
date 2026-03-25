@@ -863,7 +863,7 @@ export function render3D(
 		const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
 		gl.uniform3f(uLightDir, lx / ll, ly / ll, lz / ll);
 		// Flat shading in ortho (2D) mode, lit shading in perspective (3D)
-		gl.uniform1f(uAmbient, 0.5 + 0.5 * orthoBlend);
+		gl.uniform1f(uAmbient, 0.7 + 0.3 * orthoBlend);
 		for (const mesh of state.meshes) {
 			gl.uniform3f(uColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
@@ -878,7 +878,7 @@ export function render3D(
 		const lx = 0.4, ly = 0.3, lz = 0.8;
 		const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
 		gl.uniform3f(state.uInstLightDir, lx / ll, ly / ll, lz / ll);
-		gl.uniform1f(state.uInstAmbient, 0.5 + 0.5 * orthoBlend);
+		gl.uniform1f(state.uInstAmbient, 0.7 + 0.3 * orthoBlend);
 
 		// Draw top faces
 		gl.uniform1f(state.uInstTopFace, 1.0);
