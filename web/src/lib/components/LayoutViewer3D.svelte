@@ -33,14 +33,28 @@
 
 	export function pan(dx: number, dy: number) {
 		const step = camera.distance * 0.05;
-		camera = {
-			...camera,
-			target: [
-				camera.target[0] + dx * step,
-				camera.target[1] + dy * step,
-				camera.target[2],
-			],
-		};
+		if (orthoBlend > 0.5) {
+			// 2D: shift world X/Y directly
+			camera = {
+				...camera,
+				target: [
+					camera.target[0] + dx * step,
+					camera.target[1] + dy * step,
+					camera.target[2],
+				],
+			};
+		} else {
+			// 3D: shift along camera's local right/up
+			const ct = Math.cos(camera.theta), st = Math.sin(camera.theta);
+			camera = {
+				...camera,
+				target: [
+					camera.target[0] + (dx * ct - dy * st * Math.sin(camera.phi)) * step,
+					camera.target[1] - (dx * st + dy * ct * Math.sin(camera.phi)) * step,
+					camera.target[2] + dy * Math.cos(camera.phi) * step,
+				],
+			};
+		}
 		renderFrame();
 	}
 
