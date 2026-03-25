@@ -335,12 +335,18 @@
 		};
 	});
 
-	// Rebuild meshes when geometry or instanced scene changes
+	// Rebuild meshes when geometry or instanced scene changes, and fit camera to new data
+	let lastSceneRef: any = null;
 	$effect(() => {
 		layers;
 		instancedScene;
 		if (mounted && glState) {
 			needsRebuild = true;
+			// Auto fit-to-view when scene data changes (new file loaded)
+			if (instancedScene !== lastSceneRef) {
+				lastSceneRef = instancedScene;
+				resetView();
+			}
 			renderFrame();
 		}
 	});
