@@ -241,16 +241,7 @@ self.onmessage = async (e: MessageEvent) => {
 				return;
 			}
 			const t1 = performance.now();
-			// Count actual Float32Array sizes for comparison with JS path
-			let totalMeshBytes = 0, totalEdgeBytes = 0, totalInstBytes = 0, meshCount = 0;
-			for (const layers of Object.values(result.cellMeshes)) {
-				for (const buf of Object.values(layers)) { totalMeshBytes += buf.byteLength; meshCount++; }
-			}
-			for (const layers of Object.values(result.cellEdges)) {
-				for (const buf of Object.values(layers)) totalEdgeBytes += buf.byteLength;
-			}
-			for (const buf of Object.values(result.cellInstances)) totalInstBytes += buf.byteLength;
-			console.log(`GDS WASM: ${(t1 - t0) | 0}ms, ${meshCount} layer meshes, ${(totalMeshBytes/1e6).toFixed(1)}MB faces, ${(totalEdgeBytes/1e6).toFixed(1)}MB edges, ${(totalInstBytes/1e3).toFixed(0)}KB instances`);
+			console.log(`GDS WASM: ${(t1 - t0) | 0}ms → ${result.polygonCount.toLocaleString()} polygon verts`);
 
 			const transferables: ArrayBuffer[] = [];
 			for (const layers of Object.values(result.cellMeshes))
