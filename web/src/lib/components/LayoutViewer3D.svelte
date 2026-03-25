@@ -80,15 +80,13 @@
 		}, 400);
 	}
 
-	/** Flip the chip — rotate 180° around the screen X axis */
+	/** Flip the chip — mirror Z to see bottom of stack */
 	export function flipZ() {
-		const base = effectiveCamera();
-		animateCamera({
-			...base,
-			target: [...base.target] as [number, number, number],
-			phi: Math.PI - base.phi,
-		}, 400);
+		zFlip = zFlip * -1;
+		renderFrame();
 	}
+
+	let zFlip = 1.0;
 
 	export function pan(dx: number, dy: number) {
 		const step = camera.distance * 0.05;
@@ -127,7 +125,7 @@
 		gl.clearColor(0, 0, 0, 0);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 		// Draw geometry only (skip the clear in render3D by calling it after our clear)
-		render3D(glState, camera, w, h, orthoBlend, true, visibleGdsLayers);
+		render3D(glState, camera, w, h, orthoBlend, true, visibleGdsLayers, zFlip);
 
 		canvas.toBlob((blob) => {
 			if (!blob) return;
@@ -189,7 +187,7 @@
 			const onBatch = () => {
 				if (mounted && glState && canvas) {
 					const { w, h } = syncCanvas();
-					if (w > 0 && h > 0) render3D(glState!, camera, w, h, orthoBlend, false, visibleGdsLayers);
+					if (w > 0 && h > 0) render3D(glState!, camera, w, h, orthoBlend, false, visibleGdsLayers, zFlip);
 				}
 			};
 			if (instancedScene) {
@@ -199,7 +197,7 @@
 			}
 		}
 
-		render3D(glState, camera, w, h, orthoBlend, false, visibleGdsLayers);
+		render3D(glState, camera, w, h, orthoBlend, false, visibleGdsLayers, zFlip);
 	}
 
 	// Animate ortho blend when `ortho` prop changes

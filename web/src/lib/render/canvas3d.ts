@@ -947,6 +947,8 @@ export function render3D(
 	transparent: boolean = false,
 	/** Set of visible GDS layer numbers — if provided, skip instanced meshes not in this set */
 	visibleGdsLayers?: Set<number> | null,
+	/** Z-axis scale: 1.0 normal, -1.0 flipped */
+	zFlip: number = 1.0,
 ): void {
 	const { gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient } = state;
 
@@ -982,7 +984,16 @@ export function render3D(
 
 	const eye = cameraEye(camera);
 	const view = mat4LookAt(eye, camera.target as number[], [0, 0, 1]);
-	const vp = mat4Multiply(proj, view);
+	let vp = mat4Multiply(proj, view);
+
+	// Apply Z flip — mirror geometry across the XY plane
+	if (zFlip < 0) {
+		// Scale Z column of the MVP by -1
+		vp[2] = -vp[2];
+		vp[6] = -vp[6];
+		vp[10] = -vp[10];
+		vp[14] = -vp[14];
+	}
 
 	// Draw grid and axes first (behind geometry) — skip for transparent export
 	if (!transparent) {
