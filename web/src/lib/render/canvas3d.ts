@@ -471,8 +471,6 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const bg = hexToRgb(canvasTheme.bg);
 	gl.clearColor(bg[0], bg[1], bg[2], 1);
 	gl.enable(gl.DEPTH_TEST);
-	gl.enable(gl.CULL_FACE);
-	gl.cullFace(gl.BACK);
 
 	// Instanced shader program
 	const instProgram = linkProgramFromSource(gl, INST_VS, INST_FS);
