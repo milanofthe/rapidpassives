@@ -31,6 +31,19 @@
 		renderFrame();
 	}
 
+	export function pan(dx: number, dy: number) {
+		const step = camera.distance * 0.05;
+		camera = {
+			...camera,
+			target: [
+				camera.target[0] + dx * step,
+				camera.target[1] + dy * step,
+				camera.target[2],
+			],
+		};
+		renderFrame();
+	}
+
 	export function saveScreenshot() {
 		if (!glState || !canvas) return;
 		const { gl } = glState;
