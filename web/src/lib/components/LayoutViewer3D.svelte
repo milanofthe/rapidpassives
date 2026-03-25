@@ -31,6 +31,21 @@
 		renderFrame();
 	}
 
+	export function saveScreenshot() {
+		if (!glState || !canvas) return;
+		// Re-render to ensure the canvas has current content (WebGL preserveDrawingBuffer is false by default)
+		renderFrame();
+		canvas.toBlob((blob) => {
+			if (!blob) return;
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = 'layout.png';
+			a.click();
+			URL.revokeObjectURL(url);
+		});
+	}
+
 	let canvas: HTMLCanvasElement;
 	let container: HTMLDivElement;
 	let glState: ReturnType<typeof initGL> = null;
@@ -221,8 +236,20 @@
 		isRightDrag = false;
 	}
 
-	function onContextMenu(e: Event) {
+	let ctxMenu = $state<{ x: number; y: number } | null>(null);
+
+	function onContextMenu(e: MouseEvent) {
 		e.preventDefault();
+		ctxMenu = { x: e.clientX, y: e.clientY };
+	}
+
+	function closeCtxMenu() {
+		ctxMenu = null;
+	}
+
+	function ctxSaveImage() {
+		saveScreenshot();
+		closeCtxMenu();
 	}
 
 	function onDblClick() {
@@ -283,11 +310,12 @@
 	});
 </script>
 
-<div class="viewer3d" bind:this={container}>
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="viewer3d" bind:this={container} onclick={closeCtxMenu}>
 	<canvas
 		bind:this={canvas}
 		onwheel={onWheel}
-		onpointerdown={onPointerDown}
+		onpointerdown={(e) => { closeCtxMenu(); onPointerDown(e); }}
 		onpointermove={onPointerMove}
 		onpointerup={onPointerUp}
 		oncontextmenu={onContextMenu}
@@ -297,6 +325,11 @@
 		<span class="coord">x {cursorWorld.x.toFixed(1)}</span>
 		<span class="coord">y {cursorWorld.y.toFixed(1)}</span>
 	</div>
+	{#if ctxMenu}
+		<div class="ctx-menu" style="left: {ctxMenu.x}px; top: {ctxMenu.y}px;">
+			<button class="ctx-item" onclick={ctxSaveImage}>Save image as PNG</button>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -325,5 +358,30 @@
 		color: var(--text-dim);
 		background: var(--canvas-bg);
 		padding: 3px 8px;
+	}
+	.ctx-menu {
+		position: fixed;
+		z-index: 100;
+		background: var(--bg-surface);
+		border: 1px solid var(--border);
+		padding: 4px 0;
+		min-width: 160px;
+	}
+	.ctx-item {
+		display: block;
+		width: 100%;
+		padding: 6px 14px;
+		font-size: var(--fs-xs);
+		font-family: var(--font-mono);
+		color: var(--text-muted);
+		background: none;
+		border: none;
+		text-align: left;
+		cursor: pointer;
+		transition: background 0.1s, color 0.1s;
+	}
+	.ctx-item:hover {
+		background: var(--accent-dim);
+		color: var(--accent);
 	}
 </style>

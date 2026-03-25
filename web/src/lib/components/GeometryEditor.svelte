@@ -34,6 +34,26 @@
 		viewMode = viewMode === '2d' ? '3d' : '2d';
 	}
 
+	function onKeyDown(e: KeyboardEvent) {
+		// Ignore if user is typing in an input
+		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+		switch (e.key.toLowerCase()) {
+			case 'f': doReset(); break;
+			case 'w': wireframe = !wireframe; break;
+			case ' ':
+				e.preventDefault();
+				if (stack) toggleView();
+				break;
+			case 's':
+				if (e.ctrlKey || e.metaKey) {
+					e.preventDefault();
+					viewer?.saveScreenshot();
+				}
+				break;
+		}
+	}
+
 	// Resizable sidebar
 	let sidebarWidth = $state(280);
 	let draggingSidebar = false;
@@ -68,6 +88,8 @@
 		draggingResults = false;
 	}
 </script>
+
+<svelte:window onkeydown={onKeyDown} />
 
 <div class="workspace" bind:this={workspaceEl}>
 	<aside class="sidebar" style="width: {sidebarWidth}px; min-width: {sidebarWidth}px;">

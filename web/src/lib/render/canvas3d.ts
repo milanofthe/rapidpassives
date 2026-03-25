@@ -434,7 +434,7 @@ function cameraEye(cam: Camera): [number, number, number] {
 
 /** Initialize WebGL context and compile shaders */
 export function initGL(canvas: HTMLCanvasElement): GLState | null {
-	const gl = canvas.getContext('webgl2', { antialias: true, alpha: false });
+	const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, preserveDrawingBuffer: true });
 	if (!gl) return null;
 
 	const program = linkProgram(gl);
