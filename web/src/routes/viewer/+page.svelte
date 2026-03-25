@@ -1,9 +1,9 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
-	import type { Polygon, LayerName, LayerMap } from '$lib/geometry/types';
+	import type { LayerName, LayerMap } from '$lib/geometry/types';
 	import type { ProcessStack, StackLayer } from '$lib/stack/types';
 	import type { RenderOptions } from '$lib/render/canvas2d';
-	import { readGdsInWorker, type GdsWorkerResult } from '$lib/gds/reader';
+	import { readGdsInWorker } from '$lib/gds/reader';
 	import { type InstancedSceneData } from '$lib/render/canvas3d';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import { onMount } from 'svelte';
@@ -70,7 +70,6 @@
 
 	let fileName = $state('');
 	let gdsLayers = $state<GdsLayerInfo[]>([]);
-	let rawPolygons = $state<Map<number, Polygon[]>>(new Map());
 	let dragOver = $state(false);
 	let error = $state('');
 	let loading = $state(false);
@@ -84,21 +83,8 @@
 	/** Insertion point: the dragged item will be placed *before* this index */
 	let insertIdx = $state<number | null>(null);
 
-	let layers = $derived.by<LayerMap>(() => {
-		const m: LayerMap = {};
-		for (const info of gdsLayers) {
-			if (!info.visible) continue;
-			const polys = rawPolygons.get(info.gdsNum);
-			if (!polys || polys.length === 0) continue;
-			const layerName = GDS_TO_LAYER[info.gdsNum] ?? assignGenericLayer(info.gdsNum);
-			if (layerName) {
-				if (!m[layerName]) m[layerName] = [];
-				const arr = m[layerName]!;
-				for (let i = 0; i < polys.length; i++) arr.push(polys[i]);
-			}
-		}
-		return m;
-	});
+	// Empty LayerMap — geometry is rendered via instancedScene, not LayerMap
+	const layers: LayerMap = {};
 
 	// Assign generic layer names from the available LayerName slots
 	const GENERIC_SLOTS: LayerName[] = ['windings', 'crossings', 'windings_m2', 'crossings_m1', 'windings_m4', 'vias', 'vias1', 'vias2', 'vias3', 'centertap', 'pgs', 'guard_ring'];
@@ -226,75 +212,46 @@
 				9: 'vias3', 10: 'pgs', 11: 'guard_ring',
 			} as Record<number, LayerName>);
 			gdsLayers = [];
-			rawPolygons = new Map();
 			instancedScene = null;
 
 			const result = await readGdsInWorker(bytes, (p) => {
 				loadPolyCount = p.polygonCount;
 				const phaseNames: Record<string, string> = {
-					parsing: 'Parsing records...', flattening: 'Flattening cells...',
-					scaling: 'Scaling coordinates...', merging: 'Merging polygons...',
-					'building hierarchy': 'Analyzing hierarchy...', triangulating: 'Triangulating...',
+					parsing: 'Parsing records...',
+					'building hierarchy': 'Analyzing hierarchy...',
+					triangulating: 'Triangulating...',
 					done: 'Done',
 				};
 				loadPhase = phaseNames[p.phase] ?? p.phase;
-				loadProgress = p.phase === 'done' ? 1 : p.phase === 'triangulating' ? 0.6 : p.phase === 'scaling' ? 0.8 : p.phase === 'flattening' ? 0.4 : 0.1;
+				loadProgress = p.phase === 'done' ? 1 : p.phase === 'triangulating' ? 0.6 : 0.2;
 			});
 
-			if (result.mode === 'instanced') {
-				instancedScene = { cellMeshes: result.cellMeshes, cellInstances: result.cellInstances };
-				// Build layer info from the cell meshes (collect unique GDS layer numbers)
-				const gdsLayerNums = new Set<number>();
-				for (const meshes of Object.values(result.cellMeshes)) {
-					for (const key of Object.keys(meshes)) gdsLayerNums.add(Number(key));
-				}
-				const sortedKeys = [...gdsLayerNums].sort((a, b) => a - b);
-				// Ensure all GDS layers are mapped to LayerName slots
-				for (const gdsNum of sortedKeys) {
-					if (!GDS_TO_LAYER[gdsNum]) assignGenericLayer(gdsNum);
-				}
-				const infos: GdsLayerInfo[] = sortedKeys.map((gdsNum, i) => ({
-					gdsNum,
-					color: PALETTE[i % PALETTE.length],
-					visible: true,
-					polyCount: 0,
-					thickness: 0.5,
-				}));
-				gdsLayers = infos;
-			} else {
-				instancedScene = null;
-				updateLayerState(result.polygons);
-			}
+			instancedScene = { cellMeshes: result.cellMeshes, cellInstances: result.cellInstances };
 
+			// Build layer info from the cell meshes
+			const gdsLayerNums = new Set<number>();
+			for (const meshes of Object.values(result.cellMeshes)) {
+				for (const key of Object.keys(meshes)) gdsLayerNums.add(Number(key));
+			}
+			const sortedKeys = [...gdsLayerNums].sort((a, b) => a - b);
+			for (const gdsNum of sortedKeys) {
+				if (!GDS_TO_LAYER[gdsNum]) assignGenericLayer(gdsNum);
+			}
+			gdsLayers = sortedKeys.map((gdsNum, i) => ({
+				gdsNum,
+				color: PALETTE[i % PALETTE.length],
+				visible: true,
+				polyCount: 0,
+				thickness: 0.5,
+			}));
+
+			totalPolygons = result.polygonCount;
 			loading = false;
 		} catch (e: any) {
 			error = `Parse error: ${e.message}`;
 			loading = false;
 			console.error(e);
 		}
-	}
-
-	function updateLayerState(scaled: Map<number, Polygon[]>) {
-		const sortedKeys = [...scaled.keys()].sort((a, b) => a - b);
-
-		// Preserve existing layer settings if we're updating
-		const existingMap = new Map(gdsLayers.map(l => [l.gdsNum, l]));
-
-		const infos: GdsLayerInfo[] = [];
-		sortedKeys.forEach((gdsNum, i) => {
-			const polys = scaled.get(gdsNum)!;
-			const existing = existingMap.get(gdsNum);
-			infos.push({
-				gdsNum,
-				color: existing?.color ?? PALETTE[i % PALETTE.length],
-				visible: existing?.visible ?? true,
-				polyCount: polys.length,
-				thickness: existing?.thickness ?? 0.5,
-			});
-		});
-
-		gdsLayers = infos;
-		rawPolygons = scaled;
 	}
 
 	function onDrop(e: DragEvent) {
@@ -370,7 +327,7 @@
 		insertIdx = null;
 	}
 
-	let totalPolygons = $derived(gdsLayers.reduce((s, l) => s + l.polyCount, 0));
+	let totalPolygons = $state(0);
 	let loaded = $derived(gdsLayers.length > 0);
 </script>
 

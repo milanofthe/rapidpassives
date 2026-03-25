@@ -1,14 +1,12 @@
 /**
  * GDS parsing Web Worker.
- * Two modes:
- *   - 'parse': flat pipeline (parse → flatten → scale) for small files
- *   - 'parse-instanced': instanced pipeline (parse → hierarchy → triangulate) for large files
+ * Always uses instanced pipeline: parse → hierarchy → triangulate unique cells.
  */
 import earcut from 'earcut';
-import { readGds, flattenGds, scalePolygons, buildInstancedScene, type GdsData, type Affine2D } from '$lib/gds/reader';
+import { readGds, buildInstancedScene } from '$lib/gds/reader';
 import type { Polygon } from '$lib/geometry/types';
 
-// ─── Triangulation (same as canvas3d.ts) ─────────────────────────────
+// ─── Triangulation ───────────────────────────────────────────────────
 
 function triangulate(xs: number[], ys: number[]): number[] {
 	const cx: number[] = [], cy: number[] = [], idxMap: number[] = [];
@@ -32,9 +30,7 @@ function triangulate(xs: number[], ys: number[]): number[] {
 	return result;
 }
 
-/** Triangulate polygons into a flat Float32Array of [x,y, x,y, ...] triangle vertices */
-function triangulatPolygons(polys: Polygon[], scale: number): Float32Array {
-	// First pass: count total vertices
+function triangulatePolygons(polys: Polygon[], scale: number): Float32Array {
 	let totalVerts = 0;
 	const triResults: { tris: number[]; poly: Polygon }[] = [];
 	for (const poly of polys) {
@@ -44,8 +40,6 @@ function triangulatPolygons(polys: Polygon[], scale: number): Float32Array {
 			totalVerts += tris.length;
 		}
 	}
-
-	// Second pass: pack into Float32Array
 	const buf = new Float32Array(totalVerts * 2);
 	let offset = 0;
 	for (const { tris, poly } of triResults) {
@@ -57,61 +51,7 @@ function triangulatPolygons(polys: Polygon[], scale: number): Float32Array {
 	return buf;
 }
 
-// ─── Hierarchy diagnostics ───────────────────────────────────────────
-
-function logHierarchy(data: GdsData) {
-	let uniquePolys = 0;
-	let totalSrefs = 0;
-	let totalArefInstances = 0;
-	const cellPolyCount = new Map<string, number>();
-
-	for (const cell of data.cells) {
-		let cp = 0;
-		for (const [, polys] of cell.polygons) cp += polys.length;
-		cellPolyCount.set(cell.name, cp);
-		uniquePolys += cp;
-		totalSrefs += cell.srefs.length;
-		for (const ar of cell.arefs) totalArefInstances += ar.columns * ar.rows;
-	}
-
-	const referenced = new Set<string>();
-	for (const cell of data.cells) {
-		for (const sr of cell.srefs) referenced.add(sr.sname);
-		for (const ar of cell.arefs) referenced.add(ar.sname);
-	}
-	const topCells = data.cells.filter(c => !referenced.has(c.name));
-	const topCell = topCells.length > 0 ? topCells[topCells.length - 1] : data.cells[data.cells.length - 1];
-
-	const cellMap = new Map(data.cells.map(c => [c.name, c]));
-	let estimatedFlat = 0;
-	if (topCell) {
-		const cache = new Map<string, number>();
-		function est(name: string): number {
-			if (cache.has(name)) return cache.get(name)!;
-			const cell = cellMap.get(name);
-			if (!cell) return 0;
-			let count = cellPolyCount.get(name) || 0;
-			for (const sr of cell.srefs) count += est(sr.sname);
-			for (const ar of cell.arefs) count += est(ar.sname) * ar.columns * ar.rows;
-			cache.set(name, count);
-			return count;
-		}
-		estimatedFlat = est(topCell.name);
-	}
-
-	console.log(`GDS Hierarchy:`);
-	console.log(`  Cells: ${data.cells.length}`);
-	console.log(`  Top cell: ${topCell?.name ?? '?'}`);
-	console.log(`  Unique polygons: ${uniquePolys.toLocaleString()}`);
-	console.log(`  SREFs: ${totalSrefs.toLocaleString()}, AREF instances: ${totalArefInstances.toLocaleString()}`);
-	console.log(`  Estimated flattened: ${estimatedFlat.toLocaleString()} (${uniquePolys > 0 ? (estimatedFlat / uniquePolys).toFixed(1) : '?'}x expansion)`);
-
-	return { uniquePolys, estimatedFlat };
-}
-
 // ─── Message handler ─────────────────────────────────────────────────
-
-const INSTANCED_THRESHOLD = 500_000; // use instancing if flattened count > this
 
 self.onmessage = (e: MessageEvent) => {
 	try {
@@ -122,89 +62,58 @@ self.onmessage = (e: MessageEvent) => {
 		const data = readGds(bytes);
 		const t1 = performance.now();
 
-		const { uniquePolys, estimatedFlat } = logHierarchy(data);
-		const useInstancing = estimatedFlat > INSTANCED_THRESHOLD;
+		self.postMessage({ type: 'progress', phase: 'building hierarchy' });
+		const scene = buildInstancedScene(data);
+		const t2 = performance.now();
 
-		if (useInstancing) {
-			console.log(`  → Using instanced rendering (${estimatedFlat.toLocaleString()} > ${INSTANCED_THRESHOLD.toLocaleString()})`);
-			self.postMessage({ type: 'progress', phase: 'building hierarchy' });
+		self.postMessage({ type: 'progress', phase: 'triangulating' });
 
-			const scene = buildInstancedScene(data);
-			const t2 = performance.now();
+		const cellMeshes: Record<string, Record<number, Float32Array>> = {};
+		const cellInstances: Record<string, number[]> = {};
+		const transferables: ArrayBuffer[] = [];
+		let totalTriVerts = 0;
 
-			self.postMessage({ type: 'progress', phase: 'triangulating' });
+		for (const [cellName, cellData] of scene.cells) {
+			const instances = scene.instances.get(cellName);
+			if (!instances || instances.length === 0) continue;
 
-			// Triangulate each cell's polygons per GDS layer
-			// Result: cellName → { gdsLayer → Float32Array of triangle verts }
-			const cellMeshes: Record<string, Record<number, Float32Array>> = {};
-			const cellInstances: Record<string, number[]> = {};
-			const transferables: ArrayBuffer[] = [];
-			let totalTriVerts = 0;
-
-			for (const [cellName, cellData] of scene.cells) {
-				const instances = scene.instances.get(cellName);
-				if (!instances || instances.length === 0) continue;
-
-				const meshes: Record<number, Float32Array> = {};
-				for (const [layerNum, polys] of cellData.polygons) {
-					const buf = triangulatPolygons(polys, scene.userUnit);
-					if (buf.length > 0) {
-						meshes[layerNum] = buf;
-						transferables.push(buf.buffer);
-						totalTriVerts += buf.length / 2;
-					}
-				}
-
-				if (Object.keys(meshes).length > 0) {
-					cellMeshes[cellName] = meshes;
-					// Pack transforms as flat array: [a,b,c,d,tx,ty, a,b,c,d,tx,ty, ...]
-					// Apply userUnit scaling to tx,ty
-					const packed = new Float32Array(instances.length * 6);
-					for (let i = 0; i < instances.length; i++) {
-						const t = instances[i];
-						packed[i * 6 + 0] = t[0]; // a
-						packed[i * 6 + 1] = t[1]; // b
-						packed[i * 6 + 2] = t[2]; // c
-						packed[i * 6 + 3] = t[3]; // d
-						packed[i * 6 + 4] = t[4] * scene.userUnit; // tx
-						packed[i * 6 + 5] = t[5] * scene.userUnit; // ty
-					}
-					cellInstances[cellName] = Array.from(packed);
+			const meshes: Record<number, Float32Array> = {};
+			for (const [layerNum, polys] of cellData.polygons) {
+				const buf = triangulatePolygons(polys, scene.userUnit);
+				if (buf.length > 0) {
+					meshes[layerNum] = buf;
+					transferables.push(buf.buffer);
+					totalTriVerts += buf.length / 2;
 				}
 			}
 
-			const t3 = performance.now();
-			const totalInstances = Object.values(cellInstances).reduce((s, v) => s + v.length / 6, 0);
-			console.log(`GDS Worker: parse ${(t1 - t0) | 0}ms, hierarchy ${(t2 - t1) | 0}ms, triangulate ${(t3 - t2) | 0}ms`);
-			console.log(`  ${Object.keys(cellMeshes).length} unique cells, ${totalInstances.toLocaleString()} instances, ${totalTriVerts.toLocaleString()} tri verts`);
-
-			self.postMessage({
-				type: 'done-instanced',
-				cellMeshes,
-				cellInstances,
-				polygonCount: totalTriVerts / 2,
-			}, transferables);
-
-		} else {
-			console.log(`  → Using flat rendering (${estimatedFlat.toLocaleString()} ≤ ${INSTANCED_THRESHOLD.toLocaleString()})`);
-			self.postMessage({ type: 'progress', phase: 'flattening' });
-			const flat = flattenGds(data);
-			const t2 = performance.now();
-
-			self.postMessage({ type: 'progress', phase: 'scaling' });
-			const scaled = scalePolygons(flat, data.units.userUnit);
-			const t3 = performance.now();
-
-			const layers: Record<number, Polygon[]> = {};
-			let totalPolys = 0;
-			for (const [layerNum, polys] of scaled) {
-				layers[layerNum] = polys;
-				totalPolys += polys.length;
+			if (Object.keys(meshes).length > 0) {
+				cellMeshes[cellName] = meshes;
+				const packed = new Float32Array(instances.length * 6);
+				for (let i = 0; i < instances.length; i++) {
+					const t = instances[i];
+					packed[i * 6 + 0] = t[0];
+					packed[i * 6 + 1] = t[1];
+					packed[i * 6 + 2] = t[2];
+					packed[i * 6 + 3] = t[3];
+					packed[i * 6 + 4] = t[4] * scene.userUnit;
+					packed[i * 6 + 5] = t[5] * scene.userUnit;
+				}
+				cellInstances[cellName] = Array.from(packed);
 			}
-
-			console.log(`GDS Worker: parse ${(t1 - t0) | 0}ms, flatten ${(t2 - t1) | 0}ms, scale ${(t3 - t2) | 0}ms → ${totalPolys} polys`);
-			self.postMessage({ type: 'done', layers, polygonCount: totalPolys });
 		}
+
+		const t3 = performance.now();
+		const totalInstances = Object.values(cellInstances).reduce((s, v) => s + v.length / 6, 0);
+		console.log(`GDS Worker: parse ${(t1 - t0) | 0}ms, hierarchy ${(t2 - t1) | 0}ms, triangulate ${(t3 - t2) | 0}ms`);
+		console.log(`  ${Object.keys(cellMeshes).length} unique cells, ${totalInstances.toLocaleString()} instances, ${totalTriVerts.toLocaleString()} tri verts`);
+
+		self.postMessage({
+			type: 'done',
+			cellMeshes,
+			cellInstances,
+			polygonCount: totalTriVerts / 2,
+		}, transferables);
 	} catch (err: any) {
 		self.postMessage({ type: 'error', message: err.message });
 	}

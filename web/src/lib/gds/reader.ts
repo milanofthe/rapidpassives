@@ -1,6 +1,5 @@
 import { RecordType, type GDSRecord } from 'gdsii';
 import type { Polygon } from '$lib/geometry/types';
-import { mergePolygons } from '$lib/geometry/merge';
 
 /** Decode a GDSII 8-byte real (excess-64 exponent, base-16) */
 function parseReal8(dv: DataView, offset: number): number {
@@ -529,14 +528,15 @@ export interface GdsProgress {
 	polygonCount: number;
 }
 
-/** Result from worker — either flat polygons or instanced scene data */
-export type GdsWorkerResult =
-	| { mode: 'flat'; polygons: Map<number, Polygon[]> }
-	| { mode: 'instanced'; cellMeshes: Record<string, Record<number, Float32Array>>; cellInstances: Record<string, number[]> };
+/** Result from worker — always instanced */
+export interface GdsWorkerResult {
+	cellMeshes: Record<string, Record<number, Float32Array>>;
+	cellInstances: Record<string, number[]>;
+	polygonCount: number;
+}
 
 /**
- * Parse a GDS file in a Web Worker. Automatically picks flat or instanced
- * mode based on estimated flattened polygon count.
+ * Parse a GDS file in a Web Worker using instanced rendering pipeline.
  */
 export function readGdsInWorker(
 	bytes: Uint8Array,
@@ -548,7 +548,8 @@ export function readGdsInWorker(
 			worker = new Worker(new URL('./gds.worker.ts', import.meta.url), { type: 'module' });
 		} catch (e) {
 			console.error('GDS Worker creation failed:', e);
-			return resolve(readGdsFallback(bytes, onProgress));
+			reject(new Error('Web Worker not available'));
+			return;
 		}
 
 		worker.onmessage = (e) => {
@@ -557,19 +558,11 @@ export function readGdsInWorker(
 				onProgress({ phase: msg.phase, polygonCount: msg.polygonCount ?? 0 });
 			} else if (msg.type === 'done') {
 				worker.terminate();
-				const polygons = new Map<number, Polygon[]>();
-				for (const [key, polys] of Object.entries(msg.layers)) {
-					polygons.set(Number(key), polys as Polygon[]);
-				}
-				onProgress({ phase: 'done', polygonCount: msg.polygonCount });
-				resolve({ mode: 'flat', polygons });
-			} else if (msg.type === 'done-instanced') {
-				worker.terminate();
 				onProgress({ phase: 'done', polygonCount: msg.polygonCount });
 				resolve({
-					mode: 'instanced',
 					cellMeshes: msg.cellMeshes,
 					cellInstances: msg.cellInstances,
+					polygonCount: msg.polygonCount,
 				});
 			} else if (msg.type === 'error') {
 				worker.terminate();
@@ -579,34 +572,13 @@ export function readGdsInWorker(
 
 		worker.onerror = (e) => {
 			worker.terminate();
-			console.warn('Worker error, falling back to sync:', e.message);
-			resolve(readGdsFallback(bytes, onProgress));
+			reject(new Error(e.message));
 		};
 
 		const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 		worker.postMessage({ buffer }, [buffer]);
 	});
 }
-
-/** Synchronous fallback — always flat mode */
-function readGdsFallback(bytes: Uint8Array, onProgress: (p: GdsProgress) => void): GdsWorkerResult {
-	console.warn('GDS: running synchronous fallback (UI will freeze)');
-	onProgress({ phase: 'parsing', polygonCount: 0 });
-	const data = readGds(bytes);
-	onProgress({ phase: 'flattening', polygonCount: 0 });
-	const flat = flattenGds(data);
-	onProgress({ phase: 'scaling', polygonCount: 0 });
-	const scaled = scalePolygons(flat, data.units.userUnit);
-	onProgress({ phase: 'done', polygonCount: countPolygons(scaled) });
-	return { mode: 'flat', polygons: scaled };
-}
-
-function countPolygons(m: Map<number, Polygon[]>): number {
-	let n = 0;
-	for (const [, polys] of m) n += polys.length;
-	return n;
-}
-
 
 // --- Helpers ---
 
