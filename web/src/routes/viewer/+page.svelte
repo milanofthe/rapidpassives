@@ -73,7 +73,6 @@
 
 	let fileName = $state('');
 	let gdsLayers = $state<GdsLayerInfo[]>([]);
-	let dragOver = $state(false);
 	let error = $state('');
 	let loading = $state(false);
 	let loadProgress = $state(0);
@@ -260,27 +259,6 @@
 		}
 	}
 
-	function onDrop(e: DragEvent) {
-		e.preventDefault();
-		dragOver = false;
-		const file = e.dataTransfer?.files[0];
-		if (file) handleFile(file);
-	}
-
-	function onDragOver(e: DragEvent) {
-		e.preventDefault();
-		dragOver = true;
-	}
-
-	function onDragLeave() {
-		dragOver = false;
-	}
-
-	function onFileInput(e: Event) {
-		const input = e.target as HTMLInputElement;
-		const file = input.files?.[0];
-		if (file) handleFile(file);
-	}
 
 	function toggleLayer(i: number) {
 		gdsLayers = gdsLayers.map((l, j) => j === i ? { ...l, visible: !l.visible } : l);
@@ -481,50 +459,11 @@
 	<link rel="canonical" href="https://rapidpassives.org/viewer" />
 </svelte:head>
 
-{#if !loaded}
-	<div class="dropzone-page">
-		<div
-			class="dropzone"
-			class:dragover={dragOver}
-			class:loading
-			ondrop={onDrop}
-			ondragover={onDragOver}
-			ondragleave={onDragLeave}
-			role="button"
-			tabindex="0"
-		>
-			{#if loading}
-				<svg class="border-spinner" viewBox="0 0 400 280">
-					<rect x="1" y="1" width="398" height="278" rx="0" fill="none"
-						stroke="var(--accent)" stroke-width="2"
-						stroke-dasharray="{2 * (398 + 278)}"
-						stroke-dashoffset="{2 * (398 + 278) * (1 - loadProgress)}"
-					/>
-				</svg>
-				<p class="loading-phase">{loadPhase}</p>
-				<p class="loading-text">{loadPolyCount > 0 ? `${loadPolyCount.toLocaleString()} polygons` : ''}</p>
-			{:else}
-				<div class="dropzone-icon">
-					<svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
-						<rect x="8" y="6" width="32" height="36" rx="2" />
-						<path d="M16 24L24 32L32 24" />
-						<path d="M24 16V32" />
-					</svg>
-				</div>
-				<p class="dropzone-title">Drop GDS file here</p>
-				<p class="dropzone-hint">or click to browse</p>
-				<input type="file" accept=".gds,.gdsii,.gds2" class="dropzone-input" onchange={onFileInput} />
-			{/if}
-			{#if error}
-				<p class="dropzone-error">{error}</p>
-			{/if}
-		</div>
-	</div>
-{:else}
-	<GeometryEditor {layers} {renderOpts} {stack} {instancedScene} gdsLayerMap={GDS_TO_LAYER} {visibleGdsLayers}
-		onFileDrop={handleFile} dropLoading={loading} dropPhase={loadPhase} dropPolyCount={loadPolyCount}>
-		{#snippet sidebar()}
-			<div class="panel">
+<GeometryEditor {layers} {renderOpts} {stack} {instancedScene} gdsLayerMap={GDS_TO_LAYER} {visibleGdsLayers}
+	onFileDrop={handleFile} dropLoading={loading} dropPhase={loadPhase} dropPolyCount={loadPolyCount}>
+	{#snippet sidebar()}
+		<div class="panel">
+			{#if loaded}
 				<div class="file-info">
 					<span class="file-name" title={fileName}>{fileName}</span>
 				</div>
@@ -533,8 +472,13 @@
 					<span class="sep">/</span>
 					<span>{totalPolygons.toLocaleString()} polygons</span>
 				</div>
+			{:else}
+				<div class="file-info">
+					<span class="file-name" style="color: var(--text-dim)">No file loaded</span>
+				</div>
+			{/if}
 
-				<h4 class="section-label">Process</h4>
+			<h4 class="section-label">Process</h4>
 				<div class="preset-dropdown">
 					<button class="preset-btn" onclick={() => presetOpen = !presetOpen}>
 						{selectedPreset ? PRESETS[selectedPreset]?.name : 'No preset'}
@@ -557,6 +501,7 @@
 					<span>Drop .lyp / .csv / .json layermap</span>
 				</div>
 
+			{#if loaded}
 				<h4 class="section-label">Layers</h4>
 				<p class="hint">Drag to reorder stack. Click to toggle visibility.</p>
 
@@ -607,93 +552,12 @@
 						<div class="drop-indicator"></div>
 					{/if}
 				</div>
+			{/if}
 			</div>
 		{/snippet}
 	</GeometryEditor>
-{/if}
 
 <style>
-	/* Drop zone page */
-	.dropzone-page {
-		height: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: var(--bg);
-	}
-	.dropzone {
-		position: relative;
-		width: 400px;
-		height: 280px;
-		border: 2px dashed var(--border);
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 8px;
-		cursor: pointer;
-		transition: border-color 0.15s, background 0.15s;
-	}
-	.dropzone:hover, .dropzone.dragover {
-		border-color: var(--accent);
-		background: var(--accent-dim);
-	}
-	.dropzone-icon {
-		color: var(--text-dim);
-	}
-	.dropzone.dragover .dropzone-icon {
-		color: var(--accent);
-	}
-	.dropzone-title {
-		font-size: var(--fs-sm);
-		font-family: var(--font-mono);
-		font-weight: 600;
-		color: var(--text-muted);
-	}
-	.dropzone-hint {
-		font-size: var(--fs-xs);
-		font-family: var(--font-mono);
-		color: var(--text-dim);
-	}
-	.dropzone-input {
-		position: absolute;
-		inset: 0;
-		opacity: 0;
-		cursor: pointer;
-	}
-	.dropzone.loading {
-		border-color: transparent;
-		pointer-events: none;
-	}
-	.border-spinner {
-		position: absolute;
-		inset: -1px;
-		width: calc(100% + 2px);
-		height: calc(100% + 2px);
-		pointer-events: none;
-	}
-	.border-spinner rect {
-		transition: stroke-dashoffset 0.3s ease;
-	}
-	.loading-phase {
-		font-size: var(--fs-sm);
-		font-family: var(--font-mono);
-		font-weight: 600;
-		color: var(--accent);
-	}
-	.loading-text {
-		font-size: var(--fs-xs);
-		font-family: var(--font-mono);
-		color: var(--text-dim);
-		min-height: 14px;
-	}
-	.dropzone-error {
-		font-size: var(--fs-xs);
-		font-family: var(--font-mono);
-		color: var(--accent);
-		margin-top: 4px;
-	}
-
 	/* Sidebar */
 	.panel {
 		height: 100%;
