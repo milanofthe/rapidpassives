@@ -80,8 +80,8 @@
 			case '-': case '_': doZoomOut(); break;
 			case 'ArrowLeft': e.preventDefault(); viewer?.pan(-1, 0); break;
 			case 'ArrowRight': e.preventDefault(); viewer?.pan(1, 0); break;
-			case 'ArrowUp': e.preventDefault(); viewer?.pan(0, 1); break;
-			case 'ArrowDown': e.preventDefault(); viewer?.pan(0, -1); break;
+			case 'ArrowUp': e.preventDefault(); viewer?.pan(0, -1); break;
+			case 'ArrowDown': e.preventDefault(); viewer?.pan(0, 1); break;
 			case ' ':
 				e.preventDefault();
 				if (stack) toggleView();
