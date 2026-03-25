@@ -17,8 +17,8 @@ pub fn process_gds(data: &[u8]) -> Result<JsValue, JsValue> {
     let (cells, refs, units) = parser::parse_gds(data)
         .map_err(|e| JsValue::from_str(&e))?;
 
-    log!("WASM: parsed {} cells with polygons, {} cells with refs, userUnit={}",
-        cells.len(), refs.len(), units.user_unit);
+    log!("WASM: parsed {} cells with polygons, {} cells with refs, userUnit={}, metersPerUnit={}",
+        cells.len(), refs.len(), units.user_unit, units.meters_per_unit);
 
     // Log cell details
     for (name, cell) in &cells {

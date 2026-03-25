@@ -34,6 +34,17 @@ function processWithWasm(bytes: Uint8Array): {
 } {
 	const raw = wasmModule!.process_gds(bytes);
 	console.log('WASM raw keys:', Object.keys(raw), 'polygonCount:', raw.polygonCount);
+	const meshKeys = Object.keys(raw.cellMeshes || {});
+	console.log('WASM cellMeshes count:', meshKeys.length);
+	if (meshKeys.length > 0) {
+		const firstCell = raw.cellMeshes[meshKeys[0]];
+		console.log('WASM first cell layers:', Object.keys(firstCell || {}));
+		const layerKeys = Object.keys(firstCell || {});
+		if (layerKeys.length > 0) {
+			const firstArr = firstCell[layerKeys[0]];
+			console.log('WASM first layer data type:', typeof firstArr, 'isArray:', Array.isArray(firstArr), 'length:', firstArr?.length, 'first 4:', firstArr?.slice?.(0, 4));
+		}
+	}
 
 	const cellMeshes: Record<string, Record<number, Float32Array>> = {};
 	const cellEdges: Record<string, Record<number, Float32Array>> = {};
@@ -64,6 +75,7 @@ function processWithWasm(bytes: Uint8Array): {
 		}
 	}
 
+	console.log('WASM processed: meshes', Object.keys(cellMeshes).length, 'polygonCount', polygonCount);
 	return { cellMeshes, cellEdges, cellInstances, polygonCount };
 }
 
