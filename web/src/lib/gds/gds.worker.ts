@@ -75,8 +75,8 @@ function processWithWasm(bytes: Uint8Array): {
 		}
 	}
 
-	console.log('WASM processed: meshes', Object.keys(cellMeshes).length, 'polygonCount', polygonCount);
-	return { cellMeshes, cellEdges, cellInstances, polygonCount };
+	console.log('WASM processed: meshes', Object.keys(cellMeshes).length, 'instances', Object.keys(cellInstances).length, 'polygonCount', polygonCount);
+	return { cellMeshes, cellEdges, cellInstances, polygonCount: raw.polygonCount ?? polygonCount };
 }
 
 // ─── JS fallback path ────────────────────────────────────────────────
@@ -246,7 +246,14 @@ self.onmessage = async (e: MessageEvent) => {
 		if (useWasm) {
 			self.postMessage({ type: 'progress', phase: 'processing (WASM)' });
 			const t0 = performance.now();
-			const result = processWithWasm(bytes);
+			let result;
+			try {
+				result = processWithWasm(bytes);
+			} catch (wasmErr: any) {
+				console.error('WASM processing failed, falling back to JS:', wasmErr);
+				processWithJS(bytes);
+				return;
+			}
 			const t1 = performance.now();
 			console.log(`GDS WASM: ${(t1 - t0) | 0}ms → ${result.polygonCount.toLocaleString()} polygon verts`);
 
