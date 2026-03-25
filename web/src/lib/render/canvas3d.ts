@@ -34,8 +34,6 @@ export function createCamera(): Camera {
 interface Mesh {
 	vao: WebGLVertexArrayObject;
 	count: number;
-	wireEBO: WebGLBuffer;
-	wireCount: number;
 	color: [number, number, number];
 }
 
@@ -221,6 +219,12 @@ function hexToRgb(hex: string): [number, number, number] {
 	return [r, g, b];
 }
 
+// ─── Cached constants ────────────────────────────────────────────────
+
+const LIGHT_RAW = [0.4, 0.3, 0.8] as const;
+const LIGHT_LEN = Math.sqrt(LIGHT_RAW[0] ** 2 + LIGHT_RAW[1] ** 2 + LIGHT_RAW[2] ** 2);
+const LIGHT_DIR: [number, number, number] = [LIGHT_RAW[0] / LIGHT_LEN, LIGHT_RAW[1] / LIGHT_LEN, LIGHT_RAW[2] / LIGHT_LEN];
+
 // ─── Triangulation (earcut — robust for complex polygons) ────────────
 
 function triangulate(xs: number[], ys: number[]): number[] {
@@ -328,7 +332,7 @@ function extrudePolygon(
 	}
 }
 
-function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: number[]): { vao: WebGLVertexArrayObject; wireEBO: WebGLBuffer; wireCount: number } {
+function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: number[]): WebGLVertexArrayObject {
 	const vao = gl.createVertexArray()!;
 	gl.bindVertexArray(vao);
 
@@ -344,25 +348,8 @@ function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: nu
 	gl.enableVertexAttribArray(1);
 	gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
 
-	// Build wireframe edge indices from triangles
-	const triCount = positions.length / 9;
-	const wireIndices = new Uint32Array(triCount * 6);
-	for (let i = 0; i < triCount; i++) {
-		const base = i * 3;
-		const wi = i * 6;
-		wireIndices[wi]     = base;
-		wireIndices[wi + 1] = base + 1;
-		wireIndices[wi + 2] = base + 1;
-		wireIndices[wi + 3] = base + 2;
-		wireIndices[wi + 4] = base + 2;
-		wireIndices[wi + 5] = base;
-	}
-	const wireEBO = gl.createBuffer()!;
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wireEBO);
-	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, wireIndices, gl.STATIC_DRAW);
-
 	gl.bindVertexArray(null);
-	return { vao, wireEBO, wireCount: wireIndices.length };
+	return vao;
 }
 
 function createLineMesh(gl: WebGL2RenderingContext, positions: number[]): WebGLVertexArrayObject {
@@ -610,8 +597,8 @@ async function buildMeshesAsync(
 			if (now - lastYield > 30 && pi < polys.length - 1) {
 				if (gen !== buildGeneration) return;
 				if (allPos.length > 0) {
-					const { vao, wireEBO, wireCount } = createMesh(gl, allPos, allNorm);
-					state.meshes.push({ vao, count: allPos.length / 3, wireEBO, wireCount, color });
+					const vao = createMesh(gl, allPos, allNorm);
+					state.meshes.push({ vao, count: allPos.length / 3, color });
 					allPos = [];
 					allNorm = [];
 				}
@@ -623,8 +610,8 @@ async function buildMeshesAsync(
 
 		if (allPos.length > 0) {
 			if (gen !== buildGeneration) return;
-			const { vao, wireEBO, wireCount } = createMesh(gl, allPos, allNorm);
-			state.meshes.push({ vao, count: allPos.length / 3, wireEBO, wireCount, color });
+			const vao = createMesh(gl, allPos, allNorm);
+			state.meshes.push({ vao, count: allPos.length / 3, color });
 		}
 	}
 }
@@ -671,8 +658,8 @@ export interface InstancedSceneData {
 	cellMeshes: Record<string, Record<number, Float32Array>>;
 	/** cellName → { gdsLayer → Float32Array of edge pairs [x1,y1,x2,y2,...] } */
 	cellEdges: Record<string, Record<number, Float32Array>>;
-	/** cellName → flat array of affine transforms [a,b,c,d,tx,ty, ...] */
-	cellInstances: Record<string, number[]>;
+	/** cellName → Float32Array of affine transforms [a,b,c,d,tx,ty, ...] */
+	cellInstances: Record<string, Float32Array>;
 }
 
 /**
@@ -714,20 +701,8 @@ export function buildInstancedMeshes(
 		}
 	}
 
-	// Compute geometry center for the scene
+	// Compute geometry center from instance positions
 	let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-	for (const [cellName, meshes] of Object.entries(sceneData.cellMeshes)) {
-		const transforms = sceneData.cellInstances[cellName];
-		if (!transforms) continue;
-		for (const buf of Object.values(meshes)) {
-			for (let i = 0; i < buf.length; i += 2) {
-				// Just sample first instance to estimate bounds
-				const x = transforms[0] * buf[i] + transforms[1] * buf[i + 1] + transforms[2];
-				const y = transforms[3] * buf[i] + transforms[4] * buf[i + 1] + transforms[5]; // FIXME: wrong indices
-			}
-		}
-	}
-	// Simpler: use transforms tx,ty to estimate bounds
 	for (const transforms of Object.values(sceneData.cellInstances)) {
 		for (let i = 0; i < transforms.length; i += 6) {
 			const tx = transforms[i + 4], ty = transforms[i + 5];
@@ -974,7 +949,6 @@ export function render3D(
 	camera: Camera,
 	width: number,
 	height: number,
-	wireframe: boolean = false,
 	/** 0 = full perspective (3D), 1 = full orthographic (2D top-down) */
 	orthoBlend: number = 0,
 	/** If true, skip background clear and grid (for transparent PNG export) */
@@ -1040,9 +1014,7 @@ export function render3D(
 		const normalMat = mat3NormalFromMat4(view);
 		gl.uniformMatrix4fv(uMVP, false, vp);
 		gl.uniformMatrix3fv(uNormalMat, false, normalMat);
-		const lx = 0.4, ly = 0.3, lz = 0.8;
-		const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
-		gl.uniform3f(uLightDir, lx / ll, ly / ll, lz / ll);
+		gl.uniform3f(uLightDir, LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]);
 		// Flat shading in ortho (2D) mode, lit shading in perspective (3D)
 		gl.uniform1f(uAmbient, 0.8 + 0.2 * orthoBlend);
 		for (const mesh of state.meshes) {
@@ -1053,12 +1025,10 @@ export function render3D(
 	}
 
 	// Draw instanced meshes (from GDS import)
-	if (state.instancedMeshes.length > 0 && !wireframe) {
+	if (state.instancedMeshes.length > 0) {
 		gl.useProgram(state.instProgram);
 		gl.uniformMatrix4fv(state.uInstMVP, false, vp);
-		const lx = 0.4, ly = 0.3, lz = 0.8;
-		const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
-		gl.uniform3f(state.uInstLightDir, lx / ll, ly / ll, lz / ll);
+		gl.uniform3f(state.uInstLightDir, LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]);
 		gl.uniform1f(state.uInstAmbient, 0.8 + 0.2 * orthoBlend);
 
 		// Filter meshes by visibility and frustum
@@ -1091,7 +1061,7 @@ export function render3D(
 		// Draw side walls
 		gl.useProgram(state.instSideProgram);
 		gl.uniformMatrix4fv(state.uInstSideMVP, false, vp);
-		gl.uniform3f(state.uInstSideLightDir, lx / ll, ly / ll, lz / ll);
+		gl.uniform3f(state.uInstSideLightDir, LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]);
 		gl.uniform1f(state.uInstSideAmbient, 0.8 + 0.2 * orthoBlend);
 		for (const mesh of visibleMeshes) {
 			if (!mesh.sideVao || !mesh.sideVertCount) continue;
@@ -1159,7 +1129,6 @@ export function disposeGL(state: GLState): void {
 	const { gl } = state;
 	for (const m of state.meshes) {
 		gl.deleteVertexArray(m.vao);
-		gl.deleteBuffer(m.wireEBO);
 	}
 	for (const m of state.axisMeshes) gl.deleteVertexArray(m.vao);
 	if (state.gridMesh) gl.deleteVertexArray(state.gridMesh.vao);

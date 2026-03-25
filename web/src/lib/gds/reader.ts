@@ -532,7 +532,7 @@ export interface GdsProgress {
 export interface GdsWorkerResult {
 	cellMeshes: Record<string, Record<number, Float32Array>>;
 	cellEdges: Record<string, Record<number, Float32Array>>;
-	cellInstances: Record<string, number[]>;
+	cellInstances: Record<string, Float32Array>;
 	polygonCount: number;
 }
 

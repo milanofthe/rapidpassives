@@ -70,7 +70,7 @@ self.onmessage = (e: MessageEvent) => {
 
 		const cellMeshes: Record<string, Record<number, Float32Array>> = {};
 		const cellEdges: Record<string, Record<number, Float32Array>> = {};
-		const cellInstances: Record<string, number[]> = {};
+		const cellInstances: Record<string, Float32Array> = {};
 		const transferables: ArrayBuffer[] = [];
 		let totalTriVerts = 0;
 
@@ -120,7 +120,8 @@ self.onmessage = (e: MessageEvent) => {
 					packed[i * 6 + 4] = t[4] * scene.userUnit;
 					packed[i * 6 + 5] = t[5] * scene.userUnit;
 				}
-				cellInstances[cellName] = Array.from(packed);
+				cellInstances[cellName] = packed;
+			transferables.push(packed.buffer);
 			}
 		}
 

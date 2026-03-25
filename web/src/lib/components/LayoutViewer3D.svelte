@@ -94,7 +94,7 @@
 		gl.clearColor(0, 0, 0, 0);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 		// Draw geometry only (skip the clear in render3D by calling it after our clear)
-		render3D(glState, camera, w, h, false, orthoBlend, true, visibleGdsLayers);
+		render3D(glState, camera, w, h, orthoBlend, true, visibleGdsLayers);
 
 		canvas.toBlob((blob) => {
 			if (!blob) return;
@@ -156,7 +156,7 @@
 			const onBatch = () => {
 				if (mounted && glState && canvas) {
 					const { w, h } = syncCanvas();
-					if (w > 0 && h > 0) render3D(glState!, camera, w, h, false, orthoBlend, false, visibleGdsLayers);
+					if (w > 0 && h > 0) render3D(glState!, camera, w, h, orthoBlend, false, visibleGdsLayers);
 				}
 			};
 			if (instancedScene) {
@@ -166,7 +166,7 @@
 			}
 		}
 
-		render3D(glState, camera, w, h, false, orthoBlend, false, visibleGdsLayers);
+		render3D(glState, camera, w, h, orthoBlend, false, visibleGdsLayers);
 	}
 
 	// Animate ortho blend when `ortho` prop changes
