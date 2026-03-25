@@ -13,4 +13,9 @@ export default defineConfig({
 	worker: {
 		plugins: () => [wasm()],
 	},
+	server: {
+		fs: {
+			allow: ['..'],
+		},
+	},
 });

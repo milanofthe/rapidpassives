@@ -6,14 +6,14 @@
 
 // ─── WASM path ───────────────────────────────────────────────────────
 
-let wasmModule: typeof import('gds-wasm') | null = null;
+let wasmModule: any = null;
 let wasmFailed = false;
 
 async function initWasm(): Promise<boolean> {
 	if (wasmModule) return true;
 	if (wasmFailed) return false;
 	try {
-		const mod = await import('gds-wasm');
+		const mod = await import('../../../../wasm/pkg/gds_wasm.js');
 		await mod.default();
 		wasmModule = mod;
 		return true;
