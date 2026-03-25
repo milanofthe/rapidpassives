@@ -3,6 +3,7 @@ mod parser;
 mod hierarchy;
 mod triangulate;
 
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 macro_rules! log {
@@ -37,6 +38,7 @@ pub fn process_gds(data: &[u8]) -> Result<JsValue, JsValue> {
     log!("WASM: triangulation done, {} cell meshes, {} polygon_count",
         result.cell_meshes.len(), result.polygon_count);
 
-    serde_wasm_bindgen::to_value(&result)
+    let serializer = serde_wasm_bindgen::Serializer::new().serialize_maps_as_objects(true);
+    result.serialize(&serializer)
         .map_err(|e| JsValue::from_str(&format!("{e}")))
 }

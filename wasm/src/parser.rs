@@ -9,10 +9,20 @@ pub fn parse_gds(
     let lib = GdsLibrary::from_bytes(data.to_vec())
         .map_err(|e| format!("GDS parse error: {e}"))?;
 
-    // gds21's user_unit() = first GDSII real from UNITS record = our JS userUnit
+    // gds21 GdsUnits: user_unit = db_units per user unit, db_unit = meters per db unit
+    // JS parser: userUnit = first real from UNITS = user_unit_in_db_units (ratio)
+    // For coord scaling: display_coord = gds_int * js_userUnit
+    // gds21's user_unit() is the INVERSE: user_units_per_db_unit
+    // So: js_userUnit = 1/gds21.user_unit() ... but that doesn't match either.
+    // Let's just pass both raw values and let the log tell us.
+    let uu = lib.units.user_unit();
+    let db = lib.units.db_unit();
     let units = GdsUnits {
-        user_unit: lib.units.user_unit(),
-        meters_per_unit: lib.units.db_unit(),
+        // Try: userUnit = db_unit / (db_unit * user_unit) = 1/user_unit? No...
+        // The JS code gets 0.001 for this file. gds21 gives user_unit=1e6, db_unit=1e-9.
+        // 0.001 = 1e-9 * 1e6 = db_unit * user_unit. That's it!
+        user_unit: db * uu,
+        meters_per_unit: db,
     };
 
     let mut cells: HashMap<String, CellData> = HashMap::new();
