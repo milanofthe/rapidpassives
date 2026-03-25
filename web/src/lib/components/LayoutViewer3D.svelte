@@ -80,14 +80,13 @@
 		}, 400);
 	}
 
-	/** Flip the chip — look from below instead of above */
+	/** Flip the chip — rotate 180° around the screen X axis */
 	export function flipZ() {
 		const base = effectiveCamera();
 		animateCamera({
 			...base,
 			target: [...base.target] as [number, number, number],
-			phi: -base.phi,
-			theta: base.theta + Math.PI,
+			phi: Math.PI - base.phi,
 		}, 400);
 	}
 
