@@ -38,14 +38,16 @@
 		// Ignore if user is typing in an input
 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-		switch (e.key.toLowerCase()) {
-			case 'f': doReset(); break;
-			case 'w': wireframe = !wireframe; break;
+		switch (e.key) {
+			case 'f': case 'F': doReset(); break;
+			case 'w': case 'W': wireframe = !wireframe; break;
+			case '+': case '=': doZoomIn(); break;
+			case '-': case '_': doZoomOut(); break;
 			case ' ':
 				e.preventDefault();
 				if (stack) toggleView();
 				break;
-			case 's':
+			case 's': case 'S':
 				if (e.ctrlKey || e.metaKey) {
 					e.preventDefault();
 					viewer?.saveScreenshot();

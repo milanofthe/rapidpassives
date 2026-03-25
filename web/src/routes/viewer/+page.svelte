@@ -324,12 +324,6 @@
 		gdsLayers = gdsLayers.map((l, j) => j === i ? { ...l, thickness: value } : l);
 	}
 
-	function resetFile() {
-		fileName = '';
-		gdsLayers = [];
-		rawPolygons = new Map();
-		error = '';
-	}
 
 	// Drag reorder handlers
 	function onRowDragStart(e: DragEvent, i: number) {
@@ -376,15 +370,19 @@
 	let loaded = $derived(gdsLayers.length > 0);
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="page-drop-target" ondrop={onDrop} ondragover={onDragOver} ondragleave={onDragLeave}>
+{#if dragOver && loaded}
+	<div class="drop-overlay">
+		<p>Drop GDS file to replace</p>
+	</div>
+{/if}
 {#if !loaded}
 	<div class="dropzone-page">
 		<div
 			class="dropzone"
 			class:dragover={dragOver}
 			class:loading
-			ondrop={onDrop}
-			ondragover={onDragOver}
-			ondragleave={onDragLeave}
 			role="button"
 			tabindex="0"
 		>
@@ -421,7 +419,6 @@
 			<div class="panel">
 				<div class="file-info">
 					<span class="file-name" title={fileName}>{fileName}</span>
-					<button class="close-btn" onclick={resetFile} title="Close file">&times;</button>
 				</div>
 				<div class="stats">
 					<span>{gdsLayers.length} layers</span>
@@ -483,8 +480,32 @@
 		{/snippet}
 	</GeometryEditor>
 {/if}
+</div>
 
 <style>
+	.page-drop-target {
+		height: 100%;
+		position: relative;
+	}
+	.drop-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 50;
+		background: rgba(0, 0, 0, 0.6);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		pointer-events: none;
+	}
+	.drop-overlay p {
+		font-size: var(--fs-md);
+		font-family: var(--font-mono);
+		font-weight: 600;
+		color: var(--accent);
+		border: 2px dashed var(--accent);
+		padding: 20px 40px;
+	}
+
 	/* Drop zone page */
 	.dropzone-page {
 		height: 100%;
@@ -590,24 +611,6 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		flex: 1;
-	}
-	.close-btn {
-		background: none;
-		border: 1px solid var(--border);
-		color: var(--text-dim);
-		font-size: 16px;
-		width: 24px;
-		height: 24px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		padding: 0;
-		transition: color 0.15s, border-color 0.15s;
-	}
-	.close-btn:hover {
-		color: var(--accent);
-		border-color: var(--accent);
 	}
 	.stats {
 		font-size: var(--fs-xs);
