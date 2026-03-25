@@ -1,8 +1,45 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 
 	let { children } = $props();
+	let globalDragOver = $state(false);
+	let globalDragCounter = 0;
+
+	function onGlobalDragEnter(e: DragEvent) {
+		// Only react to file drops, not internal drags
+		if (!e.dataTransfer?.types.includes('Files')) return;
+		// Don't show overlay if already on viewer page
+		if (page.url.pathname === '/viewer') return;
+		e.preventDefault();
+		globalDragCounter++;
+		globalDragOver = true;
+	}
+
+	function onGlobalDragOver(e: DragEvent) {
+		if (!globalDragOver) return;
+		e.preventDefault();
+	}
+
+	function onGlobalDragLeave() {
+		globalDragCounter--;
+		if (globalDragCounter <= 0) {
+			globalDragCounter = 0;
+			globalDragOver = false;
+		}
+	}
+
+	function onGlobalDrop(e: DragEvent) {
+		e.preventDefault();
+		globalDragCounter = 0;
+		globalDragOver = false;
+		const file = e.dataTransfer?.files[0];
+		if (file && /\.(gds|gdsii|gds2)$/i.test(file.name)) {
+			(window as any).__gdsPendingFile = file;
+			goto('/viewer');
+		}
+	}
 
 	const generators = [
 		{ href: '/generator/spiral', label: 'Spiral' },
@@ -17,7 +54,25 @@
 	const isEditor = $derived(isGenerator || isViewer);
 </script>
 
-<div class="app">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="app"
+	ondragenter={onGlobalDragEnter}
+	ondragover={onGlobalDragOver}
+	ondragleave={onGlobalDragLeave}
+	ondrop={onGlobalDrop}
+>
+	{#if globalDragOver}
+		<div class="global-drop-overlay">
+			<div class="global-drop-prompt">
+				<svg width="32" height="32" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+					<rect x="8" y="6" width="32" height="36" rx="2" />
+					<path d="M18 24L24 30L30 24" />
+					<path d="M24 16V30" />
+				</svg>
+				<p>Drop GDS file to open in Viewer</p>
+			</div>
+		</div>
+	{/if}
 	<header>
 		<a class="brand" href="/">
 			<img src="/favicon.svg" alt="RapidPassives" class="logo" />
@@ -95,5 +150,29 @@
 		flex: 1;
 		overflow: hidden;
 		min-height: 0;
+	}
+	.global-drop-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 100;
+		background: rgba(0, 0, 0, 0.7);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		pointer-events: none;
+	}
+	.global-drop-prompt {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+		color: var(--accent);
+		border: 2px dashed var(--accent);
+		padding: 30px 50px;
+	}
+	.global-drop-prompt p {
+		font-size: var(--fs-sm);
+		font-family: var(--font-mono);
+		font-weight: 600;
 	}
 </style>
