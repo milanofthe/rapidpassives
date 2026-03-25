@@ -5,6 +5,9 @@
 	import type { RenderOptions } from '$lib/render/canvas2d';
 	import { readGdsInWorker } from '$lib/gds/reader';
 	import { type InstancedSceneData } from '$lib/render/canvas3d';
+	import { PRESET_LIST, PRESETS } from '$lib/stack/presets/index';
+	import { applyPreset } from '$lib/stack/presets/apply';
+	import { parseLyp, parseCsvLayerMap } from '$lib/stack/presets/lyp-parser';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -124,7 +127,7 @@
 		const map: Record<string, string> = {};
 		for (const info of gdsLayers) {
 			const ln = GDS_TO_LAYER[info.gdsNum];
-			if (ln) map[ln] = `Layer ${info.gdsNum}`;
+			if (ln) map[ln] = layerMapNames.get(info.gdsNum) ?? `Layer ${info.gdsNum}`;
 		}
 		return map;
 	}
@@ -327,6 +330,97 @@
 		insertIdx = null;
 	}
 
+	let selectedPreset = $state('');
+
+	function onPresetChange(e: Event) {
+		const id = (e.target as HTMLSelectElement).value;
+		selectedPreset = id;
+		if (!id || !instancedScene) return;
+		const preset = PRESETS[id];
+		if (!preset) return;
+
+		// Collect GDS layer numbers present in the loaded file
+		const gdsLayersInFile = new Set<number>();
+		for (const meshes of Object.values(instancedScene.cellMeshes)) {
+			for (const key of Object.keys(meshes)) gdsLayersInFile.add(Number(key));
+		}
+
+		const applied = applyPreset(preset, gdsLayersInFile);
+
+		// Update layer mapping
+		for (const key of Object.keys(GDS_TO_LAYER)) delete GDS_TO_LAYER[Number(key)];
+		Object.assign(GDS_TO_LAYER, applied.gdsLayerMap);
+
+		// Update gdsLayers with preset info
+		const infos: GdsLayerInfo[] = [];
+		for (const sl of applied.stack.layers) {
+			if (sl.type === 'substrate') continue;
+			const gdsNum = Number(sl.id.replace(/^preset_|^generic_/, ''));
+			const info = applied.layerInfo.get(gdsNum);
+			infos.push({
+				gdsNum,
+				color: info?.color ?? sl.color,
+				visible: sl.visible,
+				polyCount: 0,
+				thickness: info?.thickness ?? sl.thickness,
+			});
+		}
+		gdsLayers = infos;
+		stack = applied.stack;
+	}
+
+	function onLayerMapDrop(e: DragEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		const file = e.dataTransfer?.files[0];
+		if (!file) return;
+		const reader = new FileReader();
+		reader.onload = () => {
+			const text = reader.result as string;
+			const ext = file.name.toLowerCase();
+			let parsed;
+			if (ext.endsWith('.lyp')) {
+				parsed = parseLyp(text);
+			} else if (ext.endsWith('.csv')) {
+				parsed = parseCsvLayerMap(text);
+			} else if (ext.endsWith('.json')) {
+				try {
+					const json = JSON.parse(text);
+					if (Array.isArray(json.layers)) {
+						parsed = json.layers.map((l: any) => ({
+							gds: l.gds, datatype: l.datatype ?? 0, name: l.name,
+							color: l.color ?? '#888888', visible: true,
+						}));
+					}
+				} catch {}
+			}
+			if (!parsed || parsed.length === 0) return;
+
+			// Apply names and colors from the layermap to existing gdsLayers
+			const nameMap = new Map(parsed.map((l: any) => [l.gds, l]));
+			gdsLayers = gdsLayers.map(info => {
+				const match = nameMap.get(info.gdsNum);
+				if (!match) return info;
+				return { ...info, color: match.color || info.color };
+			});
+
+			// Update layer labels
+			for (const l of parsed) {
+				const ln = GDS_TO_LAYER[l.gds];
+				if (ln) {
+					// Name will be picked up via buildLayerLabels
+				}
+			}
+			// Store parsed names for label display
+			for (const l of parsed) {
+				layerMapNames.set(l.gds, l.name);
+			}
+		};
+		reader.readAsText(file);
+	}
+
+	let layerMapNames = $state(new Map<number, string>());
+
 	let totalPolygons = $state(0);
 	let loaded = $derived(gdsLayers.length > 0);
 </script>
@@ -379,6 +473,18 @@
 					<span>{gdsLayers.length} layers</span>
 					<span class="sep">/</span>
 					<span>{totalPolygons.toLocaleString()} polygons</span>
+				</div>
+
+				<h4 class="section-label">Process</h4>
+				<select class="preset-select" value={selectedPreset} onchange={onPresetChange}>
+					<option value="">No preset</option>
+					{#each PRESET_LIST as p}
+						<option value={p.id}>{p.name}</option>
+					{/each}
+				</select>
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="layermap-drop" ondrop={onLayerMapDrop} ondragover={(e) => e.preventDefault()}>
+					<span>Drop .lyp / .csv / .json layermap</span>
 				</div>
 
 				<h4 class="section-label">Layers</h4>
@@ -561,6 +667,34 @@
 		text-transform: uppercase;
 		letter-spacing: 1px;
 		margin-top: 4px;
+	}
+	.preset-select {
+		width: 100%;
+		padding: 5px 8px;
+		font-size: var(--fs-xs);
+		font-family: var(--font-mono);
+		background: var(--input-bg);
+		border: 1px solid var(--input-border);
+		color: var(--text-muted);
+		cursor: pointer;
+	}
+	.preset-select:focus {
+		border-color: var(--input-focus);
+		outline: none;
+	}
+	.layermap-drop {
+		padding: 8px;
+		border: 1px dashed var(--border);
+		text-align: center;
+		font-size: 9px;
+		font-family: var(--font-mono);
+		color: var(--text-dim);
+		cursor: default;
+		transition: border-color 0.15s, color 0.15s;
+	}
+	.layermap-drop:hover {
+		border-color: var(--accent);
+		color: var(--text-muted);
 	}
 	.hint {
 		font-size: 9px;
