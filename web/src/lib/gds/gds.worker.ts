@@ -41,20 +41,26 @@ function processWithWasm(bytes: Uint8Array): {
 	for (const [cellName, layers] of Object.entries(raw.cellMeshes ?? {})) {
 		cellMeshes[cellName] = {};
 		for (const [layer, arr] of Object.entries(layers as Record<string, Float32Array>)) {
-			cellMeshes[cellName][Number(layer)] = arr;
+			// Copy to ensure independent ArrayBuffer (WASM Float32Arrays may share backing)
+			cellMeshes[cellName][Number(layer)] = new Float32Array(arr);
 		}
 	}
 	for (const [cellName, layers] of Object.entries(raw.cellEdges ?? {})) {
 		cellEdges[cellName] = {};
 		for (const [layer, arr] of Object.entries(layers as Record<string, Float32Array>)) {
-			cellEdges[cellName][Number(layer)] = arr;
+			cellEdges[cellName][Number(layer)] = new Float32Array(arr);
 		}
+	}
+
+	const cellInstances: Record<string, Float32Array> = {};
+	for (const [cellName, arr] of Object.entries(raw.cellInstances ?? {})) {
+		cellInstances[cellName] = new Float32Array(arr as Float32Array);
 	}
 
 	return {
 		cellMeshes,
 		cellEdges,
-		cellInstances: raw.cellInstances ?? {},
+		cellInstances,
 		polygonCount: raw.polygonCount ?? 0,
 	};
 }
