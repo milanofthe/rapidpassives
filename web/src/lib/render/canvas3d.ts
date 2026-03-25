@@ -471,6 +471,8 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const bg = hexToRgb(canvasTheme.bg);
 	gl.clearColor(bg[0], bg[1], bg[2], 1);
 	gl.enable(gl.DEPTH_TEST);
+	gl.enable(gl.CULL_FACE);
+	gl.cullFace(gl.BACK);
 
 	// Instanced shader program
 	const instProgram = linkProgramFromSource(gl, INST_VS, INST_FS);
@@ -1050,24 +1052,27 @@ export function render3D(
 			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
 		}
 
-		// Draw bottom faces
-		gl.uniform1f(state.uInstTopFace, 0.0);
-		for (const mesh of visibleMeshes) {
-			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
-			gl.bindVertexArray(mesh.vao);
-			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
-		}
+		// Skip bottom faces and side walls in 2D (ortho) mode — they're invisible from top-down
+		if (orthoBlend < 0.9) {
+			// Draw bottom faces
+			gl.uniform1f(state.uInstTopFace, 0.0);
+			for (const mesh of visibleMeshes) {
+				gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
+				gl.bindVertexArray(mesh.vao);
+				gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
+			}
 
-		// Draw side walls
-		gl.useProgram(state.instSideProgram);
-		gl.uniformMatrix4fv(state.uInstSideMVP, false, vp);
-		gl.uniform3f(state.uInstSideLightDir, LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]);
-		gl.uniform1f(state.uInstSideAmbient, 0.8 + 0.2 * orthoBlend);
-		for (const mesh of visibleMeshes) {
-			if (!mesh.sideVao || !mesh.sideVertCount) continue;
-			gl.uniform3f(state.uInstSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
-			gl.bindVertexArray(mesh.sideVao);
-			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.sideVertCount, mesh.instanceCount);
+			// Draw side walls
+			gl.useProgram(state.instSideProgram);
+			gl.uniformMatrix4fv(state.uInstSideMVP, false, vp);
+			gl.uniform3f(state.uInstSideLightDir, LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]);
+			gl.uniform1f(state.uInstSideAmbient, 0.8 + 0.2 * orthoBlend);
+			for (const mesh of visibleMeshes) {
+				if (!mesh.sideVao || !mesh.sideVertCount) continue;
+				gl.uniform3f(state.uInstSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
+				gl.bindVertexArray(mesh.sideVao);
+				gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.sideVertCount, mesh.instanceCount);
+			}
 		}
 	}
 
