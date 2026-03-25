@@ -4,7 +4,7 @@
 	import type { ProcessStack } from '$lib/stack/types';
 	import { initGL, buildMeshes, buildInstancedMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera, type InstancedSceneData } from '$lib/render/canvas3d';
 
-	let { layers, stack, colorOverrides, visibleLayers, wireframe = false, ortho = false, instancedScene, gdsLayerMap }: {
+	let { layers, stack, colorOverrides, visibleLayers, wireframe = false, ortho = false, instancedScene, gdsLayerMap, visibleGdsLayers }: {
 		layers: LayerMap;
 		stack: ProcessStack;
 		colorOverrides?: Record<string, string>;
@@ -13,6 +13,7 @@
 		ortho?: boolean;
 		instancedScene?: InstancedSceneData | null;
 		gdsLayerMap?: Record<number, string>;
+		visibleGdsLayers?: Set<number> | null;
 	} = $props();
 
 	export function zoomIn() {
@@ -94,7 +95,7 @@
 		gl.clearColor(0, 0, 0, 0);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 		// Draw geometry only (skip the clear in render3D by calling it after our clear)
-		render3D(glState, camera, w, h, wireframe, orthoBlend, true);
+		render3D(glState, camera, w, h, wireframe, orthoBlend, true, visibleGdsLayers);
 
 		canvas.toBlob((blob) => {
 			if (!blob) return;
@@ -156,7 +157,7 @@
 			const onBatch = () => {
 				if (mounted && glState && canvas) {
 					const { w, h } = syncCanvas();
-					if (w > 0 && h > 0) render3D(glState!, camera, w, h, wireframe, orthoBlend);
+					if (w > 0 && h > 0) render3D(glState!, camera, w, h, wireframe, orthoBlend, false, visibleGdsLayers);
 				}
 			};
 			if (instancedScene) {
@@ -166,7 +167,7 @@
 			}
 		}
 
-		render3D(glState, camera, w, h, wireframe, orthoBlend);
+		render3D(glState, camera, w, h, wireframe, orthoBlend, false, visibleGdsLayers);
 	}
 
 	// Animate ortho blend when `ortho` prop changes
@@ -354,6 +355,12 @@
 			needsRebuild = true;
 			renderFrame();
 		}
+	});
+
+	// Re-render (no rebuild) when GDS layer visibility changes
+	$effect(() => {
+		visibleGdsLayers;
+		if (mounted && glState) renderFrame();
 	});
 </script>
 

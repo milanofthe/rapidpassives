@@ -52,6 +52,8 @@ interface InstancedMesh {
 	color: [number, number, number];
 	sideVao?: WebGLVertexArrayObject;
 	sideVertCount?: number;
+	/** GDS layer number for visibility filtering */
+	gdsLayer?: number;
 }
 
 interface GLState {
@@ -878,6 +880,7 @@ export function buildInstancedMeshes(
 				color,
 				sideVao,
 				sideVertCount,
+				gdsLayer,
 			});
 		}
 	}
@@ -896,6 +899,8 @@ export function render3D(
 	orthoBlend: number = 0,
 	/** If true, skip background clear and grid (for transparent PNG export) */
 	transparent: boolean = false,
+	/** Set of visible GDS layer numbers — if provided, skip instanced meshes not in this set */
+	visibleGdsLayers?: Set<number> | null,
 ): void {
 	const { gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient } = state;
 
@@ -986,6 +991,7 @@ export function render3D(
 		// Draw top faces
 		gl.uniform1f(state.uInstTopFace, 1.0);
 		for (const mesh of state.instancedMeshes) {
+			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
 			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
 			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
@@ -994,6 +1000,7 @@ export function render3D(
 		// Draw bottom faces
 		gl.uniform1f(state.uInstTopFace, 0.0);
 		for (const mesh of state.instancedMeshes) {
+			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
 			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
 			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
@@ -1005,6 +1012,7 @@ export function render3D(
 		gl.uniform3f(state.uInstSideLightDir, lx / ll, ly / ll, lz / ll);
 		gl.uniform1f(state.uInstSideAmbient, 0.7 + 0.3 * orthoBlend);
 		for (const mesh of state.instancedMeshes) {
+			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
 			if (!mesh.sideVao || !mesh.sideVertCount) continue;
 			gl.uniform3f(state.uInstSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.sideVao);

@@ -114,6 +114,9 @@
 		layerLabels: buildLayerLabels(),
 	});
 
+	// Set of visible GDS layer numbers for render-time filtering (no mesh rebuild)
+	let visibleGdsLayers = $derived(new Set(gdsLayers.filter(l => l.visible).map(l => l.gdsNum)));
+
 	function buildColorOverrides(): Record<string, string> {
 		const map: Record<string, string> = {};
 		for (const info of gdsLayers) {
@@ -518,7 +521,7 @@
 		</div>
 	</div>
 {:else}
-	<GeometryEditor {layers} {renderOpts} {stack} {instancedScene} gdsLayerMap={GDS_TO_LAYER}
+	<GeometryEditor {layers} {renderOpts} {stack} {instancedScene} gdsLayerMap={GDS_TO_LAYER} {visibleGdsLayers}
 		onFileDrop={handleFile} dropLoading={loading} dropPhase={loadPhase} dropPolyCount={loadPolyCount}>
 		{#snippet sidebar()}
 			<div class="panel">
