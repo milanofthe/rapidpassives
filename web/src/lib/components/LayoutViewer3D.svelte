@@ -309,7 +309,7 @@
 			camera = {
 				...camera,
 				theta: camera.theta + dx * 0.005,
-				phi: Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.05, camera.phi + dy * 0.005)),
+				phi: camera.phi + dy * 0.005,
 			};
 		}
 		renderFrame();
