@@ -1,0 +1,19 @@
+{
+	"name": "GF180MCU",
+	"description": "GlobalFoundries 180nm CMOS — 5M + thick top metal",
+	"comment": "From gf180mcu-pdk DRM sections 4.3, 5.1, 7.15. Metal1-5 thickness from Rsh=90mOhm/sq",
+	"stack": [
+		{ "gds": 30, "datatype": 0, "type": "poly",  "z": -0.18, "thickness": 0.18 },
+		{ "gds": 34, "datatype": 0, "type": "metal", "z": 0.00,  "thickness": 0.31 },
+		{ "gds": 35, "datatype": 0, "type": "via",   "z": 0.31,  "thickness": 0.50 },
+		{ "gds": 36, "datatype": 0, "type": "metal", "z": 0.81,  "thickness": 0.31 },
+		{ "gds": 38, "datatype": 0, "type": "via",   "z": 1.12,  "thickness": 0.50 },
+		{ "gds": 42, "datatype": 0, "type": "metal", "z": 1.62,  "thickness": 0.31 },
+		{ "gds": 40, "datatype": 0, "type": "via",   "z": 1.93,  "thickness": 0.50 },
+		{ "gds": 46, "datatype": 0, "type": "metal", "z": 2.43,  "thickness": 0.31 },
+		{ "gds": 41, "datatype": 0, "type": "via",   "z": 2.74,  "thickness": 0.50 },
+		{ "gds": 81, "datatype": 0, "type": "metal", "z": 3.24,  "thickness": 0.31 },
+		{ "gds": 82, "datatype": 0, "type": "via",   "z": 3.55,  "thickness": 0.70 },
+		{ "gds": 53, "datatype": 0, "type": "metal", "z": 4.25,  "thickness": 0.90 }
+	]
+}
