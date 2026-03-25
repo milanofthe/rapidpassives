@@ -3,12 +3,12 @@
 	import type { RenderOptions } from '$lib/render/canvas2d';
 	import type { ProcessStack } from '$lib/stack/types';
 	import type { SimulationResult } from '$lib/solver/peec';
-	import type { InstancedSceneData } from '$lib/render/canvas3d';
+	import type { BatchedSceneData } from '$lib/render/canvas3d';
 	import LayoutViewer3D from './LayoutViewer3D.svelte';
 	import ResultsPanel from './ResultsPanel.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, instancedScene, gdsLayerMap, onFileDrop, dropLoading = false, dropPhase = '', dropPolyCount = 0 }: {
+	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, batchedScene, gdsLayerMap, onFileDrop, dropLoading = false, dropPhase = '', dropPolyCount = 0 }: {
 		layers: LayerMap;
 		sidebar: Snippet;
 		stackPanel?: Snippet;
@@ -17,7 +17,7 @@
 		renderOpts?: RenderOptions;
 		simResult?: SimulationResult | null;
 		stack?: ProcessStack;
-		instancedScene?: InstancedSceneData | null;
+		batchedScene?: BatchedSceneData | null;
 		gdsLayerMap?: Record<number, string>;
 		onFileDrop?: (file: File) => void;
 		dropLoading?: boolean;
@@ -197,7 +197,7 @@
 					ortho={viewMode === '2d'}
 					colorOverrides={renderOpts?.colorOverrides}
 					visibleLayers={renderOpts?.visibleLayers}
-					{instancedScene} {gdsLayerMap} />
+					{batchedScene} {gdsLayerMap} />
 			{/if}
 			<div class="viewer-toolbar">
 				<button class="tb" onclick={doZoomIn} title="Zoom in">+</button>
