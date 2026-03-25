@@ -8,7 +8,7 @@
 	import ResultsPanel from './ResultsPanel.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, instancedScene, gdsLayerMap, visibleGdsLayers, onFileDrop, dropLoading = false, dropPhase = '', dropPolyCount = 0 }: {
+	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, instancedScene, gdsLayerInfo, visibleGdsLayers, onFileDrop, dropLoading = false, dropPhase = '', dropPolyCount = 0 }: {
 		layers: LayerMap;
 		sidebar: Snippet;
 		stackPanel?: Snippet;
@@ -18,7 +18,7 @@
 		simResult?: SimulationResult | null;
 		stack?: ProcessStack;
 		instancedScene?: InstancedSceneData | null;
-		gdsLayerMap?: Record<number, string>;
+		gdsLayerInfo?: Map<number, import('$lib/render/canvas3d').GdsLayerInfo>;
 		visibleGdsLayers?: Set<number> | null;
 		onFileDrop?: (file: File) => void;
 		dropLoading?: boolean;
@@ -196,7 +196,7 @@
 					ortho={viewMode === '2d'}
 					colorOverrides={renderOpts?.colorOverrides}
 					visibleLayers={renderOpts?.visibleLayers}
-					{instancedScene} {gdsLayerMap} {visibleGdsLayers} />
+					{instancedScene} {gdsLayerInfo} {visibleGdsLayers} />
 			{/if}
 			<div class="viewer-toolbar">
 				<button class="tb" onclick={doZoomIn} title="Zoom in">+</button>

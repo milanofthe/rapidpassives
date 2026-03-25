@@ -4,14 +4,14 @@
 	import type { ProcessStack } from '$lib/stack/types';
 	import { initGL, buildMeshes, buildInstancedMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera, type InstancedSceneData } from '$lib/render/canvas3d';
 
-	let { layers, stack, colorOverrides, visibleLayers, ortho = false, instancedScene, gdsLayerMap, visibleGdsLayers }: {
+	let { layers, stack, colorOverrides, visibleLayers, ortho = false, instancedScene, gdsLayerInfo, visibleGdsLayers }: {
 		layers: LayerMap;
 		stack: ProcessStack;
 		colorOverrides?: Record<string, string>;
 		visibleLayers?: Set<LayerName>;
 		ortho?: boolean;
 		instancedScene?: InstancedSceneData | null;
-		gdsLayerMap?: Record<number, string>;
+		gdsLayerInfo?: Map<number, import('$lib/render/canvas3d').GdsLayerInfo>;
 		visibleGdsLayers?: Set<number> | null;
 	} = $props();
 
@@ -160,7 +160,7 @@
 				}
 			};
 			if (instancedScene) {
-				buildInstancedMeshes(glState, instancedScene, stack, colorOverrides, onBatch, gdsLayerMap);
+				buildInstancedMeshes(glState, instancedScene, stack, colorOverrides, onBatch, gdsLayerInfo);
 			} else {
 				buildMeshes(glState, layers, stack, colorOverrides, visibleLayers, onBatch);
 			}

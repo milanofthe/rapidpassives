@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
-	import type { LayerName, LayerMap } from '$lib/geometry/types';
+	import type { LayerMap } from '$lib/geometry/types';
+	// LayerName no longer needed — GDS viewer uses direct GDS layer numbers
 	import type { ProcessStack, StackLayer } from '$lib/stack/types';
 	import type { RenderOptions } from '$lib/render/canvas2d';
 	import { readGdsInWorker } from '$lib/gds/reader';
@@ -56,12 +57,6 @@
 		'#5a9a9a', '#d97070', '#70a0d9', '#a0d970', '#d9a070',
 	];
 
-	/** Reverse lookup from GDS layer number to internal LayerName */
-	const GDS_TO_LAYER: Record<number, LayerName> = {
-		1: 'windings', 2: 'crossings', 3: 'vias', 4: 'centertap',
-		5: 'vias2', 6: 'windings_m2', 7: 'crossings_m1', 8: 'windings_m4',
-		9: 'vias3', 10: 'pgs', 11: 'guard_ring',
-	};
 
 	interface GdsLayerInfo {
 		gdsNum: number;
@@ -87,94 +82,29 @@
 
 	// Empty LayerMap — geometry is rendered via instancedScene, not LayerMap
 	const layers: LayerMap = {};
+	const renderOpts: RenderOptions = {};
 
-	// Assign generic layer names from the available LayerName slots
-	const GENERIC_SLOTS: LayerName[] = ['windings', 'crossings', 'windings_m2', 'crossings_m1', 'windings_m4', 'vias', 'vias1', 'vias2', 'vias3', 'centertap', 'pgs', 'guard_ring'];
-	const usedSlots = new Set<LayerName>();
-	function assignGenericLayer(gdsNum: number): LayerName {
-		if (GDS_TO_LAYER[gdsNum]) return GDS_TO_LAYER[gdsNum];
-		// Try to find an unused slot first
-		for (const slot of GENERIC_SLOTS) {
-			if (!usedSlots.has(slot)) {
-				const directlyMapped = gdsLayers.some(l => GDS_TO_LAYER[l.gdsNum] === slot);
-				if (!directlyMapped) {
-					usedSlots.add(slot);
-					GDS_TO_LAYER[gdsNum] = slot;
-					return slot;
-				}
-			}
+	// Direct GDS layer info for the renderer — no LayerName indirection
+	let gdsLayerInfo = $derived.by(() => {
+		const map = new Map<number, import('$lib/render/canvas3d').GdsLayerInfo>();
+		let z = 0.5;
+		for (const info of gdsLayers) {
+			map.set(info.gdsNum, { z, thickness: info.thickness, color: info.color });
+			z += info.thickness;
 		}
-		// All slots used — share a slot (layers will stack at same z, but at least render)
-		const fallbackSlot = GENERIC_SLOTS[gdsNum % GENERIC_SLOTS.length];
-		GDS_TO_LAYER[gdsNum] = fallbackSlot;
-		return fallbackSlot;
-	}
-
-	let stack = $state<ProcessStack>(buildViewerStack());
-	let renderOpts = $derived<RenderOptions>({
-		colorOverrides: buildColorOverrides(),
-		visibleLayers: buildVisibleSet(),
-		layerLabels: buildLayerLabels(),
+		return map;
 	});
 
 	// Set of visible GDS layer numbers for render-time filtering (no mesh rebuild)
 	let visibleGdsLayers = $derived(new Set(gdsLayers.filter(l => l.visible).map(l => l.gdsNum)));
 
-	function buildColorOverrides(): Record<string, string> {
-		const map: Record<string, string> = {};
-		for (const info of gdsLayers) {
-			const ln = GDS_TO_LAYER[info.gdsNum];
-			if (ln) map[ln] = info.color;
-		}
-		return map;
-	}
-
-	function buildLayerLabels(): Record<string, string> {
-		const map: Record<string, string> = {};
-		for (const info of gdsLayers) {
-			const ln = GDS_TO_LAYER[info.gdsNum];
-			if (ln) map[ln] = layerMapNames.get(info.gdsNum) ?? `Layer ${info.gdsNum}`;
-		}
-		return map;
-	}
-
-	function buildVisibleSet(): Set<LayerName> {
-		const set = new Set<LayerName>();
-		for (const info of gdsLayers) {
-			if (!info.visible) continue;
-			const ln = GDS_TO_LAYER[info.gdsNum];
-			if (ln) set.add(ln);
-		}
-		return set;
-	}
-
 	function buildViewerStack(): ProcessStack {
-		const stackLayers: StackLayer[] = [
-			{ id: 'sub', name: 'Substrate', type: 'substrate', z: 0, thickness: 300, color: '#4a4a5a', gdsLayers: [], visible: true },
-		];
-
-		// Use gdsLayers order (user-controlled via drag) for z-stacking
-		let z = 300.5;
-		for (const info of gdsLayers) {
-			const ln = GDS_TO_LAYER[info.gdsNum];
-			if (!ln) continue;
-			stackLayers.push({
-				id: `gds_${info.gdsNum}`,
-				name: `Layer ${info.gdsNum}`,
-				type: 'metal',
-				z,
-				thickness: info.thickness,
-				color: info.color,
-				gdsLayers: [ln],
-				visible: info.visible,
-			});
-			z += info.thickness;
-		}
-
 		return {
 			name: 'GDS Import',
-			layers: stackLayers,
-			substrateThickness: 300,
+			layers: [
+				{ id: 'sub', name: 'Substrate', type: 'substrate', z: 0, thickness: 0, color: '#4a4a5a', gdsLayers: [], visible: true },
+			],
+			substrateThickness: 0,
 			oxideEr: 4.0,
 			substrateRho: 10,
 			substrateEr: 11.7,
@@ -211,15 +141,6 @@
 
 	async function loadBytes(bytes: Uint8Array) {
 		try {
-			// Full reset of layer mapping and state
-			usedSlots.clear();
-			for (const key of Object.keys(GDS_TO_LAYER)) delete GDS_TO_LAYER[Number(key)];
-			// Restore defaults
-			Object.assign(GDS_TO_LAYER, {
-				1: 'windings', 2: 'crossings', 3: 'vias', 4: 'centertap',
-				5: 'vias2', 6: 'windings_m2', 7: 'crossings_m1', 8: 'windings_m4',
-				9: 'vias3', 10: 'pgs', 11: 'guard_ring',
-			} as Record<number, LayerName>);
 			gdsLayers = [];
 			instancedScene = null;
 
@@ -237,16 +158,12 @@
 
 			instancedScene = { cellMeshes: result.cellMeshes, cellEdges: result.cellEdges, cellInstances: result.cellInstances };
 
-			// Build layer info from the cell meshes
+			// Build layer info directly from GDS layer numbers — no LayerName indirection
 			const gdsLayerNums = new Set<number>();
 			for (const meshes of Object.values(result.cellMeshes)) {
 				for (const key of Object.keys(meshes)) gdsLayerNums.add(Number(key));
 			}
-			const sortedKeys = [...gdsLayerNums].sort((a, b) => a - b);
-			for (const gdsNum of sortedKeys) {
-				if (!GDS_TO_LAYER[gdsNum]) assignGenericLayer(gdsNum);
-			}
-			gdsLayers = sortedKeys.map((gdsNum, i) => ({
+			gdsLayers = [...gdsLayerNums].sort((a, b) => a - b).map((gdsNum, i) => ({
 				gdsNum,
 				color: PALETTE[i % PALETTE.length],
 				visible: true,
@@ -342,27 +259,19 @@
 
 				const applied = applyPreset(preset, gdsLayersInFile);
 
-				for (const key of Object.keys(GDS_TO_LAYER)) delete GDS_TO_LAYER[Number(key)];
-				Object.assign(GDS_TO_LAYER, applied.gdsLayerMap);
-
-				const infos: GdsLayerInfo[] = [];
-				for (const sl of applied.stack.layers) {
-					if (sl.type === 'substrate') continue;
-					const gdsNum = Number(sl.id.replace(/^preset_|^generic_/, ''));
-					const info = applied.layerInfo.get(gdsNum);
-					infos.push({
-						gdsNum,
-						color: info?.color ?? sl.color,
-						visible: sl.visible,
-						polyCount: 0,
-						thickness: info?.thickness ?? sl.thickness,
-					});
-				}
-				gdsLayers = infos;
-				stack = applied.stack;
+				// Apply preset colors/thickness/names to existing gdsLayers
+				gdsLayers = gdsLayers.map(info => {
+					const presetInfo = applied.layerInfo.get(info.gdsNum);
+					return presetInfo ? {
+						...info,
+						color: presetInfo.color,
+						thickness: presetInfo.thickness,
+					} : info;
+				});
 				// Update labels from preset
-				layerMapNames = new Map(applied.layerInfo.entries()
-					.map(([gds, info]) => [gds, info.name] as [number, string]));
+				layerMapNames = new Map(
+					[...applied.layerInfo.entries()].map(([gds, info]) => [gds, info.name] as [number, string])
+				);
 			}
 
 			loading = false;
@@ -371,34 +280,19 @@
 
 	function resetToGenericStack() {
 		if (!instancedScene) return;
-
-		// Reset layer mapping
-		for (const key of Object.keys(GDS_TO_LAYER)) delete GDS_TO_LAYER[Number(key)];
-		Object.assign(GDS_TO_LAYER, {
-			1: 'windings', 2: 'crossings', 3: 'vias', 4: 'centertap',
-			5: 'vias2', 6: 'windings_m2', 7: 'crossings_m1', 8: 'windings_m4',
-			9: 'vias3', 10: 'pgs', 11: 'guard_ring',
-		} as Record<number, LayerName>);
-		usedSlots.clear();
 		layerMapNames = new Map();
 
-		// Rebuild generic layer list
 		const gdsLayerNums = new Set<number>();
 		for (const meshes of Object.values(instancedScene.cellMeshes)) {
 			for (const key of Object.keys(meshes)) gdsLayerNums.add(Number(key));
 		}
-		const sortedKeys = [...gdsLayerNums].sort((a, b) => a - b);
-		for (const gdsNum of sortedKeys) {
-			if (!GDS_TO_LAYER[gdsNum]) assignGenericLayer(gdsNum);
-		}
-		gdsLayers = sortedKeys.map((gdsNum, i) => ({
+		gdsLayers = [...gdsLayerNums].sort((a, b) => a - b).map((gdsNum, i) => ({
 			gdsNum,
 			color: PALETTE[i % PALETTE.length],
 			visible: true,
 			polyCount: 0,
 			thickness: 0.5,
 		}));
-		stack = buildViewerStack();
 	}
 
 	function onLayerMapDrop(e: DragEvent) {
@@ -436,13 +330,6 @@
 				return { ...info, color: match.color || info.color };
 			});
 
-			// Update layer labels
-			for (const l of parsed) {
-				const ln = GDS_TO_LAYER[l.gds];
-				if (ln) {
-					// Name will be picked up via buildLayerLabels
-				}
-			}
 			// Store parsed names for label display
 			for (const l of parsed) {
 				layerMapNames.set(l.gds, l.name);
@@ -463,7 +350,7 @@
 	<link rel="canonical" href="https://rapidpassives.org/viewer" />
 </svelte:head>
 
-<GeometryEditor {layers} {renderOpts} {stack} {instancedScene} gdsLayerMap={GDS_TO_LAYER} {visibleGdsLayers}
+<GeometryEditor {layers} {renderOpts} {stack} {instancedScene} {gdsLayerInfo} {visibleGdsLayers}
 	onFileDrop={handleFile} dropLoading={loading} dropPhase={loadPhase} dropPolyCount={loadPolyCount}>
 	{#snippet sidebar()}
 		<div class="panel">
