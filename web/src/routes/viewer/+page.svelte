@@ -87,10 +87,9 @@
 	// Direct GDS layer info for the renderer — no LayerName indirection
 	let gdsLayerInfo = $derived.by(() => {
 		const map = new Map<number, import('$lib/render/canvas3d').GdsLayerInfo>();
-		// Stack from bottom to top — last layer in the list is on top
+		// z follows sidebar order: first in list = lowest z (bottom of stack)
 		let z = 0.5;
-		for (let i = gdsLayers.length - 1; i >= 0; i--) {
-			const info = gdsLayers[i];
+		for (const info of gdsLayers) {
 			map.set(info.gdsNum, { z, thickness: info.thickness, color: info.color });
 			z += info.thickness;
 		}
