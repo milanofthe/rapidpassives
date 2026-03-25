@@ -33,8 +33,16 @@
 
 	export function saveScreenshot() {
 		if (!glState || !canvas) return;
-		// Re-render to ensure the canvas has current content (WebGL preserveDrawingBuffer is false by default)
-		renderFrame();
+		const { gl } = glState;
+		const { w, h } = syncCanvas();
+		if (w <= 0 || h <= 0) return;
+
+		// Re-render with transparent background
+		gl.clearColor(0, 0, 0, 0);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+		// Draw geometry only (skip the clear in render3D by calling it after our clear)
+		render3D(glState, camera, w, h, wireframe, orthoBlend, true);
+
 		canvas.toBlob((blob) => {
 			if (!blob) return;
 			const url = URL.createObjectURL(blob);
@@ -43,7 +51,9 @@
 			a.download = 'layout.png';
 			a.click();
 			URL.revokeObjectURL(url);
-		});
+			// Re-render normally
+			renderFrame();
+		}, 'image/png');
 	}
 
 	let canvas: HTMLCanvasElement;

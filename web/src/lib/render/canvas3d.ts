@@ -434,7 +434,7 @@ function cameraEye(cam: Camera): [number, number, number] {
 
 /** Initialize WebGL context and compile shaders */
 export function initGL(canvas: HTMLCanvasElement): GLState | null {
-	const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, preserveDrawingBuffer: true });
+	const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, preserveDrawingBuffer: true });
 	if (!gl) return null;
 
 	const program = linkProgram(gl);
@@ -791,10 +791,16 @@ export function render3D(
 	wireframe: boolean = false,
 	/** 0 = full perspective (3D), 1 = full orthographic (2D top-down) */
 	orthoBlend: number = 0,
+	/** If true, skip background clear and grid (for transparent PNG export) */
+	transparent: boolean = false,
 ): void {
 	const { gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient } = state;
 
 	gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+	if (!transparent) {
+		const bg = hexToRgb(canvasTheme.bg);
+		gl.clearColor(bg[0], bg[1], bg[2], 1);
+	}
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	const aspect = width / height || 1;
@@ -824,14 +830,16 @@ export function render3D(
 	const view = mat4LookAt(eye, camera.target as number[], [0, 0, 1]);
 	const vp = mat4Multiply(proj, view);
 
-	// Draw grid and axes first (behind geometry)
-	gl.useProgram(state.lineProgram);
-	gl.uniformMatrix4fv(state.uLineMVP, false, vp);
+	// Draw grid and axes first (behind geometry) — skip for transparent export
+	if (!transparent) {
+		gl.useProgram(state.lineProgram);
+		gl.uniformMatrix4fv(state.uLineMVP, false, vp);
 
-	if (state.gridMesh) {
-		gl.uniform3f(state.uLineColor, state.gridMesh.color[0], state.gridMesh.color[1], state.gridMesh.color[2]);
-		gl.bindVertexArray(state.gridMesh.vao);
-		gl.drawArrays(gl.LINES, 0, state.gridMesh.count);
+		if (state.gridMesh) {
+			gl.uniform3f(state.uLineColor, state.gridMesh.color[0], state.gridMesh.color[1], state.gridMesh.color[2]);
+			gl.bindVertexArray(state.gridMesh.vao);
+			gl.drawArrays(gl.LINES, 0, state.gridMesh.count);
+		}
 	}
 
 	// Draw geometry
