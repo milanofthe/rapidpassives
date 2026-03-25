@@ -59,12 +59,23 @@
 
 	/** Rotate 90 degrees in the XY plane */
 	export function rotate90() {
-		animateCamera({ ...camera, theta: camera.theta + Math.PI / 2 }, 300);
+		const target: Camera = {
+			...camera,
+			target: [...camera.target] as [number, number, number],
+			theta: camera.theta + Math.PI / 2,
+		};
+		animateCamera(target, 400);
 	}
 
-	/** Flip the view (mirror Z — look from below instead of above, or vice versa) */
+	/** Flip the chip — look from below instead of above */
 	export function flipZ() {
-		animateCamera({ ...camera, phi: -camera.phi }, 300);
+		const target: Camera = {
+			...camera,
+			target: [...camera.target] as [number, number, number],
+			phi: -camera.phi,
+			theta: camera.theta + Math.PI, // rotate 180° to maintain orientation
+		};
+		animateCamera(target, 400);
 	}
 
 	export function pan(dx: number, dy: number) {
