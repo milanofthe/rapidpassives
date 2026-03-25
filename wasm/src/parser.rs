@@ -9,8 +9,9 @@ pub fn parse_gds(
     let lib = GdsLibrary::from_bytes(data.to_vec())
         .map_err(|e| format!("GDS parse error: {e}"))?;
 
+    // gds21's user_unit() = first GDSII real from UNITS record = our JS userUnit
     let units = GdsUnits {
-        user_unit: lib.units.db_unit() / lib.units.user_unit(),
+        user_unit: lib.units.user_unit(),
         meters_per_unit: lib.units.db_unit(),
     };
 

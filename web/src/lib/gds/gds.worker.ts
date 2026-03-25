@@ -33,6 +33,7 @@ function processWithWasm(bytes: Uint8Array): {
 	polygonCount: number;
 } {
 	const raw = wasmModule!.process_gds(bytes);
+	console.log('WASM raw keys:', Object.keys(raw), 'polygonCount:', raw.polygonCount);
 
 	const cellMeshes: Record<string, Record<number, Float32Array>> = {};
 	const cellEdges: Record<string, Record<number, Float32Array>> = {};
