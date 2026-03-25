@@ -1030,8 +1030,8 @@ export function render3D(
 		}
 	}
 
-	// Compute 2D view bounds for frustum culling (only reliable in ortho/near-ortho mode)
-	const viewBounds = orthoBlend > 0.3 ? getViewBounds2D(vp) : null;
+	// No frustum culling — bbox approach was unreliable across view modes
+	const viewBounds: [number, number, number, number] | null = null;
 
 	// Draw geometry
 	{
