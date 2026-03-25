@@ -26,23 +26,35 @@
 	} = $props();
 
 	let viewerDragOver = $state(false);
+	let dragCounter = 0;
 
 	function onViewerDrop(e: DragEvent) {
 		e.preventDefault();
+		dragCounter = 0;
 		viewerDragOver = false;
 		if (!onFileDrop) return;
 		const file = e.dataTransfer?.files[0];
 		if (file) onFileDrop(file);
 	}
 
-	function onViewerDragOver(e: DragEvent) {
+	function onViewerDragEnter(e: DragEvent) {
 		if (!onFileDrop) return;
 		e.preventDefault();
+		dragCounter++;
 		viewerDragOver = true;
 	}
 
+	function onViewerDragOver(e: DragEvent) {
+		if (!onFileDrop) return;
+		e.preventDefault();
+	}
+
 	function onViewerDragLeave() {
-		viewerDragOver = false;
+		dragCounter--;
+		if (dragCounter <= 0) {
+			dragCounter = 0;
+			viewerDragOver = false;
+		}
 	}
 
 	let activeTab = $state<'params' | 'stack' | 'sim'>('params');
@@ -159,6 +171,7 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="viewer-pane"
 			ondrop={onViewerDrop}
+			ondragenter={onViewerDragEnter}
 			ondragover={onViewerDragOver}
 			ondragleave={onViewerDragLeave}
 		>
