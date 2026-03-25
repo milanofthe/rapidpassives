@@ -30,22 +30,54 @@ function triangulate(xs: number[], ys: number[]): number[] {
 	return result;
 }
 
+/** Check if polygon is an axis-aligned rectangle (4 points, all right angles) */
+function isRect(x: number[], y: number[]): boolean {
+	if (x.length !== 4) return false;
+	// All edges must be axis-aligned: either dx=0 or dy=0
+	for (let i = 0; i < 4; i++) {
+		const j = (i + 1) % 4;
+		const dx = x[j] - x[i], dy = y[j] - y[i];
+		if (Math.abs(dx) > 1e-10 && Math.abs(dy) > 1e-10) return false;
+	}
+	return true;
+}
+
 function triangulatePolygons(polys: Polygon[], scale: number): Float32Array {
+	// First pass: count vertices (rects = 6, others = earcut result)
 	let totalVerts = 0;
-	const triResults: { tris: number[]; poly: Polygon }[] = [];
+	const results: { type: 'rect' | 'tri'; poly: Polygon; tris?: number[] }[] = [];
 	for (const poly of polys) {
-		const tris = triangulate(poly.x, poly.y);
-		if (tris.length > 0) {
-			triResults.push({ tris, poly });
-			totalVerts += tris.length;
+		if (poly.x.length < 3) continue;
+		if (isRect(poly.x, poly.y)) {
+			results.push({ type: 'rect', poly });
+			totalVerts += 6; // 2 triangles
+		} else {
+			const tris = triangulate(poly.x, poly.y);
+			if (tris.length > 0) {
+				results.push({ type: 'tri', poly, tris });
+				totalVerts += tris.length;
+			}
 		}
 	}
+
+	// Second pass: pack vertices
 	const buf = new Float32Array(totalVerts * 2);
 	let offset = 0;
-	for (const { tris, poly } of triResults) {
-		for (let i = 0; i < tris.length; i++) {
-			buf[offset++] = poly.x[tris[i]] * scale;
-			buf[offset++] = poly.y[tris[i]] * scale;
+	for (const r of results) {
+		const { x, y } = r.poly;
+		if (r.type === 'rect') {
+			// 2 triangles: 0-1-2, 0-2-3
+			buf[offset++] = x[0] * scale; buf[offset++] = y[0] * scale;
+			buf[offset++] = x[1] * scale; buf[offset++] = y[1] * scale;
+			buf[offset++] = x[2] * scale; buf[offset++] = y[2] * scale;
+			buf[offset++] = x[0] * scale; buf[offset++] = y[0] * scale;
+			buf[offset++] = x[2] * scale; buf[offset++] = y[2] * scale;
+			buf[offset++] = x[3] * scale; buf[offset++] = y[3] * scale;
+		} else {
+			for (let i = 0; i < r.tris!.length; i++) {
+				buf[offset++] = x[r.tris![i]] * scale;
+				buf[offset++] = y[r.tris![i]] * scale;
+			}
 		}
 	}
 	return buf;
