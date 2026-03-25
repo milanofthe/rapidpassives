@@ -175,7 +175,7 @@
 		justify-content: center;
 	}
 	.card {
-		width: 220px;
+		width: 180px;
 		background: var(--bg-surface);
 		border: 1px solid var(--border-subtle);
 		text-decoration: none;
