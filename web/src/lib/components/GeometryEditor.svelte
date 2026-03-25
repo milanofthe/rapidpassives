@@ -8,7 +8,7 @@
 	import ResultsPanel from './ResultsPanel.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, instancedScene, gdsLayerMap }: {
+	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, instancedScene, gdsLayerMap, onFileDrop, dropLoading = false, dropPhase = '', dropPolyCount = 0 }: {
 		layers: LayerMap;
 		sidebar: Snippet;
 		stackPanel?: Snippet;
@@ -19,7 +19,31 @@
 		stack?: ProcessStack;
 		instancedScene?: InstancedSceneData | null;
 		gdsLayerMap?: Record<number, string>;
+		onFileDrop?: (file: File) => void;
+		dropLoading?: boolean;
+		dropPhase?: string;
+		dropPolyCount?: number;
 	} = $props();
+
+	let viewerDragOver = $state(false);
+
+	function onViewerDrop(e: DragEvent) {
+		e.preventDefault();
+		viewerDragOver = false;
+		if (!onFileDrop) return;
+		const file = e.dataTransfer?.files[0];
+		if (file) onFileDrop(file);
+	}
+
+	function onViewerDragOver(e: DragEvent) {
+		if (!onFileDrop) return;
+		e.preventDefault();
+		viewerDragOver = true;
+	}
+
+	function onViewerDragLeave() {
+		viewerDragOver = false;
+	}
 
 	let activeTab = $state<'params' | 'stack' | 'sim'>('params');
 	let viewMode = $state<'2d' | '3d'>('2d');
@@ -132,7 +156,29 @@
 		{#if !valid}
 			<div class="invalid-bar">Invalid geometry — parameters cause clipping or overlap</div>
 		{/if}
-		<div class="viewer-pane">
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="viewer-pane"
+			ondrop={onViewerDrop}
+			ondragover={onViewerDragOver}
+			ondragleave={onViewerDragLeave}
+		>
+			{#if (viewerDragOver || dropLoading) && onFileDrop}
+				<div class="viewer-drop-overlay">
+					{#if dropLoading}
+						<p class="drop-phase">{dropPhase}</p>
+						<p class="drop-text">{dropPolyCount > 0 ? `${dropPolyCount.toLocaleString()} polygons` : ''}</p>
+					{:else}
+						<div class="drop-prompt">
+							<svg width="32" height="32" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+								<rect x="8" y="6" width="32" height="36" rx="2" />
+								<path d="M18 24L24 30L30 24" />
+								<path d="M24 16V30" />
+							</svg>
+							<p>Drop GDS file</p>
+						</div>
+					{/if}
+				</div>
+			{/if}
 			{#if stack}
 				<LayoutViewer3D bind:this={viewer} {layers} {stack} {wireframe}
 					ortho={viewMode === '2d'}
@@ -266,6 +312,48 @@
 		flex: 1;
 		position: relative;
 		min-height: 0;
+	}
+	.viewer-drop-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 20;
+		background: var(--bg);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+	}
+	.drop-prompt {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+		color: var(--text-dim);
+		border: 2px dashed var(--border);
+		padding: 30px 50px;
+		transition: border-color 0.15s, color 0.15s;
+	}
+	.viewer-drop-overlay:not(:has(.drop-phase)) .drop-prompt {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+	.drop-prompt p {
+		font-size: var(--fs-sm);
+		font-family: var(--font-mono);
+		font-weight: 600;
+	}
+	.drop-phase {
+		font-size: var(--fs-sm);
+		font-family: var(--font-mono);
+		font-weight: 600;
+		color: var(--accent);
+	}
+	.drop-text {
+		font-size: var(--fs-xs);
+		font-family: var(--font-mono);
+		color: var(--text-dim);
+		min-height: 14px;
 	}
 	.viewer-toolbar {
 		position: absolute;

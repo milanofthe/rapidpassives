@@ -370,20 +370,6 @@
 	let loaded = $derived(gdsLayers.length > 0);
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="page-drop-target" ondrop={onDrop} ondragover={onDragOver} ondragleave={onDragLeave}>
-{#if loaded && (dragOver || loading)}
-	<div class="drop-overlay">
-		{#if loading}
-			<div class="overlay-loading">
-				<p class="loading-phase">{loadPhase}</p>
-				<p class="loading-text">{loadPolyCount > 0 ? `${loadPolyCount.toLocaleString()} polygons` : ''}</p>
-			</div>
-		{:else}
-			<p>Drop GDS file to replace</p>
-		{/if}
-	</div>
-{/if}
 {#if !loaded}
 	<div class="dropzone-page">
 		<div
@@ -421,7 +407,8 @@
 		</div>
 	</div>
 {:else}
-	<GeometryEditor {layers} {renderOpts} {stack} {instancedScene} gdsLayerMap={GDS_TO_LAYER}>
+	<GeometryEditor {layers} {renderOpts} {stack} {instancedScene} gdsLayerMap={GDS_TO_LAYER}
+		onFileDrop={handleFile} dropLoading={loading} dropPhase={loadPhase} dropPolyCount={loadPolyCount}>
 		{#snippet sidebar()}
 			<div class="panel">
 				<div class="file-info">
@@ -487,47 +474,8 @@
 		{/snippet}
 	</GeometryEditor>
 {/if}
-</div>
 
 <style>
-	.page-drop-target {
-		height: 100%;
-		position: relative;
-	}
-	.drop-overlay {
-		position: absolute;
-		inset: 0;
-		z-index: 50;
-		background: rgba(0, 0, 0, 0.6);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		pointer-events: none;
-	}
-	.drop-overlay p {
-		font-size: var(--fs-md);
-		font-family: var(--font-mono);
-		font-weight: 600;
-		color: var(--accent);
-		border: 2px dashed var(--accent);
-		padding: 20px 40px;
-	}
-	.overlay-loading {
-		text-align: center;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 8px;
-	}
-	.overlay-loading .loading-phase {
-		border: none;
-		padding: 0;
-	}
-	.overlay-loading .loading-text {
-		border: none;
-		padding: 0;
-	}
-
 	/* Drop zone page */
 	.dropzone-page {
 		height: 100%;
