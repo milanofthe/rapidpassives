@@ -4,12 +4,11 @@
 	import type { ProcessStack } from '$lib/stack/types';
 	import { initGL, buildMeshes, buildInstancedMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera, type InstancedSceneData } from '$lib/render/canvas3d';
 
-	let { layers, stack, colorOverrides, visibleLayers, wireframe = false, ortho = false, instancedScene, gdsLayerMap, visibleGdsLayers }: {
+	let { layers, stack, colorOverrides, visibleLayers, ortho = false, instancedScene, gdsLayerMap, visibleGdsLayers }: {
 		layers: LayerMap;
 		stack: ProcessStack;
 		colorOverrides?: Record<string, string>;
 		visibleLayers?: Set<LayerName>;
-		wireframe?: boolean;
 		ortho?: boolean;
 		instancedScene?: InstancedSceneData | null;
 		gdsLayerMap?: Record<number, string>;
@@ -95,7 +94,7 @@
 		gl.clearColor(0, 0, 0, 0);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 		// Draw geometry only (skip the clear in render3D by calling it after our clear)
-		render3D(glState, camera, w, h, wireframe, orthoBlend, true, visibleGdsLayers);
+		render3D(glState, camera, w, h, false, orthoBlend, true, visibleGdsLayers);
 
 		canvas.toBlob((blob) => {
 			if (!blob) return;
@@ -157,7 +156,7 @@
 			const onBatch = () => {
 				if (mounted && glState && canvas) {
 					const { w, h } = syncCanvas();
-					if (w > 0 && h > 0) render3D(glState!, camera, w, h, wireframe, orthoBlend, false, visibleGdsLayers);
+					if (w > 0 && h > 0) render3D(glState!, camera, w, h, false, orthoBlend, false, visibleGdsLayers);
 				}
 			};
 			if (instancedScene) {
@@ -167,7 +166,7 @@
 			}
 		}
 
-		render3D(glState, camera, w, h, wireframe, orthoBlend, false, visibleGdsLayers);
+		render3D(glState, camera, w, h, false, orthoBlend, false, visibleGdsLayers);
 	}
 
 	// Animate ortho blend when `ortho` prop changes
@@ -350,7 +349,6 @@
 		colorOverrides;
 		visibleLayers;
 		stack;
-		wireframe;
 		if (mounted && glState) {
 			needsRebuild = true;
 			renderFrame();

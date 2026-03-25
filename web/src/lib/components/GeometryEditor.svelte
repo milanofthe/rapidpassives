@@ -60,7 +60,6 @@
 
 	let activeTab = $state<'params' | 'stack' | 'sim'>('params');
 	let viewMode = $state<'2d' | '3d'>('2d');
-	let wireframe = $state(false);
 	let viewer: LayoutViewer3D | undefined = $state();
 
 	function doZoomIn() { viewer?.zoomIn(); }
@@ -77,7 +76,6 @@
 
 		switch (e.key) {
 			case 'f': case 'F': doReset(); break;
-			case 'w': case 'W': wireframe = !wireframe; break;
 			case '+': case '=': doZoomIn(); break;
 			case '-': case '_': doZoomOut(); break;
 			case 'ArrowLeft': e.preventDefault(); viewer?.pan(-1, 0); break;
@@ -194,7 +192,7 @@
 				</div>
 			{/if}
 			{#if stack}
-				<LayoutViewer3D bind:this={viewer} {layers} {stack} {wireframe}
+				<LayoutViewer3D bind:this={viewer} {layers} {stack}
 					ortho={viewMode === '2d'}
 					colorOverrides={renderOpts?.colorOverrides}
 					visibleLayers={renderOpts?.visibleLayers}
@@ -217,13 +215,6 @@
 						<path d="M2 10v3h12v-3" />
 						<path d="M8 2v8" />
 						<path d="M5 7l3 3 3-3" />
-					</svg>
-				</button>
-				<button class="tb" class:active-toggle={wireframe} onclick={() => wireframe = !wireframe} title="Toggle wireframe">
-					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
-						<path d="M1 5L8 1L15 5L15 11L8 15L1 11Z" />
-						<path d="M1 5L8 9L15 5" />
-						<path d="M8 9L8 15" />
 					</svg>
 				</button>
 				{#if stack}

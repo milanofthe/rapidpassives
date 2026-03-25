@@ -54,6 +54,8 @@ interface InstancedMesh {
 	sideVertCount?: number;
 	/** GDS layer number for visibility filtering */
 	gdsLayer?: number;
+	/** World-space bounding box of all instances [minX, minY, maxX, maxY] */
+	bbox?: [number, number, number, number];
 }
 
 interface GLState {
@@ -755,6 +757,20 @@ export function buildInstancedMeshes(
 		if (!transforms || transforms.length === 0) continue;
 		const instanceCount = transforms.length / 6;
 
+		// Compute cell-local vertex extent (shared across layers for this cell)
+		let cellMinX = Infinity, cellMaxX = -Infinity, cellMinY = Infinity, cellMaxY = -Infinity;
+		for (const vb of Object.values(meshes)) {
+			for (let i = 0; i < vb.length; i += 2) {
+				const vx = vb[i], vy = vb[i + 1];
+				if (vx < cellMinX) cellMinX = vx;
+				if (vx > cellMaxX) cellMaxX = vx;
+				if (vy < cellMinY) cellMinY = vy;
+				if (vy > cellMaxY) cellMaxY = vy;
+			}
+		}
+		const cellHalfW = isFinite(cellMaxX) ? (cellMaxX - cellMinX) / 2 + 1 : 1;
+		const cellHalfH = isFinite(cellMaxY) ? (cellMaxY - cellMinY) / 2 + 1 : 1;
+
 		for (const [gdsLayerStr, vertBuf] of Object.entries(meshes)) {
 			const gdsLayer = Number(gdsLayerStr);
 			const zInfo = layerZMap.get(gdsLayer);
@@ -768,20 +784,28 @@ export function buildInstancedMeshes(
 			const zBot = zInfo.z - cz;
 			const zTop = zInfo.z + zInfo.thickness - cz;
 
-			// Build instance buffer: pack transforms with z values
-			// Per instance: [a, b, tx-cx, zBot, c, d, ty-cy, zTop] → 2 vec4s
+			// Build instance buffer and compute bounding box
 			const instData = new Float32Array(instanceCount * 8);
+			let bMinX = Infinity, bMaxX = -Infinity, bMinY = Infinity, bMaxY = -Infinity;
 			for (let i = 0; i < instanceCount; i++) {
 				const si = i * 6;
+				const txCentered = transforms[si + 4] - cx;
+				const tyCentered = transforms[si + 5] - cy;
 				instData[i * 8 + 0] = transforms[si + 0]; // a
 				instData[i * 8 + 1] = transforms[si + 1]; // b
-				instData[i * 8 + 2] = transforms[si + 4] - cx; // tx - cx
+				instData[i * 8 + 2] = txCentered;          // tx - cx
 				instData[i * 8 + 3] = zBot;
 				instData[i * 8 + 4] = transforms[si + 2]; // c
 				instData[i * 8 + 5] = transforms[si + 3]; // d
-				instData[i * 8 + 6] = transforms[si + 5] - cy; // ty - cy
+				instData[i * 8 + 6] = tyCentered;          // ty - cy
 				instData[i * 8 + 7] = zTop;
+				// Expand bbox by instance position + cell extent
+				if (txCentered - cellHalfW < bMinX) bMinX = txCentered - cellHalfW;
+				if (txCentered + cellHalfW > bMaxX) bMaxX = txCentered + cellHalfW;
+				if (tyCentered - cellHalfH < bMinY) bMinY = tyCentered - cellHalfH;
+				if (tyCentered + cellHalfH > bMaxY) bMaxY = tyCentered + cellHalfH;
 			}
+			const bbox: [number, number, number, number] = [bMinX, bMinY, bMaxX, bMaxY];
 
 			const vao = gl.createVertexArray()!;
 			gl.bindVertexArray(vao);
@@ -881,11 +905,67 @@ export function buildInstancedMeshes(
 				sideVao,
 				sideVertCount,
 				gdsLayer,
+				bbox,
 			});
 		}
 	}
 
 	onDone?.();
+}
+
+/** Extract 2D view bounds from MVP matrix by unprojecting clip-space corners */
+function getViewBounds2D(mvp: Mat4): [number, number, number, number] | null {
+	// Invert the MVP
+	const inv = mat4Invert(mvp);
+	if (!inv) return null;
+	// Unproject the 4 corners of clip space at z=0
+	let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+	for (const [cx, cy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+		// Unproject (cx, cy, 0, 1) — z=0 is where our geometry lives
+		const x = inv[0] * cx + inv[4] * cy + inv[12];
+		const y = inv[1] * cx + inv[5] * cy + inv[13];
+		const w = inv[3] * cx + inv[7] * cy + inv[15];
+		if (Math.abs(w) < 1e-10) continue;
+		const wx = x / w, wy = y / w;
+		if (wx < minX) minX = wx; if (wx > maxX) maxX = wx;
+		if (wy < minY) minY = wy; if (wy > maxY) maxY = wy;
+	}
+	if (!isFinite(minX)) return null;
+	return [minX, minY, maxX, maxY];
+}
+
+function mat4Invert(m: Mat4): Mat4 | null {
+	const o = new Float32Array(16) as Mat4;
+	const a00 = m[0], a01 = m[1], a02 = m[2], a03 = m[3];
+	const a10 = m[4], a11 = m[5], a12 = m[6], a13 = m[7];
+	const a20 = m[8], a21 = m[9], a22 = m[10], a23 = m[11];
+	const a30 = m[12], a31 = m[13], a32 = m[14], a33 = m[15];
+	const b00 = a00 * a11 - a01 * a10, b01 = a00 * a12 - a02 * a10;
+	const b02 = a00 * a13 - a03 * a10, b03 = a01 * a12 - a02 * a11;
+	const b04 = a01 * a13 - a03 * a11, b05 = a02 * a13 - a03 * a12;
+	const b06 = a20 * a31 - a21 * a30, b07 = a20 * a32 - a22 * a30;
+	const b08 = a20 * a33 - a23 * a30, b09 = a21 * a32 - a22 * a31;
+	const b10 = a21 * a33 - a23 * a31, b11 = a22 * a33 - a23 * a32;
+	let det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+	if (Math.abs(det) < 1e-10) return null;
+	det = 1 / det;
+	o[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
+	o[1] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
+	o[2] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
+	o[3] = (a22 * b04 - a21 * b05 - a23 * b03) * det;
+	o[4] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
+	o[5] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
+	o[6] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
+	o[7] = (a20 * b05 - a22 * b02 + a23 * b01) * det;
+	o[8] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
+	o[9] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+	o[10] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
+	o[11] = (a21 * b02 - a20 * b04 - a23 * b00) * det;
+	o[12] = (a11 * b07 - a10 * b09 - a12 * b06) * det;
+	o[13] = (a00 * b09 - a01 * b07 + a02 * b06) * det;
+	o[14] = (a31 * b01 - a30 * b03 - a32 * b00) * det;
+	o[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
+	return o;
 }
 
 /** Render one frame */
@@ -950,18 +1030,11 @@ export function render3D(
 		}
 	}
 
+	// Compute 2D view bounds for frustum culling
+	const viewBounds = getViewBounds2D(vp);
+
 	// Draw geometry
-	if (wireframe) {
-		// Wireframe: use line program with edge indices
-		gl.useProgram(state.lineProgram);
-		gl.uniformMatrix4fv(state.uLineMVP, false, vp);
-		for (const mesh of state.meshes) {
-			gl.uniform3f(state.uLineColor, mesh.color[0], mesh.color[1], mesh.color[2]);
-			gl.bindVertexArray(mesh.vao);
-			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.wireEBO);
-			gl.drawElements(gl.LINES, mesh.wireCount, gl.UNSIGNED_INT, 0);
-		}
-	} else {
+	{
 		// Solid: use lit program
 		gl.useProgram(program);
 		const normalMat = mat3NormalFromMat4(view);
@@ -988,10 +1061,20 @@ export function render3D(
 		gl.uniform3f(state.uInstLightDir, lx / ll, ly / ll, lz / ll);
 		gl.uniform1f(state.uInstAmbient, 0.8 + 0.2 * orthoBlend);
 
+		// Filter meshes by visibility and frustum
+		const visibleMeshes = state.instancedMeshes.filter(mesh => {
+			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) return false;
+			if (viewBounds && mesh.bbox) {
+				const [vMinX, vMinY, vMaxX, vMaxY] = viewBounds;
+				const [bMinX, bMinY, bMaxX, bMaxY] = mesh.bbox;
+				if (bMaxX < vMinX || bMinX > vMaxX || bMaxY < vMinY || bMinY > vMaxY) return false;
+			}
+			return true;
+		});
+
 		// Draw top faces
 		gl.uniform1f(state.uInstTopFace, 1.0);
-		for (const mesh of state.instancedMeshes) {
-			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
+		for (const mesh of visibleMeshes) {
 			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
 			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
@@ -999,8 +1082,7 @@ export function render3D(
 
 		// Draw bottom faces
 		gl.uniform1f(state.uInstTopFace, 0.0);
-		for (const mesh of state.instancedMeshes) {
-			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
+		for (const mesh of visibleMeshes) {
 			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
 			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
@@ -1011,8 +1093,7 @@ export function render3D(
 		gl.uniformMatrix4fv(state.uInstSideMVP, false, vp);
 		gl.uniform3f(state.uInstSideLightDir, lx / ll, ly / ll, lz / ll);
 		gl.uniform1f(state.uInstSideAmbient, 0.8 + 0.2 * orthoBlend);
-		for (const mesh of state.instancedMeshes) {
-			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
+		for (const mesh of visibleMeshes) {
 			if (!mesh.sideVao || !mesh.sideVertCount) continue;
 			gl.uniform3f(state.uInstSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.sideVao);
