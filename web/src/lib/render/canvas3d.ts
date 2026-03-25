@@ -54,16 +54,6 @@ interface InstancedMesh {
 	sideVertCount?: number;
 }
 
-interface BatchedMesh {
-	vao: WebGLVertexArrayObject;
-	vertCount: number;
-	color: [number, number, number];
-	zBot: number;
-	zTop: number;
-	sideVao?: WebGLVertexArrayObject;
-	sideVertCount?: number;
-}
-
 interface GLState {
 	gl: WebGL2RenderingContext;
 	program: WebGLProgram;
@@ -83,26 +73,11 @@ interface GLState {
 	uInstSideColor: WebGLUniformLocation;
 	uInstSideLightDir: WebGLUniformLocation;
 	uInstSideAmbient: WebGLUniformLocation;
-	batchProgram: WebGLProgram;
-	uBatchMVP: WebGLUniformLocation;
-	uBatchColor: WebGLUniformLocation;
-	uBatchLightDir: WebGLUniformLocation;
-	uBatchAmbient: WebGLUniformLocation;
-	uBatchZ: WebGLUniformLocation;
-	uBatchTopFace: WebGLUniformLocation;
-	batchSideProgram: WebGLProgram;
-	uBatchSideMVP: WebGLUniformLocation;
-	uBatchSideColor: WebGLUniformLocation;
-	uBatchSideLightDir: WebGLUniformLocation;
-	uBatchSideAmbient: WebGLUniformLocation;
-	uBatchSideZBot: WebGLUniformLocation;
-	uBatchSideZTop: WebGLUniformLocation;
 	lineProgram: WebGLProgram;
 	uLineMVP: WebGLUniformLocation;
 	uLineColor: WebGLUniformLocation;
 	meshes: Mesh[];
 	instancedMeshes: InstancedMesh[];
-	batchedMeshes: BatchedMesh[];
 	axisMeshes: LineMesh[];
 	gridMesh: LineMesh | null;
 }
@@ -184,35 +159,6 @@ void main() {
 	float diff = max(dot(normalize(vNormal), uLightDir), 0.0);
 	vec3 lit = uColor * (uAmbient + (1.0 - uAmbient) * diff);
 	fragColor = vec4(lit, 1.0);
-}`;
-
-// Batched face shader: pre-transformed 2D positions + z from uniforms
-const BATCH_VS = `#version 300 es
-precision highp float;
-layout(location=0) in vec2 aPos;
-uniform mat4 uMVP;
-uniform float uZ;
-out vec3 vNormal;
-uniform float uTopFace;
-void main() {
-	gl_Position = uMVP * vec4(aPos, uZ, 1.0);
-	vNormal = vec3(0.0, 0.0, uTopFace > 0.5 ? 1.0 : -1.0);
-}`;
-
-// Batched side wall shader: pre-transformed 2D positions + normals
-const BATCH_SIDE_VS = `#version 300 es
-precision highp float;
-layout(location=0) in vec2 aPos;
-layout(location=1) in float aZFlag;
-layout(location=2) in vec2 aNormalXY;
-uniform mat4 uMVP;
-uniform float uZBot;
-uniform float uZTop;
-out vec3 vNormal;
-void main() {
-	float z = mix(uZBot, uZTop, aZFlag);
-	gl_Position = uMVP * vec4(aPos, z, 1.0);
-	vNormal = normalize(vec3(aNormalXY, 0.0));
 }`;
 
 const LINE_VS = `#version 300 es
@@ -550,32 +496,12 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uInstSideLightDir = gl.getUniformLocation(instSideProgram, 'uLightDir')!;
 	const uInstSideAmbient = gl.getUniformLocation(instSideProgram, 'uAmbient')!;
 
-	// Batched face shader (uses same FS as lit program)
-	const batchProgram = linkProgramFromSource(gl, BATCH_VS, FS);
-	const uBatchMVP = gl.getUniformLocation(batchProgram, 'uMVP')!;
-	const uBatchColor = gl.getUniformLocation(batchProgram, 'uColor')!;
-	const uBatchLightDir = gl.getUniformLocation(batchProgram, 'uLightDir')!;
-	const uBatchAmbient = gl.getUniformLocation(batchProgram, 'uAmbient')!;
-	const uBatchZ = gl.getUniformLocation(batchProgram, 'uZ')!;
-	const uBatchTopFace = gl.getUniformLocation(batchProgram, 'uTopFace')!;
-
-	// Batched side wall shader
-	const batchSideProgram = linkProgramFromSource(gl, BATCH_SIDE_VS, FS);
-	const uBatchSideMVP = gl.getUniformLocation(batchSideProgram, 'uMVP')!;
-	const uBatchSideColor = gl.getUniformLocation(batchSideProgram, 'uColor')!;
-	const uBatchSideLightDir = gl.getUniformLocation(batchSideProgram, 'uLightDir')!;
-	const uBatchSideAmbient = gl.getUniformLocation(batchSideProgram, 'uAmbient')!;
-	const uBatchSideZBot = gl.getUniformLocation(batchSideProgram, 'uZBot')!;
-	const uBatchSideZTop = gl.getUniformLocation(batchSideProgram, 'uZTop')!;
-
 	return {
 		gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient,
 		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace,
 		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient,
-		batchProgram, uBatchMVP, uBatchColor, uBatchLightDir, uBatchAmbient, uBatchZ, uBatchTopFace,
-		batchSideProgram, uBatchSideMVP, uBatchSideColor, uBatchSideLightDir, uBatchSideAmbient, uBatchSideZBot, uBatchSideZTop,
 		lineProgram, uLineMVP, uLineColor,
-		meshes: [], instancedMeshes: [], batchedMeshes: [], axisMeshes: [], gridMesh: null,
+		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null,
 	};
 }
 
@@ -959,158 +885,6 @@ export function buildInstancedMeshes(
 	onDone?.();
 }
 
-// ─── Batched mesh building (pre-flattened by worker) ─────────────────
-
-export interface BatchedSceneData {
-	/** GDS layer → Float32Array of pre-transformed face vertices [x,y,...] */
-	layerVerts: Record<number, Float32Array>;
-	/** GDS layer → Float32Array of pre-transformed side wall vertices [x,y,zFlag,nx,ny,...] */
-	layerSides: Record<number, Float32Array>;
-	/** GDS layer → [minX, minY, maxX, maxY] */
-	layerBounds: Record<number, [number, number, number, number]>;
-	/** List of GDS layer numbers present */
-	gdsLayers: number[];
-}
-
-export function buildBatchedMeshes(
-	state: GLState,
-	sceneData: BatchedSceneData,
-	stack: ProcessStack,
-	colorOverrides?: Record<string, string>,
-	gdsLayerMap?: Record<number, string>,
-	onDone?: () => void,
-): void {
-	const { gl } = state;
-
-	// Clean up old batched meshes
-	for (const m of state.batchedMeshes) {
-		gl.deleteVertexArray(m.vao);
-		if (m.sideVao) gl.deleteVertexArray(m.sideVao);
-	}
-	state.batchedMeshes = [];
-	// Also clean instanced meshes (replacing them)
-	for (const m of state.instancedMeshes) gl.deleteVertexArray(m.vao);
-	state.instancedMeshes = [];
-	for (const m of state.meshes) gl.deleteVertexArray(m.vao);
-	state.meshes = [];
-
-	// Map GDS layer → stack z/thickness/color
-	const layerZMap = new Map<number, { z: number; thickness: number; color: string }>();
-	for (const sl of stack.layers) {
-		if (sl.type === 'substrate') continue;
-		for (const glName of sl.gdsLayers) {
-			if (gdsLayerMap) {
-				for (const [num, name] of Object.entries(gdsLayerMap)) {
-					if (name === glName) layerZMap.set(Number(num), { z: sl.z, thickness: sl.thickness, color: sl.color });
-				}
-			}
-		}
-	}
-
-	// Compute center from bounds
-	let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-	for (const b of Object.values(sceneData.layerBounds)) {
-		if (b[0] < minX) minX = b[0];
-		if (b[2] > maxX) maxX = b[2];
-		if (b[1] < minY) minY = b[1];
-		if (b[3] > maxY) maxY = b[3];
-	}
-	const cx = isFinite(minX) ? (minX + maxX) / 2 : 0;
-	const cy = isFinite(minY) ? (minY + maxY) / 2 : 0;
-	const xyExtent = Math.max(isFinite(maxX) ? maxX - minX : 1, isFinite(maxY) ? maxY - minY : 1);
-
-	let minZ = Infinity, maxZ = -Infinity;
-	for (const sl of stack.layers) {
-		if (sl.type === 'substrate') continue;
-		minZ = Math.min(minZ, sl.z);
-		maxZ = Math.max(maxZ, sl.z + sl.thickness);
-	}
-	const cz = isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
-
-	// Build grid
-	const gridZ = isFinite(minZ) ? minZ - cz : 0;
-	buildGrid(state, xyExtent, gridZ);
-
-	// Create one VAO per layer
-	for (const gdsLayer of sceneData.gdsLayers) {
-		const zInfo = layerZMap.get(gdsLayer);
-		if (!zInfo) continue;
-
-		const layerName = gdsLayerMap?.[gdsLayer] ?? '';
-		const colorHex = colorOverrides?.[layerName] ?? zInfo.color ?? '#888888';
-		const color = hexToRgb(colorHex);
-		const zBot = zInfo.z - cz;
-		const zTop = zInfo.z + zInfo.thickness - cz;
-
-		// Face VAO — simple vec2 positions, centered
-		const faceData = sceneData.layerVerts[gdsLayer];
-		if (!faceData || faceData.length === 0) continue;
-
-		// Center the vertices
-		const centered = new Float32Array(faceData.length);
-		for (let i = 0; i < faceData.length; i += 2) {
-			centered[i] = faceData[i] - cx;
-			centered[i + 1] = faceData[i + 1] - cy;
-		}
-
-		const faceVao = gl.createVertexArray()!;
-		gl.bindVertexArray(faceVao);
-		const faceBuf = gl.createBuffer()!;
-		gl.bindBuffer(gl.ARRAY_BUFFER, faceBuf);
-		gl.bufferData(gl.ARRAY_BUFFER, centered, gl.STATIC_DRAW);
-		gl.enableVertexAttribArray(0);
-		gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-		gl.bindVertexArray(null);
-
-		// Side wall VAO
-		const sideData = sceneData.layerSides[gdsLayer];
-		let sideVao: WebGLVertexArrayObject | undefined;
-		let sideVertCount = 0;
-
-		if (sideData && sideData.length > 0) {
-			// Center the side wall positions (x,y are at offsets 0,1 in stride of 5)
-			const centeredSides = new Float32Array(sideData.length);
-			for (let i = 0; i < sideData.length; i += 5) {
-				centeredSides[i] = sideData[i] - cx;
-				centeredSides[i + 1] = sideData[i + 1] - cy;
-				centeredSides[i + 2] = sideData[i + 2]; // zFlag
-				centeredSides[i + 3] = sideData[i + 3]; // nx
-				centeredSides[i + 4] = sideData[i + 4]; // ny
-			}
-
-			sideVao = gl.createVertexArray()!;
-			gl.bindVertexArray(sideVao);
-			const sideBuf = gl.createBuffer()!;
-			gl.bindBuffer(gl.ARRAY_BUFFER, sideBuf);
-			gl.bufferData(gl.ARRAY_BUFFER, centeredSides, gl.STATIC_DRAW);
-			// aPos (location 0): vec2, stride 20, offset 0
-			gl.enableVertexAttribArray(0);
-			gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 20, 0);
-			// aZFlag (location 1): float, stride 20, offset 8
-			gl.enableVertexAttribArray(1);
-			gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 20, 8);
-			// aNormalXY (location 2): vec2, stride 20, offset 12
-			gl.enableVertexAttribArray(2);
-			gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 20, 12);
-			gl.bindVertexArray(null);
-
-			sideVertCount = centeredSides.length / 5;
-		}
-
-		state.batchedMeshes.push({
-			vao: faceVao,
-			vertCount: centered.length / 2,
-			color,
-			zBot,
-			zTop,
-			sideVao,
-			sideVertCount,
-		});
-	}
-
-	onDone?.();
-}
-
 /** Render one frame */
 export function render3D(
 	state: GLState,
@@ -1192,7 +966,7 @@ export function render3D(
 		const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
 		gl.uniform3f(uLightDir, lx / ll, ly / ll, lz / ll);
 		// Flat shading in ortho (2D) mode, lit shading in perspective (3D)
-		gl.uniform1f(uAmbient, 0.8 + 0.2 * orthoBlend);
+		gl.uniform1f(uAmbient, 0.7 + 0.3 * orthoBlend);
 		for (const mesh of state.meshes) {
 			gl.uniform3f(uColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
@@ -1207,7 +981,7 @@ export function render3D(
 		const lx = 0.4, ly = 0.3, lz = 0.8;
 		const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
 		gl.uniform3f(state.uInstLightDir, lx / ll, ly / ll, lz / ll);
-		gl.uniform1f(state.uInstAmbient, 0.8 + 0.2 * orthoBlend);
+		gl.uniform1f(state.uInstAmbient, 0.7 + 0.3 * orthoBlend);
 
 		// Draw top faces
 		gl.uniform1f(state.uInstTopFace, 1.0);
@@ -1229,7 +1003,7 @@ export function render3D(
 		gl.useProgram(state.instSideProgram);
 		gl.uniformMatrix4fv(state.uInstSideMVP, false, vp);
 		gl.uniform3f(state.uInstSideLightDir, lx / ll, ly / ll, lz / ll);
-		gl.uniform1f(state.uInstSideAmbient, 0.8 + 0.2 * orthoBlend);
+		gl.uniform1f(state.uInstSideAmbient, 0.7 + 0.3 * orthoBlend);
 		for (const mesh of state.instancedMeshes) {
 			if (!mesh.sideVao || !mesh.sideVertCount) continue;
 			gl.uniform3f(state.uInstSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
@@ -1238,55 +1012,11 @@ export function render3D(
 		}
 	}
 
-	// Draw batched meshes (pre-flattened, one VAO per layer)
-	if (state.batchedMeshes.length > 0 && !wireframe) {
-		const lx = 0.4, ly2 = 0.3, lz2 = 0.8;
-		const ll2 = Math.sqrt(lx * lx + ly2 * ly2 + lz2 * lz2);
-
-		// Top + bottom faces
-		gl.useProgram(state.batchProgram);
-		gl.uniformMatrix4fv(state.uBatchMVP, false, vp);
-		gl.uniform3f(state.uBatchLightDir, lx / ll2, ly2 / ll2, lz2 / ll2);
-		gl.uniform1f(state.uBatchAmbient, 0.8 + 0.2 * orthoBlend);
-
-		// Top faces
-		gl.uniform1f(state.uBatchTopFace, 1.0);
-		for (const mesh of state.batchedMeshes) {
-			gl.uniform3f(state.uBatchColor, mesh.color[0], mesh.color[1], mesh.color[2]);
-			gl.uniform1f(state.uBatchZ, mesh.zTop);
-			gl.bindVertexArray(mesh.vao);
-			gl.drawArrays(gl.TRIANGLES, 0, mesh.vertCount);
-		}
-
-		// Bottom faces
-		gl.uniform1f(state.uBatchTopFace, 0.0);
-		for (const mesh of state.batchedMeshes) {
-			gl.uniform3f(state.uBatchColor, mesh.color[0], mesh.color[1], mesh.color[2]);
-			gl.uniform1f(state.uBatchZ, mesh.zBot);
-			gl.bindVertexArray(mesh.vao);
-			gl.drawArrays(gl.TRIANGLES, 0, mesh.vertCount);
-		}
-
-		// Side walls
-		gl.useProgram(state.batchSideProgram);
-		gl.uniformMatrix4fv(state.uBatchSideMVP, false, vp);
-		gl.uniform3f(state.uBatchSideLightDir, lx / ll2, ly2 / ll2, lz2 / ll2);
-		gl.uniform1f(state.uBatchSideAmbient, 0.8 + 0.2 * orthoBlend);
-		for (const mesh of state.batchedMeshes) {
-			if (!mesh.sideVao || !mesh.sideVertCount) continue;
-			gl.uniform3f(state.uBatchSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
-			gl.uniform1f(state.uBatchSideZBot, mesh.zBot);
-			gl.uniform1f(state.uBatchSideZTop, mesh.zTop);
-			gl.bindVertexArray(mesh.sideVao);
-			gl.drawArrays(gl.TRIANGLES, 0, mesh.sideVertCount);
-		}
-	}
-
 	gl.bindVertexArray(null);
 }
 
 /** Compute a good initial camera distance to fit all geometry */
-export function fitCamera(layers: LayerMap, stack: ProcessStack, batchedScene?: BatchedSceneData | null): Camera {
+export function fitCamera(layers: LayerMap, stack: ProcessStack, instancedScene?: InstancedSceneData | null): Camera {
 	let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
 	// Bounds from flat LayerMap
@@ -1298,13 +1028,14 @@ export function fitCamera(layers: LayerMap, stack: ProcessStack, batchedScene?: 
 		}
 	}
 
-	// Bounds from batched scene
-	if (batchedScene) {
-		for (const b of Object.values(batchedScene.layerBounds)) {
-			if (b[0] < minX) minX = b[0];
-			if (b[2] > maxX) maxX = b[2];
-			if (b[1] < minY) minY = b[1];
-			if (b[3] > maxY) maxY = b[3];
+	// Bounds from instanced scene (use instance transform tx,ty)
+	if (instancedScene) {
+		for (const transforms of Object.values(instancedScene.cellInstances)) {
+			for (let i = 0; i < transforms.length; i += 6) {
+				const tx = transforms[i + 4], ty = transforms[i + 5];
+				if (tx < minX) minX = tx; if (tx > maxX) maxX = tx;
+				if (ty < minY) minY = ty; if (ty > maxY) maxY = ty;
+			}
 		}
 	}
 	const xyExtent = Math.max(

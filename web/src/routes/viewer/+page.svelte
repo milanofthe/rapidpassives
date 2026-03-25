@@ -4,7 +4,7 @@
 	import type { ProcessStack, StackLayer } from '$lib/stack/types';
 	import type { RenderOptions } from '$lib/render/canvas2d';
 	import { readGdsInWorker } from '$lib/gds/reader';
-	import { type BatchedSceneData } from '$lib/render/canvas3d';
+	import { type InstancedSceneData } from '$lib/render/canvas3d';
 	import { PRESET_LIST, PRESETS } from '$lib/stack/presets/index';
 	import { applyPreset } from '$lib/stack/presets/apply';
 	import { parseLyp, parseCsvLayerMap } from '$lib/stack/presets/lyp-parser';
@@ -79,14 +79,14 @@
 	let loadProgress = $state(0);
 	let loadPolyCount = $state(0);
 	let loadPhase = $state('');
-	let batchedScene = $state<BatchedSceneData | null>(null);
+	let instancedScene = $state<InstancedSceneData | null>(null);
 
 	// Drag reorder state
 	let dragIdx = $state<number | null>(null);
 	/** Insertion point: the dragged item will be placed *before* this index */
 	let insertIdx = $state<number | null>(null);
 
-	// Empty LayerMap — geometry is rendered via batchedScene, not LayerMap
+	// Empty LayerMap — geometry is rendered via instancedScene, not LayerMap
 	const layers: LayerMap = {};
 
 	// Assign generic layer names from the available LayerName slots
@@ -215,7 +215,7 @@
 				9: 'vias3', 10: 'pgs', 11: 'guard_ring',
 			} as Record<number, LayerName>);
 			gdsLayers = [];
-			batchedScene = null;
+			instancedScene = null;
 
 			const result = await readGdsInWorker(bytes, (p) => {
 				loadPolyCount = p.polygonCount;
@@ -229,14 +229,14 @@
 				loadProgress = p.phase === 'done' ? 1 : p.phase === 'triangulating' ? 0.6 : 0.2;
 			});
 
-			batchedScene = {
-				layerVerts: result.layerVerts,
-				layerSides: result.layerSides,
-				layerBounds: result.layerBounds,
-				gdsLayers: result.gdsLayers,
-			};
+			instancedScene = { cellMeshes: result.cellMeshes, cellEdges: result.cellEdges, cellInstances: result.cellInstances };
 
-			const sortedKeys = [...result.gdsLayers].sort((a, b) => a - b);
+			// Build layer info from the cell meshes
+			const gdsLayerNums = new Set<number>();
+			for (const meshes of Object.values(result.cellMeshes)) {
+				for (const key of Object.keys(meshes)) gdsLayerNums.add(Number(key));
+			}
+			const sortedKeys = [...gdsLayerNums].sort((a, b) => a - b);
 			for (const gdsNum of sortedKeys) {
 				if (!GDS_TO_LAYER[gdsNum]) assignGenericLayer(gdsNum);
 			}
@@ -335,7 +335,7 @@
 
 	function applyPresetById(id: string) {
 		selectedPreset = id;
-		if (!batchedScene) return;
+		if (!instancedScene) return;
 
 		// Show loading
 		loading = true;
@@ -351,7 +351,9 @@
 				if (!preset) { loading = false; return; }
 
 				const gdsLayersInFile = new Set<number>();
-				for (const gds of batchedScene!.gdsLayers) gdsLayersInFile.add(gds);
+				for (const meshes of Object.values(instancedScene!.cellMeshes)) {
+					for (const key of Object.keys(meshes)) gdsLayersInFile.add(Number(key));
+				}
 
 				const applied = applyPreset(preset, gdsLayersInFile);
 
@@ -383,7 +385,7 @@
 	}
 
 	function resetToGenericStack() {
-		if (!batchedScene) return;
+		if (!instancedScene) return;
 
 		// Reset layer mapping
 		for (const key of Object.keys(GDS_TO_LAYER)) delete GDS_TO_LAYER[Number(key)];
@@ -396,7 +398,11 @@
 		layerMapNames = new Map();
 
 		// Rebuild generic layer list
-		const sortedKeys = [...batchedScene.gdsLayers].sort((a, b) => a - b);
+		const gdsLayerNums = new Set<number>();
+		for (const meshes of Object.values(instancedScene.cellMeshes)) {
+			for (const key of Object.keys(meshes)) gdsLayerNums.add(Number(key));
+		}
+		const sortedKeys = [...gdsLayerNums].sort((a, b) => a - b);
 		for (const gdsNum of sortedKeys) {
 			if (!GDS_TO_LAYER[gdsNum]) assignGenericLayer(gdsNum);
 		}
@@ -478,9 +484,6 @@
 			class="dropzone"
 			class:dragover={dragOver}
 			class:loading
-			ondrop={onDrop}
-			ondragover={onDragOver}
-			ondragleave={onDragLeave}
 			role="button"
 			tabindex="0"
 		>
@@ -512,7 +515,7 @@
 		</div>
 	</div>
 {:else}
-	<GeometryEditor {layers} {renderOpts} {stack} {batchedScene} gdsLayerMap={GDS_TO_LAYER}
+	<GeometryEditor {layers} {renderOpts} {stack} {instancedScene} gdsLayerMap={GDS_TO_LAYER}
 		onFileDrop={handleFile} dropLoading={loading} dropPhase={loadPhase} dropPolyCount={loadPolyCount}>
 		{#snippet sidebar()}
 			<div class="panel">

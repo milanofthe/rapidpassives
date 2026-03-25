@@ -2,16 +2,16 @@
 	import { onMount } from 'svelte';
 	import type { LayerMap, LayerName } from '$lib/geometry/types';
 	import type { ProcessStack } from '$lib/stack/types';
-	import { initGL, buildMeshes, buildBatchedMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera, type BatchedSceneData } from '$lib/render/canvas3d';
+	import { initGL, buildMeshes, buildInstancedMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera, type InstancedSceneData } from '$lib/render/canvas3d';
 
-	let { layers, stack, colorOverrides, visibleLayers, wireframe = false, ortho = false, batchedScene, gdsLayerMap }: {
+	let { layers, stack, colorOverrides, visibleLayers, wireframe = false, ortho = false, instancedScene, gdsLayerMap }: {
 		layers: LayerMap;
 		stack: ProcessStack;
 		colorOverrides?: Record<string, string>;
 		visibleLayers?: Set<LayerName>;
 		wireframe?: boolean;
 		ortho?: boolean;
-		batchedScene?: BatchedSceneData | null;
+		instancedScene?: InstancedSceneData | null;
 		gdsLayerMap?: Record<number, string>;
 	} = $props();
 
@@ -24,7 +24,7 @@
 		renderFrame();
 	}
 	export function resetView() {
-		const target = fitCamera(layers, stack, batchedScene);
+		const target = fitCamera(layers, stack, instancedScene);
 		if (orthoBlend > 0.5) {
 			target.phi = Math.PI / 2 - 0.05;
 			target.theta = 0;
@@ -159,8 +159,8 @@
 					if (w > 0 && h > 0) render3D(glState!, camera, w, h, wireframe, orthoBlend);
 				}
 			};
-			if (batchedScene) {
-				buildBatchedMeshes(glState, batchedScene, stack, colorOverrides, gdsLayerMap, onBatch);
+			if (instancedScene) {
+				buildInstancedMeshes(glState, instancedScene, stack, colorOverrides, onBatch, gdsLayerMap);
 			} else {
 				buildMeshes(glState, layers, stack, colorOverrides, visibleLayers, onBatch);
 			}
@@ -312,7 +312,7 @@
 		glState = initGL(canvas);
 		if (!glState) return;
 
-		camera = fitCamera(layers, stack, batchedScene);
+		camera = fitCamera(layers, stack, instancedScene);
 		if (ortho) {
 			camera = { ...camera, phi: Math.PI / 2 - 0.05, theta: 0 };
 			orthoBlend = 1;
@@ -338,7 +338,7 @@
 	// Rebuild meshes when geometry or instanced scene changes
 	$effect(() => {
 		layers;
-		batchedScene;
+		instancedScene;
 		if (mounted && glState) {
 			needsRebuild = true;
 			renderFrame();

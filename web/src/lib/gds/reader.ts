@@ -528,12 +528,11 @@ export interface GdsProgress {
 	polygonCount: number;
 }
 
-/** Result from worker — pre-flattened per-layer buffers */
+/** Result from worker — always instanced */
 export interface GdsWorkerResult {
-	layerVerts: Record<number, Float32Array>;
-	layerSides: Record<number, Float32Array>;
-	layerBounds: Record<number, [number, number, number, number]>;
-	gdsLayers: number[];
+	cellMeshes: Record<string, Record<number, Float32Array>>;
+	cellEdges: Record<string, Record<number, Float32Array>>;
+	cellInstances: Record<string, number[]>;
 	polygonCount: number;
 }
 
@@ -562,10 +561,9 @@ export function readGdsInWorker(
 				worker.terminate();
 				onProgress({ phase: 'done', polygonCount: msg.polygonCount });
 				resolve({
-					layerVerts: msg.layerVerts,
-					layerSides: msg.layerSides,
-					layerBounds: msg.layerBounds,
-					gdsLayers: msg.gdsLayers,
+					cellMeshes: msg.cellMeshes,
+					cellEdges: msg.cellEdges,
+					cellInstances: msg.cellInstances,
 					polygonCount: msg.polygonCount,
 				});
 			} else if (msg.type === 'error') {
