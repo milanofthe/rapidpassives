@@ -57,6 +57,16 @@
 		requestAnimationFrame(tick);
 	}
 
+	/** Rotate 90 degrees in the XY plane */
+	export function rotate90() {
+		animateCamera({ ...camera, theta: camera.theta + Math.PI / 2 }, 300);
+	}
+
+	/** Flip the view (mirror Z — look from below instead of above, or vice versa) */
+	export function flipZ() {
+		animateCamera({ ...camera, phi: -camera.phi }, 300);
+	}
+
 	export function pan(dx: number, dy: number) {
 		const step = camera.distance * 0.05;
 		if (orthoBlend > 0.5) {

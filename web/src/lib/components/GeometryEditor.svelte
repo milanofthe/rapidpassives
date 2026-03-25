@@ -82,6 +82,8 @@
 			case 'ArrowRight': e.preventDefault(); viewer?.pan(1, 0); break;
 			case 'ArrowUp': e.preventDefault(); viewer?.pan(0, -1); break;
 			case 'ArrowDown': e.preventDefault(); viewer?.pan(0, 1); break;
+			case 'r': case 'R': viewer?.rotate90(); break;
+			case 'z': case 'Z': viewer?.flipZ(); break;
 			case ' ':
 				e.preventDefault();
 				if (stack) toggleView();
