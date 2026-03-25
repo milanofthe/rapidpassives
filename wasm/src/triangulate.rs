@@ -17,17 +17,17 @@ pub fn process_scene(
             _ => continue,
         };
 
-        let mut meshes: HashMap<i32, Vec<f32>> = HashMap::new();
-        let mut edges: HashMap<i32, Vec<f32>> = HashMap::new();
+        let mut meshes: HashMap<String, Vec<f32>> = HashMap::new();
+        let mut edges: HashMap<String, Vec<f32>> = HashMap::new();
 
         for (&layer_num, polys) in &cell_data.polygons {
-            let layer_key = layer_num as i32;
+            let layer_key = layer_num.to_string();
 
             // Triangulate polygons
             let tri_verts = triangulate_polygons(polys, scale);
             if !tri_verts.is_empty() {
                 result.polygon_count += (tri_verts.len() / 2) as u32;
-                meshes.insert(layer_key, tri_verts);
+                meshes.insert(layer_key.clone(), tri_verts);
             }
 
             // Extract edges for side walls

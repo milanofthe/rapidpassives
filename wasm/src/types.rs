@@ -6,10 +6,10 @@ use std::collections::HashMap;
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GdsResult {
-    /// cellName → { gdsLayer → [x,y,x,y,...] triangulated face vertices }
-    pub cell_meshes: HashMap<String, HashMap<i32, Vec<f32>>>,
-    /// cellName → { gdsLayer → [x0,y0,x1,y1,...] edge pairs for side walls }
-    pub cell_edges: HashMap<String, HashMap<i32, Vec<f32>>>,
+    /// cellName → { "gdsLayer" → [x,y,x,y,...] triangulated face vertices }
+    pub cell_meshes: HashMap<String, HashMap<String, Vec<f32>>>,
+    /// cellName → { "gdsLayer" → [x0,y0,x1,y1,...] edge pairs for side walls }
+    pub cell_edges: HashMap<String, HashMap<String, Vec<f32>>>,
     /// cellName → [a,b,c,d,tx,ty, ...] packed affine transforms (6 per instance)
     pub cell_instances: HashMap<String, Vec<f32>>,
     /// Total triangle vertex count
