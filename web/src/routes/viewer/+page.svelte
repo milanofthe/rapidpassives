@@ -372,9 +372,16 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="page-drop-target" ondrop={onDrop} ondragover={onDragOver} ondragleave={onDragLeave}>
-{#if dragOver && loaded}
+{#if loaded && (dragOver || loading)}
 	<div class="drop-overlay">
-		<p>Drop GDS file to replace</p>
+		{#if loading}
+			<div class="overlay-loading">
+				<p class="loading-phase">{loadPhase}</p>
+				<p class="loading-text">{loadPolyCount > 0 ? `${loadPolyCount.toLocaleString()} polygons` : ''}</p>
+			</div>
+		{:else}
+			<p>Drop GDS file to replace</p>
+		{/if}
 	</div>
 {/if}
 {#if !loaded}
@@ -504,6 +511,21 @@
 		color: var(--accent);
 		border: 2px dashed var(--accent);
 		padding: 20px 40px;
+	}
+	.overlay-loading {
+		text-align: center;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+	}
+	.overlay-loading .loading-phase {
+		border: none;
+		padding: 0;
+	}
+	.overlay-loading .loading-text {
+		border: none;
+		padding: 0;
 	}
 
 	/* Drop zone page */
