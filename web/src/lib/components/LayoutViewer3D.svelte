@@ -32,7 +32,11 @@
 		animateCamera(target, 300);
 	}
 
+	// Track the intended final camera state for queueable animations
+	let cameraTarget: Camera | null = null;
+
 	function animateCamera(target: Camera, durationMs: number) {
+		cameraTarget = target;
 		const start = { ...camera };
 		const startTime = performance.now();
 		const id = ++animId;
@@ -52,30 +56,39 @@
 				],
 			};
 			renderFrame();
-			if (t < 1) requestAnimationFrame(tick);
+			if (t < 1) {
+				requestAnimationFrame(tick);
+			} else {
+				cameraTarget = null;
+			}
 		}
 		requestAnimationFrame(tick);
 	}
 
+	/** Get the effective target camera (in-flight animation target or current) */
+	function effectiveCamera(): Camera {
+		return cameraTarget ?? camera;
+	}
+
 	/** Rotate 90 degrees in the XY plane */
 	export function rotate90() {
-		const target: Camera = {
-			...camera,
-			target: [...camera.target] as [number, number, number],
-			theta: camera.theta + Math.PI / 2,
-		};
-		animateCamera(target, 400);
+		const base = effectiveCamera();
+		animateCamera({
+			...base,
+			target: [...base.target] as [number, number, number],
+			theta: base.theta + Math.PI / 2,
+		}, 400);
 	}
 
 	/** Flip the chip — look from below instead of above */
 	export function flipZ() {
-		const target: Camera = {
-			...camera,
-			target: [...camera.target] as [number, number, number],
-			phi: -camera.phi,
-			theta: camera.theta + Math.PI, // rotate 180° to maintain orientation
-		};
-		animateCamera(target, 400);
+		const base = effectiveCamera();
+		animateCamera({
+			...base,
+			target: [...base.target] as [number, number, number],
+			phi: -base.phi,
+			theta: base.theta + Math.PI,
+		}, 400);
 	}
 
 	export function pan(dx: number, dy: number) {
