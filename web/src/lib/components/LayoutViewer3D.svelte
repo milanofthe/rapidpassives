@@ -355,6 +355,7 @@
 		colorOverrides;
 		visibleLayers;
 		stack;
+		gdsLayerInfo;
 		if (mounted && glState) {
 			needsRebuild = true;
 			renderFrame();
