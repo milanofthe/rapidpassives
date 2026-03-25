@@ -91,8 +91,9 @@
 	// Assign generic layer names from the available LayerName slots
 	const GENERIC_SLOTS: LayerName[] = ['windings', 'crossings', 'windings_m2', 'crossings_m1', 'windings_m4', 'vias', 'vias1', 'vias2', 'vias3', 'centertap', 'pgs', 'guard_ring'];
 	const usedSlots = new Set<LayerName>();
-	function assignGenericLayer(gdsNum: number): LayerName | null {
+	function assignGenericLayer(gdsNum: number): LayerName {
 		if (GDS_TO_LAYER[gdsNum]) return GDS_TO_LAYER[gdsNum];
+		// Try to find an unused slot first
 		for (const slot of GENERIC_SLOTS) {
 			if (!usedSlots.has(slot)) {
 				const directlyMapped = gdsLayers.some(l => GDS_TO_LAYER[l.gdsNum] === slot);
@@ -103,7 +104,10 @@
 				}
 			}
 		}
-		return null;
+		// All slots used — share a slot (layers will stack at same z, but at least render)
+		const fallbackSlot = GENERIC_SLOTS[gdsNum % GENERIC_SLOTS.length];
+		GDS_TO_LAYER[gdsNum] = fallbackSlot;
+		return fallbackSlot;
 	}
 
 	let stack = $state<ProcessStack>(buildViewerStack());
@@ -486,7 +490,7 @@
 					</button>
 					{#if presetOpen}
 						<div class="preset-menu">
-							<button class="preset-option" class:active={!selectedPreset} onclick={() => { selectedPreset = ''; presetOpen = false; }}>No preset</button>
+							<button class="preset-option" class:active={!selectedPreset} onclick={() => { applyPresetById(''); presetOpen = false; }}>No preset</button>
 							{#each PRESET_LIST as p}
 								<button class="preset-option" class:active={selectedPreset === p.id} onclick={() => { applyPresetById(p.id); presetOpen = false; }}>
 									<span>{p.name}</span>
