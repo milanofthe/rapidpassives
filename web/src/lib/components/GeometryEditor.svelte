@@ -198,6 +198,13 @@
 						<rect x="5" y="5" width="6" height="6" rx="0.5" />
 					</svg>
 				</button>
+				<button class="tb" onclick={() => viewer?.saveScreenshot()} title="Save as PNG (Ctrl+S)">
+					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+						<path d="M2 10v3h12v-3" />
+						<path d="M8 2v8" />
+						<path d="M5 7l3 3 3-3" />
+					</svg>
+				</button>
 				<button class="tb" class:active-toggle={wireframe} onclick={() => wireframe = !wireframe} title="Toggle wireframe">
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
 						<path d="M1 5L8 1L15 5L15 11L8 15L1 11Z" />
