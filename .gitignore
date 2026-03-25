@@ -77,3 +77,4 @@ ENV/
 ehthumbs.db
 Thumbs.dbwasm/target/
 wasm/pkg/
+wasm/target/
