@@ -23,8 +23,9 @@
 			return;
 		}
 
-		// Check for ?url= query parameter
-		const gdsUrl = page.url.searchParams.get('url');
+		// Check for ?url= query parameter (use window.location directly to avoid SvelteKit timing issues)
+		const params = new URLSearchParams(window.location.search);
+		const gdsUrl = params.get('url');
 		if (gdsUrl) {
 			fetchFromUrl(gdsUrl);
 		}
@@ -35,18 +36,19 @@
 		loadProgress = 0;
 		loadPolyCount = 0;
 		loadPhase = 'Fetching file...';
-		fileName = url.split('/').pop() || 'remote.gds';
+		fileName = url.split('/').pop()?.split('?')[0] || 'remote.gds';
 		error = '';
 
 		try {
-			const resp = await fetch(url);
+			// Try direct fetch first, fall back to no-cors mode hint
+			const resp = await fetch(url, { mode: 'cors' });
 			if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
 			const bytes = new Uint8Array(await resp.arrayBuffer());
 			await loadBytes(bytes);
 		} catch (e: any) {
-			error = `Fetch error: ${e.message}`;
+			error = `Failed to load: ${e.message}. The remote server may not allow cross-origin requests (CORS).`;
 			loading = false;
-			console.error(e);
+			console.error('[gds-viewer] Fetch failed:', e);
 		}
 	}
 
