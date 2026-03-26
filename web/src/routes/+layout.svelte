@@ -47,6 +47,7 @@
 		{ href: '/generator/symmetric-transformer', label: 'Interleaved' },
 		{ href: '/generator/stacked-transformer', label: 'Stacked' },
 		{ href: '/generator/mom-capacitor', label: 'MOM Cap' },
+		{ href: '/generator/patch-antenna', label: 'Patch' },
 	];
 
 	const isGenerator = $derived(generators.some(t => page.url.pathname === t.href));

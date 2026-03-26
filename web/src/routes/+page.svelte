@@ -5,6 +5,7 @@
 	import { buildSymmetricTransformer } from '$lib/geometry/symmetric_transformer';
 	import { buildStackedTransformer } from '$lib/geometry/stacked_transformer';
 	import { buildMomCapacitor } from '$lib/geometry/mom_capacitor';
+	import { buildPatchAntenna } from '$lib/geometry/patch_antenna';
 	import { fitToView, renderLayers } from '$lib/render/canvas2d';
 	import { onMount } from 'svelte';
 
@@ -38,6 +39,12 @@
 			href: '/generator/mom-capacitor',
 			desc: 'Interdigitated metal-oxide-metal finger capacitor',
 			layers: buildMomCapacitor({ nFingers: 15, fingerLength: 30, fingerWidth: 1, fingerSpacing: 1, busWidth: 3, nLayers: 3, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
+		},
+		{
+			title: 'Patch Antenna',
+			href: '/generator/patch-antenna',
+			desc: 'Microstrip patch antenna with inset or edge feed',
+			layers: buildPatchAntenna({ W: 200, L: 160, feedType: 'inset', feedWidth: 10, feedLength: 80, insetDepth: 40, insetGap: 2, groundMargin: 60 }).layers,
 		},
 	];
 

@@ -6,5 +6,6 @@ export * from './symmetric_inductor';
 export * from './symmetric_transformer';
 export * from './stacked_transformer';
 export * from './mom_capacitor';
+export * from './patch_antenna';
 export * from './merge';
 export * from './utils';

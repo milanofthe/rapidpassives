@@ -76,6 +76,25 @@ export interface StackedTransformerParams {
 	portSpacing?: number;
 }
 
+export interface PatchAntennaParams {
+	/** Patch width (um) */
+	W: number;
+	/** Patch length (um) */
+	L: number;
+	/** Feed type */
+	feedType: 'edge' | 'inset';
+	/** Feed line width (um) */
+	feedWidth: number;
+	/** Feed line length (um) */
+	feedLength: number;
+	/** Inset depth (um) — only used for inset feed */
+	insetDepth: number;
+	/** Inset gap width (um) — only used for inset feed */
+	insetGap: number;
+	/** Ground plane margin beyond patch (um) */
+	groundMargin: number;
+}
+
 export interface MomCapacitorParams {
 	nFingers: number;
 	fingerLength: number;
@@ -101,8 +120,8 @@ export interface PgsParams {
 	spacing: number;
 }
 
-export type GeometryParams = SpiralInductorParams | SymmetricInductorParams | SymmetricTransformerParams | StackedTransformerParams | MomCapacitorParams;
+export type GeometryParams = SpiralInductorParams | SymmetricInductorParams | SymmetricTransformerParams | StackedTransformerParams | MomCapacitorParams | PatchAntennaParams;
 
-export type GeometryType = 'spiral' | 'symmetric_inductor' | 'symmetric_transformer' | 'stacked_transformer' | 'mom_capacitor';
+export type GeometryType = 'spiral' | 'symmetric_inductor' | 'symmetric_transformer' | 'stacked_transformer' | 'mom_capacitor' | 'patch_antenna';
 
 export type { ConductorNetwork, ConductorNode, ConductorSegment, ViaConnection, Port, GeometryResult } from './network';
