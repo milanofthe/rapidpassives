@@ -17,7 +17,7 @@
 	}
 
 	let p = $state<RatraceCouplerParams>({
-		radius: 120, ringWidth: 8, portWidth: 10, feedLength: 40, sides: 64,
+		radius: 120, ringWidth: 8, portWidth: 10, feedLength: 40, sides: 64, groundMargin: 30,
 	});
 
 	let stack = $state(create2MetalStack());
