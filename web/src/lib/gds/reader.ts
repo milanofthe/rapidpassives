@@ -1,5 +1,6 @@
 import { RecordType, type GDSRecord } from 'gdsii';
 import type { Polygon } from '$lib/geometry/types';
+import { triangulatePolygons } from './triangulate';
 
 /** Decode a GDSII 8-byte real (excess-64 exponent, base-16) */
 function parseReal8(dv: DataView, offset: number): number {
@@ -511,7 +512,7 @@ export function buildInstancedScene(data: GdsData): InstancedScene {
 }
 
 /** Convert InstancedScene (Maps) to InstancedSceneData (Records of Float32Arrays).
- *  Triangulates polygons and packs instance transforms. */
+ *  Triangulates polygons with earcut and packs instance transforms. */
 export function sceneToInstancedData(scene: InstancedScene): {
 	cellMeshes: Record<string, Record<number, Float32Array>>;
 	cellEdges: Record<string, Record<number, Float32Array>>;
@@ -531,29 +532,16 @@ export function sceneToInstancedData(scene: InstancedScene): {
 		const edges: Record<number, Float32Array> = {};
 		for (const [layerNum, polys] of cellData.polygons) {
 			polygonCount += polys.length * instances.length;
-			// Triangulate
-			const triVerts: number[] = [];
-			for (const poly of polys) {
-				if (poly.x.length < 3) continue;
-				const n = poly.x.length;
-				// Simple fan triangulation for convex, earcut for complex
-				for (let i = 1; i < n - 1; i++) {
-					triVerts.push(
-						poly.x[0] * scene.userUnit, poly.y[0] * scene.userUnit,
-						poly.x[i] * scene.userUnit, poly.y[i] * scene.userUnit,
-						poly.x[i + 1] * scene.userUnit, poly.y[i + 1] * scene.userUnit,
-					);
-				}
-			}
-			if (triVerts.length > 0) meshes[layerNum] = new Float32Array(triVerts);
 
-			// Edges
+			const buf = triangulatePolygons(polys, scene.userUnit);
+			if (buf.length > 0) meshes[layerNum] = buf;
+
 			const edgeVerts: number[] = [];
 			for (const poly of polys) {
-				const pn = poly.x.length;
-				if (pn < 3) continue;
-				for (let i = 0; i < pn; i++) {
-					const j = (i + 1) % pn;
+				const n = poly.x.length;
+				if (n < 3) continue;
+				for (let i = 0; i < n; i++) {
+					const j = (i + 1) % n;
 					edgeVerts.push(
 						poly.x[i] * scene.userUnit, poly.y[i] * scene.userUnit,
 						poly.x[j] * scene.userUnit, poly.y[j] * scene.userUnit,

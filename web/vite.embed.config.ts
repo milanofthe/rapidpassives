@@ -22,4 +22,12 @@ export default defineConfig({
 			'$lib': resolve(__dirname, 'src/lib'),
 		},
 	},
+	worker: {
+		format: 'iife',
+		rollupOptions: {
+			output: {
+				entryFileNames: 'assets/[name].js',
+			},
+		},
+	},
 });

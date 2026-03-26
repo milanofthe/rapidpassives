@@ -211,9 +211,11 @@ class GdsViewerElement extends HTMLElement {
 			if (this.loadingEl) this.loadingEl.textContent = 'Parsing...';
 
 			const gds = readGds(new Uint8Array(buf));
+			if (this.loadingEl) this.loadingEl.textContent = 'Building...';
 			const rawScene = buildInstancedScene(gds);
-			const data = sceneToInstancedData(rawScene);
-			this.scene = { cellMeshes: data.cellMeshes, cellEdges: data.cellEdges, cellInstances: data.cellInstances };
+			if (this.loadingEl) this.loadingEl.textContent = 'Triangulating...';
+			const result = sceneToInstancedData(rawScene);
+			this.scene = { cellMeshes: result.cellMeshes, cellEdges: result.cellEdges, cellInstances: result.cellInstances };
 
 			// Parse config
 			let layerConfig: Record<number, { color?: string; z?: number; thickness?: number }> | undefined;
