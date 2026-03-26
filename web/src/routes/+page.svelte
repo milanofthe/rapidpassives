@@ -80,7 +80,6 @@
 			<p>Browser-based RFIC passive layout generator. Configure geometry, preview in real time, and export production-ready GDS-II.</p>
 		</div>
 		<hr class="divider" />
-		<h2 class="section-heading">Generators</h2>
 		<div class="cards">
 			{#each cards as card, i}
 				<a class="card" href={card.href}>
@@ -93,31 +92,24 @@
 					</div>
 				</a>
 			{/each}
+			<a class="card" href="/viewer">
+				<div class="card-preview viewer-preview">
+					<svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+						<rect x="8" y="6" width="32" height="36" rx="2" />
+						<path d="M18 24L24 30L30 24" />
+						<path d="M24 16V30" />
+					</svg>
+				</div>
+				<div class="card-info">
+					<h3>GDS Viewer</h3>
+					<p>Import and visualize GDS-II files in 2D and 3D</p>
+				</div>
+			</a>
 		</div>
 		<div class="features">
 			<span class="pill">Real-time Preview</span>
 			<span class="pill">GDS Export</span>
 			<span class="pill">Process Stack</span>
-		</div>
-		<hr class="divider" />
-		<h2 class="section-heading">Viewer</h2>
-		<a
-			class="dropcard"
-			href="/viewer"
-		>
-			<svg width="32" height="32" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
-				<rect x="8" y="6" width="32" height="36" rx="2" />
-				<path d="M18 24L24 30L30 24" />
-				<path d="M24 16V30" />
-			</svg>
-			<div class="dropcard-text">
-				<p>Import and visualize GDS-II files in 2D and 3D</p>
-			</div>
-		</a>
-		<div class="features">
-			<span class="pill">GDS Import</span>
-			<span class="pill">2D / 3D</span>
-			<span class="pill">No Install</span>
 		</div>
 	</div>
 	<footer class="landing-footer">
@@ -160,15 +152,6 @@
 		font-family: var(--font-mono);
 		line-height: 1.5;
 	}
-	.section-heading {
-		font-size: var(--fs-md);
-		font-family: var(--font-mono);
-		font-weight: 700;
-		letter-spacing: 2px;
-		text-transform: uppercase;
-		color: var(--accent);
-		text-align: center;
-	}
 	.divider {
 		width: calc(100% + 80px);
 		margin: 0 -40px;
@@ -180,6 +163,7 @@
 		gap: 16px;
 		flex-wrap: wrap;
 		justify-content: center;
+		max-width: 900px;
 	}
 	.card {
 		width: 200px;
@@ -225,29 +209,12 @@
 		line-height: 1.4;
 		font-family: var(--font-mono);
 	}
-	.dropcard {
-		width: 100%;
-		max-width: 600px;
-		display: flex;
-		align-items: center;
-		gap: 16px;
-		padding: 20px 24px;
-		border: 1px solid var(--border-subtle);
-		background: var(--bg-surface);
-		text-decoration: none;
-		transition: border-color 0.15s, transform 0.15s;
+	.viewer-preview {
 		color: var(--text-dim);
+		transition: color 0.15s;
 	}
-	.dropcard:hover {
-		border-color: var(--accent);
-		transform: translateY(-2px);
+	.card:hover .viewer-preview {
 		color: var(--accent);
-	}
-	.dropcard-text p {
-		font-size: var(--fs-xs);
-		color: var(--text-dim);
-		font-family: var(--font-mono);
-		line-height: 1.4;
 	}
 	.features {
 		display: flex;
