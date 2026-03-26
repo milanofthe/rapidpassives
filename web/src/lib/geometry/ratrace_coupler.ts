@@ -74,8 +74,8 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 		const py = cos;
 		const hw = portWidth / 2;
 
-		// Start inside the ring, end beyond it
-		const startR = rIn - ringWidth / 2;
+		// Start at ring center, end beyond outer edge
+		const startR = radius;
 		const endR = rOut + feedLength;
 		polys.push({
 			x: [
