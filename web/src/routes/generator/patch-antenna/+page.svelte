@@ -84,6 +84,14 @@
 					<div class="f"><span>Inset Gap</span><div class="fi"><button onclick={() => nud('insetGap',-0.5,0.1)}>-</button><input type="number" value={p.insetGap} oninput={e => inp('insetGap',e)}/><button onclick={() => nud('insetGap',0.5,0.1)}>+</button><em>um</em></div></div>
 				{/if}
 			</div>
+			<div class="param-section"><h4>Array</h4>
+				<div class="f"><span>Columns</span><div class="fi"><button onclick={() => set('arrayCols', Math.max(1, (p.arrayCols ?? 1) - 1))}>-</button><input type="number" value={p.arrayCols ?? 1} oninput={e => { const v = parseInput(e); if (v && v >= 1) set('arrayCols', v); }}/><button onclick={() => set('arrayCols', (p.arrayCols ?? 1) + 1)}>+</button><em></em></div></div>
+				<div class="f"><span>Rows</span><div class="fi"><button onclick={() => set('arrayRows', Math.max(1, (p.arrayRows ?? 1) - 1))}>-</button><input type="number" value={p.arrayRows ?? 1} oninput={e => { const v = parseInput(e); if (v && v >= 1) set('arrayRows', v); }}/><button onclick={() => set('arrayRows', (p.arrayRows ?? 1) + 1)}>+</button><em></em></div></div>
+				{#if (p.arrayCols ?? 1) > 1 || (p.arrayRows ?? 1) > 1}
+					<div class="f"><span>Spacing X</span><div class="fi"><button onclick={() => set('arraySpacingX', Math.max(p.W + 1, (p.arraySpacingX ?? p.W + p.groundMargin) - 10))}>-</button><input type="number" value={p.arraySpacingX ?? ''} placeholder="auto" oninput={e => { const v = parseInput(e); set('arraySpacingX', v && v > 0 ? v : undefined); }}/><button onclick={() => set('arraySpacingX', (p.arraySpacingX ?? p.W + p.groundMargin) + 10)}>+</button><em>um</em></div></div>
+					<div class="f"><span>Spacing Y</span><div class="fi"><button onclick={() => set('arraySpacingY', Math.max(p.L + 1, (p.arraySpacingY ?? p.L + p.groundMargin) - 10))}>-</button><input type="number" value={p.arraySpacingY ?? ''} placeholder="auto" oninput={e => { const v = parseInput(e); set('arraySpacingY', v && v > 0 ? v : undefined); }}/><button onclick={() => set('arraySpacingY', (p.arraySpacingY ?? p.L + p.groundMargin) + 10)}>+</button><em>um</em></div></div>
+				{/if}
+			</div>
 			<div class="param-section"><h4>Ground</h4>
 				<div class="f"><span>Margin</span><div class="fi"><button onclick={() => nud('groundMargin',-5,1)}>-</button><input type="number" value={p.groundMargin} oninput={e => inp('groundMargin',e)}/><button onclick={() => nud('groundMargin',5,1)}>+</button><em>um</em></div></div>
 			</div>
