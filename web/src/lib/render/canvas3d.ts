@@ -64,17 +64,20 @@ interface GLState {
 	uColor: WebGLUniformLocation;
 	uLightDir: WebGLUniformLocation;
 	uAmbient: WebGLUniformLocation;
+	uZFlip: WebGLUniformLocation;
 	instProgram: WebGLProgram;
 	uInstMVP: WebGLUniformLocation;
 	uInstColor: WebGLUniformLocation;
 	uInstLightDir: WebGLUniformLocation;
 	uInstAmbient: WebGLUniformLocation;
 	uInstTopFace: WebGLUniformLocation;
+	uInstZFlip: WebGLUniformLocation;
 	instSideProgram: WebGLProgram;
 	uInstSideMVP: WebGLUniformLocation;
 	uInstSideColor: WebGLUniformLocation;
 	uInstSideLightDir: WebGLUniformLocation;
 	uInstSideAmbient: WebGLUniformLocation;
+	uInstSideZFlip: WebGLUniformLocation;
 	lineProgram: WebGLProgram;
 	uLineMVP: WebGLUniformLocation;
 	uLineColor: WebGLUniformLocation;
@@ -92,10 +95,15 @@ layout(location=0) in vec3 aPos;
 layout(location=1) in vec3 aNormal;
 uniform mat4 uMVP;
 uniform mat3 uNormalMat;
+uniform float uZFlip;
 out vec3 vNormal;
 void main() {
-	vNormal = normalize(uNormalMat * aNormal);
-	gl_Position = uMVP * vec4(aPos, 1.0);
+	vec3 n = aNormal;
+	n.z *= uZFlip;
+	vNormal = normalize(uNormalMat * n);
+	vec3 pos = aPos;
+	pos.z *= uZFlip;
+	gl_Position = uMVP * vec4(pos, 1.0);
 }`;
 
 const FS = `#version 300 es
@@ -119,14 +127,14 @@ layout(location=1) in vec4 aInstRow0;     // per-instance: [a, b, tx, zBottom]
 layout(location=2) in vec4 aInstRow1;     // per-instance: [c, d, ty, zTop]
 uniform mat4 uMVP;
 uniform float uTopFace;                   // 1.0 for top face pass, 0.0 for bottom
+uniform float uZFlip;
 out vec3 vNormal;
 void main() {
-	// Apply 2D affine: x' = a*x + b*y + tx, y' = c*x + d*y + ty
 	float wx = aInstRow0.x * aPos.x + aInstRow0.y * aPos.y + aInstRow0.z;
 	float wy = aInstRow1.x * aPos.x + aInstRow1.y * aPos.y + aInstRow1.z;
-	float z = mix(aInstRow1.w, aInstRow0.w, uTopFace); // bottom or top
+	float z = mix(aInstRow1.w, aInstRow0.w, uTopFace) * uZFlip;
 	gl_Position = uMVP * vec4(wx, wy, z, 1.0);
-	vNormal = vec3(0.0, 0.0, uTopFace > 0.5 ? 1.0 : -1.0);
+	vNormal = vec3(0.0, 0.0, (uTopFace > 0.5 ? 1.0 : -1.0) * uZFlip);
 }`;
 
 // Instanced side wall shader: 3D vertices (x,y,zFlag,nx,ny) + per-instance 2D affine + z
@@ -138,13 +146,13 @@ layout(location=4) in vec2 aNormalXY;     // per-vertex: outward normal in XY
 layout(location=1) in vec4 aInstRow0;     // per-instance: [a, b, tx, zBottom]
 layout(location=2) in vec4 aInstRow1;     // per-instance: [c, d, ty, zTop]
 uniform mat4 uMVP;
+uniform float uZFlip;
 out vec3 vNormal;
 void main() {
 	float wx = aInstRow0.x * aPos.x + aInstRow0.y * aPos.y + aInstRow0.z;
 	float wy = aInstRow1.x * aPos.x + aInstRow1.y * aPos.y + aInstRow1.z;
-	float z = mix(aInstRow1.w, aInstRow0.w, aZFlag);
+	float z = mix(aInstRow1.w, aInstRow0.w, aZFlag) * uZFlip;
 	gl_Position = uMVP * vec4(wx, wy, z, 1.0);
-	// Transform normal by the instance rotation (ignore translation)
 	float tnx = aInstRow0.x * aNormalXY.x + aInstRow0.y * aNormalXY.y;
 	float tny = aInstRow1.x * aNormalXY.x + aInstRow1.y * aNormalXY.y;
 	vNormal = normalize(vec3(tnx, tny, 0.0));
@@ -462,6 +470,7 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uColor = gl.getUniformLocation(program, 'uColor')!;
 	const uLightDir = gl.getUniformLocation(program, 'uLightDir')!;
 	const uAmbient = gl.getUniformLocation(program, 'uAmbient')!;
+	const uZFlip = gl.getUniformLocation(program, 'uZFlip')!;
 
 	// Line shader program
 	const lineProgram = linkProgramFromSource(gl, LINE_VS, LINE_FS);
@@ -479,6 +488,7 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uInstLightDir = gl.getUniformLocation(instProgram, 'uLightDir')!;
 	const uInstAmbient = gl.getUniformLocation(instProgram, 'uAmbient')!;
 	const uInstTopFace = gl.getUniformLocation(instProgram, 'uTopFace')!;
+	const uInstZFlip = gl.getUniformLocation(instProgram, 'uZFlip')!;
 
 	// Instanced side wall shader
 	const instSideProgram = linkProgramFromSource(gl, INST_SIDE_VS, INST_FS);
@@ -486,11 +496,12 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uInstSideColor = gl.getUniformLocation(instSideProgram, 'uColor')!;
 	const uInstSideLightDir = gl.getUniformLocation(instSideProgram, 'uLightDir')!;
 	const uInstSideAmbient = gl.getUniformLocation(instSideProgram, 'uAmbient')!;
+	const uInstSideZFlip = gl.getUniformLocation(instSideProgram, 'uZFlip')!;
 
 	return {
-		gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient,
-		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace,
-		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient,
+		gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient, uZFlip,
+		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace, uInstZFlip,
+		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient, uInstSideZFlip,
 		lineProgram, uLineMVP, uLineColor,
 		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null,
 	};
@@ -986,15 +997,6 @@ export function render3D(
 	const view = mat4LookAt(eye, camera.target as number[], [0, 0, 1]);
 	let vp = mat4Multiply(proj, view);
 
-	// Apply Z flip — mirror geometry across the XY plane
-	if (zFlip < 0) {
-		// Scale Z column of the MVP by -1
-		vp[2] = -vp[2];
-		vp[6] = -vp[6];
-		vp[10] = -vp[10];
-		vp[14] = -vp[14];
-	}
-
 	// Draw grid and axes first (behind geometry) — skip for transparent export
 	if (!transparent) {
 		gl.useProgram(state.lineProgram);
@@ -1020,6 +1022,7 @@ export function render3D(
 		gl.uniform3f(uLightDir, LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]);
 		// Flat shading in ortho (2D) mode, lit shading in perspective (3D)
 		gl.uniform1f(uAmbient, 0.8 + 0.2 * orthoBlend);
+		gl.uniform1f(state.uZFlip, zFlip);
 		for (const mesh of state.meshes) {
 			gl.uniform3f(uColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
@@ -1033,6 +1036,7 @@ export function render3D(
 		gl.uniformMatrix4fv(state.uInstMVP, false, vp);
 		gl.uniform3f(state.uInstLightDir, LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]);
 		gl.uniform1f(state.uInstAmbient, 0.8 + 0.2 * orthoBlend);
+		gl.uniform1f(state.uInstZFlip, zFlip);
 
 		// Filter meshes by visibility and frustum
 		const visibleMeshes = state.instancedMeshes.filter(mesh => {
@@ -1068,6 +1072,7 @@ export function render3D(
 			gl.uniformMatrix4fv(state.uInstSideMVP, false, vp);
 			gl.uniform3f(state.uInstSideLightDir, LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]);
 			gl.uniform1f(state.uInstSideAmbient, 0.8 + 0.2 * orthoBlend);
+			gl.uniform1f(state.uInstSideZFlip, zFlip);
 			for (const mesh of visibleMeshes) {
 				if (!mesh.sideVao || !mesh.sideVertCount) continue;
 				gl.uniform3f(state.uInstSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
