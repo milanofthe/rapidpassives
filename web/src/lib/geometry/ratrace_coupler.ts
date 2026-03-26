@@ -28,37 +28,34 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 
 	const polys: Polygon[] = [];
 
-	// Draw ring as 4 arc segments between ports, each as a polygon strip
-	for (let p = 0; p < 4; p++) {
-		const a0 = portAngles[p];
-		const a1 = portAngles[(p + 1) % 4];
-		const endAngle = a1 <= a0 ? a1 + 2 * PI : a1;
+	// Build ring as a single annular polygon using the "keyhole" technique:
+	// Trace outer boundary CCW, bridge to inner boundary, trace inner CW, bridge back.
+	// The bridge is placed at a non-port angle to avoid visual artifacts.
+	const bridgeAngle = PI / 4; // 45° — between port 1 and port 2
+	const bridgeIdx = Math.round(bridgeAngle / (2 * PI) * sides);
 
-		// Number of sub-segments for this arc
-		const arcFraction = (endAngle - a0) / (2 * PI);
-		const nSegs = Math.max(4, Math.round(sides * arcFraction));
+	const ringX: number[] = [];
+	const ringY: number[] = [];
 
-		const outerX: number[] = [];
-		const outerY: number[] = [];
-		const innerX: number[] = [];
-		const innerY: number[] = [];
-
-		for (let i = 0; i <= nSegs; i++) {
-			const angle = a0 + (endAngle - a0) * i / nSegs;
-			outerX.push(rOut * Math.cos(angle));
-			outerY.push(rOut * Math.sin(angle));
-			innerX.push(rIn * Math.cos(angle));
-			innerY.push(rIn * Math.sin(angle));
-		}
-
-		polys.push({
-			x: [...outerX, ...[...innerX].reverse()],
-			y: [...outerY, ...[...innerY].reverse()],
-		});
+	// Outer boundary (CCW from bridge angle)
+	for (let i = 0; i <= sides; i++) {
+		const idx = (bridgeIdx + i) % sides;
+		const angle = (2 * PI * idx) / sides;
+		ringX.push(rOut * Math.cos(angle));
+		ringY.push(rOut * Math.sin(angle));
 	}
 
-	// Feed lines at each port — extend radially, with width matching portWidth
-	// Include a small junction patch at the ring to avoid gaps
+	// Inner boundary (CW = reversed, from bridge angle)
+	for (let i = sides; i >= 0; i--) {
+		const idx = (bridgeIdx + i) % sides;
+		const angle = (2 * PI * idx) / sides;
+		ringX.push(rIn * Math.cos(angle));
+		ringY.push(rIn * Math.sin(angle));
+	}
+
+	polys.push({ x: ringX, y: ringY });
+
+	// Feed lines at each port
 	const nodes: ConductorNode[] = [];
 	const ports: Port[] = [];
 
@@ -66,32 +63,12 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 		const angle = portAngles[i];
 		const cos = Math.cos(angle);
 		const sin = Math.sin(angle);
-		// Perpendicular direction
-		const px = -sin;
+		const px = -sin; // perpendicular
 		const py = cos;
-
 		const hw = portWidth / 2;
 
-		// Junction patch: covers the ring width at the port angle
-		const jInner = rIn - hw;
-		const jOuter = rOut + hw;
-		polys.push({
-			x: [
-				cos * jInner + px * hw,
-				cos * jOuter + px * hw,
-				cos * jOuter - px * hw,
-				cos * jInner - px * hw,
-			],
-			y: [
-				sin * jInner + py * hw,
-				sin * jOuter + py * hw,
-				sin * jOuter - py * hw,
-				sin * jInner - py * hw,
-			],
-		});
-
-		// Feed line extending outward from ring
-		const startR = rOut;
+		// Feed line from inner ring edge to beyond outer edge + feedLength
+		const startR = rIn;
 		const endR = rOut + feedLength;
 		polys.push({
 			x: [

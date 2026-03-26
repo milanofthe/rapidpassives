@@ -9,7 +9,7 @@
 	import StackView from '$lib/components/StackView.svelte';
 	import { nudgeValue, parseInput } from '$lib/components/fields';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
-	import { mergeLayers } from '$lib/geometry/merge';
+
 
 	function doExport() {
 		const data = exportGds(layers, { cellName: 'RatraceCoupler' });
@@ -31,7 +31,7 @@
 	});
 	let layers = $derived.by<LayerMap>(() => {
 		if (!result) return {};
-		return mergeLayers(result.layers);
+		return result.layers;
 	});
 	let valid = $derived(isRatraceCouplerValid({ ...p }));
 	let portMarkers = $derived.by(() => {

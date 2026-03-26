@@ -1,0 +1,1 @@
+C:\Repositories\rapidpassives\wasm\target\wasm32-unknown-unknown\release\gds_wasm.wasm: C:\Repositories\rapidpassives\wasm\src\hierarchy.rs C:\Repositories\rapidpassives\wasm\src\lib.rs C:\Repositories\rapidpassives\wasm\src\parser.rs C:\Repositories\rapidpassives\wasm\src\triangulate.rs C:\Repositories\rapidpassives\wasm\src\types.rs

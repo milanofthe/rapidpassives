@@ -7,8 +7,6 @@
 	import { buildMomCapacitor } from '$lib/geometry/mom_capacitor';
 	import { buildPatchAntenna } from '$lib/geometry/patch_antenna';
 	import { buildRatraceCoupler } from '$lib/geometry/ratrace_coupler';
-	import { buildMeanderLine } from '$lib/geometry/meander_line';
-	import { buildMarchandBalun } from '$lib/geometry/balun';
 	import { fitToView, renderLayers } from '$lib/render/canvas2d';
 	import { onMount } from 'svelte';
 
@@ -54,18 +52,6 @@
 			href: '/generator/ratrace-coupler',
 			desc: 'Ring hybrid coupler with 4 ports',
 			layers: buildRatraceCoupler({ radius: 80, ringWidth: 6, portWidth: 8, feedLength: 25, sides: 64 }).layers,
-		},
-		{
-			title: 'Meander Line',
-			href: '/generator/meander-line',
-			desc: 'Serpentine delay line for phase matching',
-			layers: buildMeanderLine({ segments: 6, segmentLength: 40, width: 4, spacing: 4 }).layers,
-		},
-		{
-			title: 'Marchand Balun',
-			href: '/generator/balun',
-			desc: 'Coupled-line balun for balanced-unbalanced conversion',
-			layers: buildMarchandBalun({ coupledLength: 120, width: 6, gap: 2, stubLength: 30, feedLength: 25 }).layers,
 		},
 	];
 
