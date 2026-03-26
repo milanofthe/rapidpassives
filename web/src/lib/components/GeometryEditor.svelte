@@ -201,9 +201,9 @@
 					{instancedScene} {gdsLayerInfo} {visibleGdsLayers} />
 			{/if}
 			<div class="viewer-toolbar">
-				<button class="tb" onclick={doZoomIn} title="Zoom in">+</button>
-				<button class="tb" onclick={doZoomOut} title="Zoom out">&minus;</button>
-				<button class="tb" onclick={doReset} title="Fit to view">
+				<button class="tb" onclick={doZoomIn} title="Zoom in (+)">+</button>
+				<button class="tb" onclick={doZoomOut} title="Zoom out (-)">&minus;</button>
+				<button class="tb" onclick={doReset} title="Fit to view (F)">
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
 						<polyline points="1,5 1,1 5,1" />
 						<polyline points="11,1 15,1 15,5" />
@@ -212,7 +212,20 @@
 						<rect x="5" y="5" width="6" height="6" rx="0.5" />
 					</svg>
 				</button>
-				<button class="tb" onclick={() => viewer?.saveScreenshot()} title="Save as PNG (Ctrl+S)">
+				<button class="tb" onclick={() => viewer?.rotate90()} title="Rotate 90° (R)">
+					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+						<path d="M2 8a6 6 0 0 1 10.3-4.2" />
+						<polyline points="10,1 13,4 10,4" />
+					</svg>
+				</button>
+				<button class="tb" onclick={() => viewer?.flipZ()} title="Flip Z (Z)">
+					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+						<path d="M3 4h10" />
+						<path d="M8 4v8" />
+						<path d="M5 9l3 3 3-3" />
+					</svg>
+				</button>
+				<button class="tb" onclick={() => viewer?.saveScreenshot()} title="Save PNG (Ctrl+S)">
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
 						<path d="M2 10v3h12v-3" />
 						<path d="M8 2v8" />
@@ -220,7 +233,7 @@
 					</svg>
 				</button>
 				{#if stack}
-					<button class="tb view-mode" onclick={toggleView} title="Toggle 2D/3D view">
+					<button class="tb view-mode" onclick={toggleView} title="Toggle 2D/3D (Space)">
 						{viewMode === '2d' ? '3D' : '2D'}
 					</button>
 				{/if}

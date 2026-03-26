@@ -440,7 +440,6 @@
 		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
 		color: var(--text-dim);
-		background: var(--canvas-bg);
-		padding: 3px 8px;
+		pointer-events: none;
 	}
 </style>
