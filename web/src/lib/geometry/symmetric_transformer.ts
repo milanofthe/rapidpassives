@@ -275,13 +275,15 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 
 	const network: ConductorNetwork = { nodes: netNodes, segments: netSegments, vias: netVias, ports: netPorts };
 
-	// Apply aspect ratio — scale all Y coordinates
+	// Apply aspect ratio — extend straight side segments (not corners)
 	if (ar !== 1) {
-		for (const node of netNodes) node.y *= ar;
+		const ext = Dout * (ar - 1);
+		const shiftY = (y: number) => y > 0 ? y + ext / 2 : y < 0 ? y - ext / 2 : y;
+		for (const node of netNodes) node.y = shiftY(node.y);
 		for (const polys of Object.values(layers)) {
 			if (!polys) continue;
 			for (const poly of polys) {
-				poly.y = poly.y.map(y => y * ar);
+				poly.y = poly.y.map(shiftY);
 			}
 		}
 	}

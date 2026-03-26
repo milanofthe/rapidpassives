@@ -74,13 +74,15 @@ export function buildStackedTransformer(params: StackedTransformerParams): Geome
 		],
 	};
 
-	// Apply aspect ratio — scale all Y coordinates
+	// Apply aspect ratio — extend straight side segments (not corners)
 	if (ar !== 1) {
-		for (const node of network.nodes) node.y *= ar;
+		const ext = Dout * (ar - 1);
+		const shiftY = (y: number) => y > 0 ? y + ext / 2 : y < 0 ? y - ext / 2 : y;
+		for (const node of network.nodes) node.y = shiftY(node.y);
 		for (const polys of Object.values(layers)) {
 			if (!polys) continue;
 			for (const poly of polys) {
-				poly.y = poly.y.map(y => y * ar);
+				poly.y = poly.y.map(shiftY);
 			}
 		}
 	}
