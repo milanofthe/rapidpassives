@@ -68,6 +68,17 @@ ENV/
 # powerpoint
 *.pptx
 
+# Rust / WASM build artifacts
+wasm/target/
+wasm/pkg/
+
+# Node
+node_modules/
+
+# SvelteKit build output
+web/build/
+web/.svelte-kit/
+
 # OS generated files
 .DS_Store
 .DS_Store?
