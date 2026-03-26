@@ -157,7 +157,7 @@ class GdsViewerElement extends HTMLElement {
 			}
 
 			// Fit camera
-			this.camera = fitCamera({}, stack, this.scene);
+			this.camera = fitCamera({}, stack, this.scene, this.glState);
 			this.camera = { ...this.camera, phi: Math.PI / 4, theta: Math.PI / 4 };
 
 			this.startAnimation();

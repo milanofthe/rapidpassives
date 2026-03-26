@@ -711,13 +711,34 @@ export function buildInstancedMeshes(
 	// Use provided GDS layer info directly
 	const layerZMap = gdsLayerInfo ?? new Map<number, GdsLayerInfo>();
 
-	// Compute geometry center from instance positions
+	// Compute geometry center from mesh vertex bounds × instance transforms
 	let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-	for (const transforms of Object.values(sceneData.cellInstances)) {
+	for (const [cellName, meshes] of Object.entries(sceneData.cellMeshes)) {
+		// Cell-local vertex bounds
+		let cMinX = Infinity, cMaxX = -Infinity, cMinY = Infinity, cMaxY = -Infinity;
+		for (const vb of Object.values(meshes)) {
+			for (let i = 0; i < vb.length; i += 2) {
+				const vx = vb[i], vy = vb[i + 1];
+				if (vx < cMinX) cMinX = vx; if (vx > cMaxX) cMaxX = vx;
+				if (vy < cMinY) cMinY = vy; if (vy > cMaxY) cMaxY = vy;
+			}
+		}
+		if (!isFinite(cMinX)) continue;
+		const transforms = sceneData.cellInstances[cellName];
+		if (!transforms) continue;
+		// Transform bounding box corners through each instance
 		for (let i = 0; i < transforms.length; i += 6) {
+			const a = transforms[i], b = transforms[i + 1];
+			const c = transforms[i + 2], d = transforms[i + 3];
 			const tx = transforms[i + 4], ty = transforms[i + 5];
-			if (tx < minX) minX = tx; if (tx > maxX) maxX = tx;
-			if (ty < minY) minY = ty; if (ty > maxY) maxY = ty;
+			for (const bx of [cMinX, cMaxX]) {
+				for (const by of [cMinY, cMaxY]) {
+					const wx = a * bx + b * by + tx;
+					const wy = c * bx + d * by + ty;
+					if (wx < minX) minX = wx; if (wx > maxX) maxX = wx;
+					if (wy < minY) minY = wy; if (wy > maxY) maxY = wy;
+				}
+			}
 		}
 	}
 	const cx = isFinite(minX) ? (minX + maxX) / 2 : 0;
@@ -1097,7 +1118,7 @@ export function render3D(
 }
 
 /** Compute a good initial camera distance to fit all geometry */
-export function fitCamera(layers: LayerMap, stack: ProcessStack, instancedScene?: InstancedSceneData | null): Camera {
+export function fitCamera(layers: LayerMap, stack: ProcessStack, instancedScene?: InstancedSceneData | null, state?: GLState | null): Camera {
 	let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
 	// Bounds from flat LayerMap
@@ -1109,36 +1130,14 @@ export function fitCamera(layers: LayerMap, stack: ProcessStack, instancedScene?
 		}
 	}
 
-	// Bounds from instanced scene — combine mesh vertex bounds with instance transforms
-	if (instancedScene) {
-		for (const [cellName, layerMeshes] of Object.entries(instancedScene.cellMeshes)) {
-			// Get vertex bounds for this cell's meshes
-			let cellMinX = Infinity, cellMaxX = -Infinity, cellMinY = Infinity, cellMaxY = -Infinity;
-			for (const verts of Object.values(layerMeshes)) {
-				for (let i = 0; i < verts.length; i += 2) {
-					const vx = verts[i], vy = verts[i + 1];
-					if (vx < cellMinX) cellMinX = vx; if (vx > cellMaxX) cellMaxX = vx;
-					if (vy < cellMinY) cellMinY = vy; if (vy > cellMaxY) cellMaxY = vy;
-				}
-			}
-			if (!isFinite(cellMinX)) continue;
-
-			// Apply each instance transform to the cell bounds
-			const transforms = instancedScene.cellInstances[cellName];
-			if (!transforms) continue;
-			for (let i = 0; i < transforms.length; i += 6) {
-				const a = transforms[i], b = transforms[i + 1];
-				const c = transforms[i + 2], d = transforms[i + 3];
-				const tx = transforms[i + 4], ty = transforms[i + 5];
-				// Transform all 4 corners of the cell bounding box
-				for (const cx of [cellMinX, cellMaxX]) {
-					for (const cy of [cellMinY, cellMaxY]) {
-						const wx = a * cx + b * cy + tx;
-						const wy = c * cx + d * cy + ty;
-						if (wx < minX) minX = wx; if (wx > maxX) maxX = wx;
-						if (wy < minY) minY = wy; if (wy > maxY) maxY = wy;
-					}
-				}
+	// Bounds from instanced scene — use the already-computed bboxes from built meshes
+	// (these are in centered coordinates since buildInstancedMeshes centers the geometry)
+	if (instancedScene && state) {
+		for (const mesh of state.instancedMeshes) {
+			if (mesh.bbox) {
+				const [bx0, by0, bx1, by1] = mesh.bbox;
+				if (bx0 < minX) minX = bx0; if (bx1 > maxX) maxX = bx1;
+				if (by0 < minY) minY = by0; if (by1 > maxY) maxY = by1;
 			}
 		}
 	}

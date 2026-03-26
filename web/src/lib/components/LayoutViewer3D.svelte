@@ -24,7 +24,7 @@
 		renderFrame();
 	}
 	export function resetView() {
-		const target = fitCamera(layers, stack, instancedScene);
+		const target = fitCamera(layers, stack, instancedScene, glState);
 		if (orthoBlend > 0.5) {
 			target.phi = Math.PI / 2 - 0.05;
 			target.theta = 0;
@@ -343,7 +343,7 @@
 		glState = initGL(canvas);
 		if (!glState) return;
 
-		camera = fitCamera(layers, stack, instancedScene);
+		camera = fitCamera(layers, stack, instancedScene, glState);
 		if (ortho) {
 			camera = { ...camera, phi: Math.PI / 2 - 0.05, theta: 0 };
 			orthoBlend = 1;
