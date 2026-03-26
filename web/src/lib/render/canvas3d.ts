@@ -3,8 +3,8 @@
  * No dependencies beyond browser WebGL2.
  */
 
-import earcut from 'earcut';
 import type { LayerMap, LayerName, Polygon } from '$lib/geometry/types';
+import { triangulate } from '$lib/gds/triangulate';
 import { LAYER_COLORS, LAYER_ORDER } from '$lib/geometry/types';
 import type { ProcessStack } from '$lib/stack/types';
 import { canvas as canvasTheme } from '$lib/theme';
@@ -229,61 +229,6 @@ function hexToRgb(hex: string): [number, number, number] {
 	const g = parseInt(hex.slice(3, 5), 16) / 255;
 	const b = parseInt(hex.slice(5, 7), 16) / 255;
 	return [r, g, b];
-}
-
-// ─── Cached constants ────────────────────────────────────────────────
-
-const LIGHT_RAW = [0.4, 0.3, 0.8] as const;
-const LIGHT_LEN = Math.sqrt(LIGHT_RAW[0] ** 2 + LIGHT_RAW[1] ** 2 + LIGHT_RAW[2] ** 2);
-const LIGHT_DIR: [number, number, number] = [LIGHT_RAW[0] / LIGHT_LEN, LIGHT_RAW[1] / LIGHT_LEN, LIGHT_RAW[2] / LIGHT_LEN];
-
-// ─── Triangulation (earcut — robust for complex polygons) ────────────
-
-function triangulate(xs: number[], ys: number[]): number[] {
-	// Remove duplicate consecutive vertices
-	const cx: number[] = [];
-	const cy: number[] = [];
-	const idxMap: number[] = []; // maps cleaned index back to original
-	for (let i = 0; i < xs.length; i++) {
-		const px = xs[i], py = ys[i];
-		if (cx.length > 0 && Math.abs(px - cx[cx.length - 1]) < 1e-10 && Math.abs(py - cy[cy.length - 1]) < 1e-10) continue;
-		cx.push(px);
-		cy.push(py);
-		idxMap.push(i);
-	}
-	// Also check first vs last
-	if (cx.length > 1 && Math.abs(cx[0] - cx[cx.length - 1]) < 1e-10 && Math.abs(cy[0] - cy[cy.length - 1]) < 1e-10) {
-		cx.pop();
-		cy.pop();
-		idxMap.pop();
-	}
-
-	const n = cx.length;
-	if (n < 3) return [];
-
-	// Check polygon has nonzero area
-	let area = 0;
-	for (let i = 0; i < n; i++) {
-		const j = (i + 1) % n;
-		area += cx[i] * cy[j] - cx[j] * cy[i];
-	}
-	if (Math.abs(area) < 1e-20) return [];
-
-	// Pack into flat coordinate array for earcut
-	const coords = new Float64Array(n * 2);
-	for (let i = 0; i < n; i++) {
-		coords[i * 2] = cx[i];
-		coords[i * 2 + 1] = cy[i];
-	}
-
-	const tris = earcut(coords as unknown as number[]);
-
-	// Map back to original indices
-	const result = new Array(tris.length);
-	for (let i = 0; i < tris.length; i++) {
-		result[i] = idxMap[tris[i]];
-	}
-	return result;
 }
 
 // ─── Mesh building ───────────────────────────────────────────────────
@@ -925,61 +870,6 @@ export function buildInstancedMeshes(
 	onDone?.();
 }
 
-/** Extract 2D view bounds from MVP matrix by unprojecting clip-space corners */
-function getViewBounds2D(mvp: Mat4): [number, number, number, number] | null {
-	// Invert the MVP
-	const inv = mat4Invert(mvp);
-	if (!inv) return null;
-	// Unproject the 4 corners of clip space at z=0
-	let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-	for (const [cx, cy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-		// Unproject (cx, cy, 0, 1) — z=0 is where our geometry lives
-		const x = inv[0] * cx + inv[4] * cy + inv[12];
-		const y = inv[1] * cx + inv[5] * cy + inv[13];
-		const w = inv[3] * cx + inv[7] * cy + inv[15];
-		if (Math.abs(w) < 1e-10) continue;
-		const wx = x / w, wy = y / w;
-		if (wx < minX) minX = wx; if (wx > maxX) maxX = wx;
-		if (wy < minY) minY = wy; if (wy > maxY) maxY = wy;
-	}
-	if (!isFinite(minX)) return null;
-	return [minX, minY, maxX, maxY];
-}
-
-function mat4Invert(m: Mat4): Mat4 | null {
-	const o = new Float32Array(16) as Mat4;
-	const a00 = m[0], a01 = m[1], a02 = m[2], a03 = m[3];
-	const a10 = m[4], a11 = m[5], a12 = m[6], a13 = m[7];
-	const a20 = m[8], a21 = m[9], a22 = m[10], a23 = m[11];
-	const a30 = m[12], a31 = m[13], a32 = m[14], a33 = m[15];
-	const b00 = a00 * a11 - a01 * a10, b01 = a00 * a12 - a02 * a10;
-	const b02 = a00 * a13 - a03 * a10, b03 = a01 * a12 - a02 * a11;
-	const b04 = a01 * a13 - a03 * a11, b05 = a02 * a13 - a03 * a12;
-	const b06 = a20 * a31 - a21 * a30, b07 = a20 * a32 - a22 * a30;
-	const b08 = a20 * a33 - a23 * a30, b09 = a21 * a32 - a22 * a31;
-	const b10 = a21 * a33 - a23 * a31, b11 = a22 * a33 - a23 * a32;
-	let det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
-	if (Math.abs(det) < 1e-10) return null;
-	det = 1 / det;
-	o[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
-	o[1] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
-	o[2] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
-	o[3] = (a22 * b04 - a21 * b05 - a23 * b03) * det;
-	o[4] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
-	o[5] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
-	o[6] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
-	o[7] = (a20 * b05 - a22 * b02 + a23 * b01) * det;
-	o[8] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
-	o[9] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
-	o[10] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
-	o[11] = (a21 * b02 - a20 * b04 - a23 * b00) * det;
-	o[12] = (a11 * b07 - a10 * b09 - a12 * b06) * det;
-	o[13] = (a00 * b09 - a01 * b07 + a02 * b06) * det;
-	o[14] = (a31 * b01 - a30 * b03 - a32 * b00) * det;
-	o[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
-	return o;
-}
-
 /** Render one frame */
 export function render3D(
 	state: GLState,
@@ -1052,9 +942,6 @@ export function render3D(
 		}
 	}
 
-	// No frustum culling — bbox approach was unreliable across view modes
-	const viewBounds: [number, number, number, number] | null = null;
-
 	// Draw geometry
 	{
 		// Solid: use lit program
@@ -1081,14 +968,9 @@ export function render3D(
 		gl.uniform1f(state.uInstAmbient, 0.8 + 0.2 * orthoBlend);
 		gl.uniform1f(state.uInstZFlip, zFlip);
 
-		// Filter meshes by visibility and frustum
+		// Filter meshes by visibility
 		const visibleMeshes = state.instancedMeshes.filter(mesh => {
 			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) return false;
-			if (viewBounds && mesh.bbox) {
-				const [vMinX, vMinY, vMaxX, vMaxY] = viewBounds;
-				const [bMinX, bMinY, bMaxX, bMaxY] = mesh.bbox;
-				if (bMaxX < vMinX || bMinX > vMaxX || bMaxY < vMinY || bMinY > vMaxY) return false;
-			}
 			return true;
 		});
 

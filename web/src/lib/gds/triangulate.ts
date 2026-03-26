@@ -4,7 +4,7 @@
 import earcut from 'earcut';
 import type { Polygon } from '$lib/geometry/types';
 
-function triangulate(xs: number[], ys: number[]): number[] {
+export function triangulate(xs: number[], ys: number[]): number[] {
 	const cx: number[] = [], cy: number[] = [], idxMap: number[] = [];
 	for (let i = 0; i < xs.length; i++) {
 		if (cx.length > 0 && Math.abs(xs[i] - cx[cx.length - 1]) < 1e-10 && Math.abs(ys[i] - cy[cy.length - 1]) < 1e-10) continue;

@@ -319,83 +319,6 @@ export function readGds(bytes: Uint8Array): GdsData {
 	return { cells, units };
 }
 
-/** Flatten all cell references and return polygons per GDS layer for the top cell */
-export function flattenGds(data: GdsData): Map<number, Polygon[]> {
-	const cellMap = new Map<string, GdsCell>();
-	for (const cell of data.cells) cellMap.set(cell.name, cell);
-
-	// Top cell is typically the last one, or the one not referenced by others
-	const referenced = new Set<string>();
-	for (const cell of data.cells) {
-		for (const sr of cell.srefs) referenced.add(sr.sname);
-		for (const ar of cell.arefs) referenced.add(ar.sname);
-	}
-	const topCells = data.cells.filter(c => !referenced.has(c.name));
-	const topCell = topCells.length > 0 ? topCells[topCells.length - 1] : data.cells[data.cells.length - 1];
-
-	if (!topCell) return new Map();
-
-	const result = new Map<number, Polygon[]>();
-	const visited = new Set<string>();
-
-	function flattenCell(cell: GdsCell, ox: number, oy: number, sMag: number, sAngle: number, reflect: boolean) {
-		// Add this cell's polygons with transform
-		for (const [layerNum, polys] of cell.polygons) {
-			for (const poly of polys) {
-				const transformed = transformPolygon(poly, ox, oy, sMag, sAngle, reflect);
-				addPolygon(result, layerNum, transformed);
-			}
-		}
-
-		// Flatten SREFs
-		for (const sr of cell.srefs) {
-			const child = cellMap.get(sr.sname);
-			if (!child) continue;
-			// Prevent infinite recursion
-			const key = `${sr.sname}@${ox + sr.xy[0]},${oy + sr.xy[1]}`;
-			if (visited.has(key)) continue;
-			visited.add(key);
-
-			const childReflect = reflect !== !!(sr.strans & 0x8000);
-			const childAngle = sAngle + sr.angle;
-			const childMag = sMag * sr.mag;
-			const [cx, cy] = applyTransform(sr.xy[0], sr.xy[1], ox, oy, sMag, sAngle, reflect);
-			flattenCell(child, cx, cy, childMag, childAngle, childReflect);
-
-			visited.delete(key);
-		}
-
-		// Flatten AREFs
-		for (const ar of cell.arefs) {
-			const child = cellMap.get(ar.sname);
-			if (!child) continue;
-			if (ar.xy.length < 3) continue;
-
-			const [refX, refY] = ar.xy[0];
-			const colDx = (ar.xy[1][0] - refX) / ar.columns;
-			const colDy = (ar.xy[1][1] - refY) / ar.columns;
-			const rowDx = (ar.xy[2][0] - refX) / ar.rows;
-			const rowDy = (ar.xy[2][1] - refY) / ar.rows;
-
-			const childReflect = reflect !== !!(ar.strans & 0x8000);
-			const childAngle = sAngle + ar.angle;
-			const childMag = sMag * ar.mag;
-
-			for (let col = 0; col < ar.columns; col++) {
-				for (let row = 0; row < ar.rows; row++) {
-					const ex = refX + col * colDx + row * rowDx;
-					const ey = refY + col * colDy + row * rowDy;
-					const [cx, cy] = applyTransform(ex, ey, ox, oy, sMag, sAngle, reflect);
-					flattenCell(child, cx, cy, childMag, childAngle, childReflect);
-				}
-			}
-		}
-	}
-
-	flattenCell(topCell, 0, 0, 1, 0, false);
-	return result;
-}
-
 /**
  * A 2D affine transform: [a, b, c, d, tx, ty]
  * Maps (x,y) → (a*x + b*y + tx, c*x + d*y + ty)
@@ -569,18 +492,6 @@ export function sceneToInstancedData(scene: InstancedScene): {
 	return { cellMeshes, cellEdges, cellInstances, polygonCount };
 }
 
-/** Convert GDS integer coordinates to user units (typically microns) */
-export function scalePolygons(polys: Map<number, Polygon[]>, userUnit: number): Map<number, Polygon[]> {
-	const result = new Map<number, Polygon[]>();
-	for (const [layer, polygons] of polys) {
-		result.set(layer, polygons.map(p => ({
-			x: p.x.map(v => v * userUnit),
-			y: p.y.map(v => v * userUnit),
-		})));
-	}
-	return result;
-}
-
 /** Progress callback for streaming parse */
 export interface GdsProgress {
 	phase: string;
@@ -694,33 +605,3 @@ function addPolygon(map: Map<number, Polygon[]>, layer: number, poly: Polygon) {
 	arr.push(poly);
 }
 
-function transformPolygon(poly: Polygon, ox: number, oy: number, mag: number, angleDeg: number, reflect: boolean): Polygon {
-	if (ox === 0 && oy === 0 && mag === 1 && angleDeg === 0 && !reflect) return poly;
-
-	const rad = angleDeg * Math.PI / 180;
-	const cosA = Math.cos(rad);
-	const sinA = Math.sin(rad);
-	const n = poly.x.length;
-	const rx = new Array(n);
-	const ry = new Array(n);
-
-	for (let i = 0; i < n; i++) {
-		let px = poly.x[i] * mag;
-		let py = poly.y[i] * mag;
-		if (reflect) py = -py;
-		rx[i] = ox + px * cosA - py * sinA;
-		ry[i] = oy + px * sinA + py * cosA;
-	}
-	return { x: rx, y: ry };
-}
-
-function applyTransform(x: number, y: number, ox: number, oy: number, mag: number, angleDeg: number, reflect: boolean): [number, number] {
-	let px = x * mag;
-	let py = y * mag;
-	if (reflect) py = -py;
-	const rad = angleDeg * Math.PI / 180;
-	return [
-		ox + px * Math.cos(rad) - py * Math.sin(rad),
-		oy + px * Math.sin(rad) + py * Math.cos(rad),
-	];
-}

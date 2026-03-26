@@ -66,6 +66,18 @@ function assignLayerInfo(
 	return info;
 }
 
+function computeXYExtent(meshes: { bbox?: [number, number, number, number] }[]): number {
+	let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+	for (const m of meshes) {
+		if (!m.bbox) continue;
+		if (m.bbox[0] < minX) minX = m.bbox[0];
+		if (m.bbox[2] > maxX) maxX = m.bbox[2];
+		if (m.bbox[1] < minY) minY = m.bbox[1];
+		if (m.bbox[3] > maxY) maxY = m.bbox[3];
+	}
+	return Math.max(isFinite(maxX) ? maxX - minX : 1, isFinite(maxY) ? maxY - minY : 1);
+}
+
 class GdsViewerElement extends HTMLElement {
 	private canvas: HTMLCanvasElement | null = null;
 	private wrapper: HTMLDivElement | null = null;
@@ -246,17 +258,8 @@ class GdsViewerElement extends HTMLElement {
 			const stack = createEmbedStack();
 			if (this.glState) {
 				buildInstancedMeshes(this.glState, this.scene, stack, undefined, undefined, this.gdsLayerInfo);
-				// Compute extent from built meshes for proportional animations
-				let bMinX = Infinity, bMaxX = -Infinity, bMinY = Infinity, bMaxY = -Infinity;
-				for (const m of this.glState.instancedMeshes) {
-					if (m.bbox) {
-						if (m.bbox[0] < bMinX) bMinX = m.bbox[0];
-						if (m.bbox[2] > bMaxX) bMaxX = m.bbox[2];
-						if (m.bbox[1] < bMinY) bMinY = m.bbox[1];
-						if (m.bbox[3] > bMaxY) bMaxY = m.bbox[3];
-					}
-				}
-				this.xyExtent = Math.max(isFinite(bMaxX) ? bMaxX - bMinX : 1, isFinite(bMaxY) ? bMaxY - bMinY : 1);
+				// Compute XY extent from mesh bboxes for proportional explode animation
+				this.xyExtent = computeXYExtent(this.glState.instancedMeshes);
 			}
 
 			this.fitView();
