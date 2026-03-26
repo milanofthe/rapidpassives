@@ -10,7 +10,7 @@ export default defineConfig({
 			formats: ['iife'],
 		},
 		outDir: 'static/embed',
-		emptyOutDir: true,
+		emptyOutDir: false,
 		rollupOptions: {
 			output: {
 				entryFileNames: 'gds-viewer.js',
