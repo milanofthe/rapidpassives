@@ -130,6 +130,7 @@
 	}
 	.hero {
 		text-align: center;
+		margin-bottom: 16px;
 	}
 	.hero h1 {
 		font-size: 28px;
