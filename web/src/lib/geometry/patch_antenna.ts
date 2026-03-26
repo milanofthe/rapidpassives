@@ -108,6 +108,42 @@ export function buildPatchAntenna(params: PatchAntennaParams): GeometryResult {
 	return { network, layers };
 }
 
+/** Compute patch dimensions from target frequency and substrate parameters.
+ *  Returns { W, L, insetDepth } in um.
+ *  @param freqGHz - target resonant frequency in GHz
+ *  @param er - substrate relative permittivity
+ *  @param h - substrate height in um
+ *  @param Z0 - target input impedance (typically 50)
+ */
+export function designPatchAntenna(freqGHz: number, er: number, h: number, Z0: number = 50): { W: number; L: number; insetDepth: number } {
+	const c = 299792.458; // speed of light in um/ns → um * GHz
+	const f0 = freqGHz;
+
+	// Patch width
+	const W = c / (2 * f0 * Math.sqrt((er + 1) / 2));
+
+	// Effective dielectric constant
+	const erEff = (er + 1) / 2 + (er - 1) / 2 / Math.sqrt(1 + 12 * h / W);
+
+	// Fringing extension (Hammerstad)
+	const dL = 0.412 * h * ((erEff + 0.3) * (W / h + 0.264)) / ((erEff - 0.258) * (W / h + 0.8));
+
+	// Patch length
+	const L = c / (2 * f0 * Math.sqrt(erEff)) - 2 * dL;
+
+	// Edge impedance
+	const Zedge = 90 * (er * er / (er - 1)) * (L / W) * (L / W);
+
+	// Inset depth for impedance matching
+	const insetDepth = (L / Math.PI) * Math.acos(Math.pow(Z0 / Zedge, 0.25));
+
+	return {
+		W: Math.round(W * 10) / 10,
+		L: Math.round(L * 10) / 10,
+		insetDepth: Math.round(insetDepth * 10) / 10,
+	};
+}
+
 /** Validate patch antenna parameters */
 export function isPatchAntennaValid(params: PatchAntennaParams): boolean {
 	const { W, L, feedWidth, feedLength, insetDepth, insetGap, groundMargin, feedType } = params;

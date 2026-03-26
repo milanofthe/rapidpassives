@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
 	import type { PatchAntennaParams, LayerMap } from '$lib/geometry/types';
-	import { buildPatchAntenna, isPatchAntennaValid } from '$lib/geometry/patch_antenna';
+	import { buildPatchAntenna, isPatchAntennaValid, designPatchAntenna } from '$lib/geometry/patch_antenna';
 	import { create2MetalStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
@@ -23,6 +23,16 @@
 	});
 
 	let stack = $state(create2MetalStack());
+
+	// Auto-design from frequency
+	let designFreq = $state(2.4);
+	let designEr = $state(4.4);
+	let designH = $state(1.6);
+
+	function autoDesign() {
+		const d = designPatchAntenna(designFreq, designEr, designH);
+		p = { ...p, W: d.W, L: d.L, insetDepth: d.insetDepth, feedType: 'inset' };
+	}
 
 	function set(k: keyof PatchAntennaParams, v: any) { p = { ...p, [k]: v }; }
 	function nud(k: keyof PatchAntennaParams, s: number, mn?: number, mx?: number) { set(k, nudgeValue(p[k] as number, s, mn, mx)); }
@@ -56,6 +66,11 @@
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
+			<div class="param-section"><h4>Design</h4>
+				<div class="f"><span>Frequency</span><div class="fi"><button onclick={() => { designFreq = Math.max(0.1, Math.round((designFreq - 0.1) * 10) / 10); autoDesign(); }}>-</button><input type="number" value={designFreq} step="0.1" oninput={e => { const v = parseInput(e); if (v && v > 0) { designFreq = v; autoDesign(); } }}/><button onclick={() => { designFreq = Math.round((designFreq + 0.1) * 10) / 10; autoDesign(); }}>+</button><em>GHz</em></div></div>
+				<div class="f"><span>εr</span><div class="fi"><button onclick={() => { designEr = Math.max(1, Math.round((designEr - 0.1) * 10) / 10); autoDesign(); }}>-</button><input type="number" value={designEr} step="0.1" oninput={e => { const v = parseInput(e); if (v && v >= 1) { designEr = v; autoDesign(); } }}/><button onclick={() => { designEr = Math.round((designEr + 0.1) * 10) / 10; autoDesign(); }}>+</button><em></em></div></div>
+				<div class="f"><span>Height</span><div class="fi"><button onclick={() => { designH = Math.max(0.1, Math.round((designH - 0.1) * 10) / 10); autoDesign(); }}>-</button><input type="number" value={designH} step="0.1" oninput={e => { const v = parseInput(e); if (v && v > 0) { designH = v; autoDesign(); } }}/><button onclick={() => { designH = Math.round((designH + 0.1) * 10) / 10; autoDesign(); }}>+</button><em>mm</em></div></div>
+			</div>
 			<div class="param-section"><h4>Patch</h4>
 				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('W',-5,1)}>-</button><input type="number" value={p.W} oninput={e => inp('W',e)}/><button onclick={() => nud('W',5,1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>Length</span><div class="fi"><button onclick={() => nud('L',-5,1)}>-</button><input type="number" value={p.L} oninput={e => inp('L',e)}/><button onclick={() => nud('L',5,1)}>+</button><em>um</em></div></div>
