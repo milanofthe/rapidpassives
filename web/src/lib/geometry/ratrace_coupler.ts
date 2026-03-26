@@ -10,8 +10,6 @@ export interface RatraceCouplerParams {
 	portWidth: number;
 	/** Port feed line length (um) */
 	feedLength: number;
-	/** Number of polygon sides for ring approximation */
-	sides: number;
 	/** Ground plane margin beyond ring (um) */
 	groundMargin: number;
 	/** Which ports are enabled [Σ, B, Δ, A] */
@@ -24,7 +22,7 @@ export interface RatraceCouplerParams {
  *  Ports at 0°, 60°, 120°, 180°.
  */
 export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResult {
-	const { radius, ringWidth, portWidth, feedLength, sides, groundMargin } = params;
+	const { radius, ringWidth, portWidth, feedLength, groundMargin } = params;
 	const enabled = params.enabledPorts ?? [true, true, true, true];
 	const PI = Math.PI;
 	const rOut = radius + ringWidth / 2;
@@ -42,8 +40,8 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 		const a1 = portAngles[(p + 1) % 4];
 		const endAngle = a1 <= a0 ? a1 + 2 * PI : a1;
 
-		const arcFraction = (endAngle - a0) / (2 * PI);
-		const nSegs = Math.max(4, Math.round(sides * arcFraction));
+		const arcDeg = (endAngle - a0) * 180 / PI;
+		const nSegs = Math.max(4, Math.round(arcDeg / 3)); // ~3° per segment
 
 		const outerX: number[] = [];
 		const outerY: number[] = [];
@@ -119,9 +117,9 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 }
 
 export function isRatraceCouplerValid(params: RatraceCouplerParams): boolean {
-	const { radius, ringWidth, portWidth, feedLength, sides } = params;
+	const { radius, ringWidth, portWidth, feedLength } = params;
 	return radius > 0 && ringWidth > 0 && portWidth > 0 && feedLength > 0
-		&& sides >= 8 && ringWidth < radius;
+		&& ringWidth < radius;
 }
 
 /** Compute rat-race dimensions from target frequency and substrate parameters.

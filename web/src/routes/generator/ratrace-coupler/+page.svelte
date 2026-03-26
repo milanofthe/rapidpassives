@@ -9,7 +9,7 @@
 	import StackView from '$lib/components/StackView.svelte';
 	import { nudgeValue, parseInput } from '$lib/components/fields';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
-
+	import { mergeLayers } from '$lib/geometry/merge';
 
 	function doExport() {
 		const data = exportGds(layers, { cellName: 'RatraceCoupler' });
@@ -17,7 +17,7 @@
 	}
 
 	let p = $state<RatraceCouplerParams>({
-		radius: 120, ringWidth: 8, portWidth: 10, feedLength: 40, sides: 64, groundMargin: 30,
+		radius: 120, ringWidth: 8, portWidth: 10, feedLength: 40, groundMargin: 30,
 	});
 
 	let stack = $state(create2MetalStack());
@@ -57,7 +57,6 @@
 			<div class="param-section"><h4>Ring</h4>
 				<div class="f"><span>Radius</span><div class="fi"><button onclick={() => nud('radius',-5,1)}>-</button><input type="number" value={p.radius} oninput={e => inp('radius',e)}/><button onclick={() => nud('radius',5,1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('ringWidth',-0.5,0.1)}>-</button><input type="number" value={p.ringWidth} oninput={e => inp('ringWidth',e)}/><button onclick={() => nud('ringWidth',0.5,0.1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>Sides</span><div class="fi"><button onclick={() => nud('sides',-4,8,128)}>-</button><input type="number" value={p.sides} oninput={e => inp('sides',e)}/><button onclick={() => nud('sides',4,8,128)}>+</button><em></em></div></div>
 			</div>
 			<div class="param-section"><h4>Ports</h4>
 				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('portWidth',-0.5,0.1)}>-</button><input type="number" value={p.portWidth} oninput={e => inp('portWidth',e)}/><button onclick={() => nud('portWidth',0.5,0.1)}>+</button><em>um</em></div></div>

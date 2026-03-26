@@ -7,7 +7,6 @@
 	import { buildMomCapacitor } from '$lib/geometry/mom_capacitor';
 	import { buildPatchAntenna } from '$lib/geometry/patch_antenna';
 	import { buildRatraceCoupler } from '$lib/geometry/ratrace_coupler';
-	import { mergeLayers } from '$lib/geometry/merge';
 	import { fitToView, renderLayers } from '$lib/render/canvas2d';
 	import { onMount } from 'svelte';
 
@@ -52,7 +51,7 @@
 			title: 'Rat-Race Coupler',
 			href: '/generator/ratrace-coupler',
 			desc: 'Ring hybrid coupler with 4 ports',
-			layers: { windings: buildRatraceCoupler({ radius: 80, ringWidth: 6, portWidth: 8, feedLength: 25, sides: 64, groundMargin: 20 }).layers.windings },
+			layers: { windings: buildRatraceCoupler({ radius: 80, ringWidth: 6, portWidth: 8, feedLength: 25, groundMargin: 20 }).layers.windings },
 		},
 	];
 
