@@ -97,14 +97,6 @@ export interface PatchAntennaParams {
 	insetGap: number;
 	/** Ground plane margin beyond patch (um) */
 	groundMargin: number;
-	/** Number of columns in array (default 1) */
-	arrayCols?: number;
-	/** Number of rows in array (default 1) */
-	arrayRows?: number;
-	/** Element spacing X — center to center (um) */
-	arraySpacingX?: number;
-	/** Element spacing Y — center to center (um) */
-	arraySpacingY?: number;
 }
 
 export interface MomCapacitorParams {
