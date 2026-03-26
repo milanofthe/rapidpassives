@@ -51,7 +51,7 @@
 			title: 'Rat-Race Coupler',
 			href: '/generator/ratrace-coupler',
 			desc: 'Ring hybrid coupler with 4 ports',
-			layers: { windings: buildRatraceCoupler({ radius: 80, ringWidth: 6, portWidth: 8, feedLength: 25, groundMargin: 20 }).layers.windings },
+			layers: buildRatraceCoupler({ radius: 80, ringWidth: 6, portWidth: 8, feedLength: 25, groundMargin: 20 }).layers,
 		},
 	];
 
