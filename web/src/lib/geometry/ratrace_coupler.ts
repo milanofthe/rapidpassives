@@ -40,7 +40,7 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 	// Outer boundary (CCW from bridge angle)
 	for (let i = 0; i <= sides; i++) {
 		const idx = (bridgeIdx + i) % sides;
-		const angle = (2 * PI * idx) / sides;
+		const angle = (2 * PI * idx) / sides + PI / sides; // half-segment offset so flat sides face ports
 		ringX.push(rOut * Math.cos(angle));
 		ringY.push(rOut * Math.sin(angle));
 	}
@@ -48,7 +48,7 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 	// Inner boundary (CW = reversed, from bridge angle)
 	for (let i = sides; i >= 0; i--) {
 		const idx = (bridgeIdx + i) % sides;
-		const angle = (2 * PI * idx) / sides;
+		const angle = (2 * PI * idx) / sides + PI / sides;
 		ringX.push(rIn * Math.cos(angle));
 		ringY.push(rIn * Math.sin(angle));
 	}
