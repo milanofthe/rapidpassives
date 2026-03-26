@@ -212,15 +212,19 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 	// --- Generate polygons from legacy code for exact visual match ---
 	const layers = generateLegacyPolygons(params);
 
-	// Apply aspect ratio — extend straight side segments (not corners)
+	// Apply aspect ratio — extend straight side segments, preserve 45° crossings
 	if (ar !== 1) {
 		const ext = Dout * (ar - 1);
-		const shiftY = (y: number) => y > 0 ? y + ext / 2 : y < 0 ? y - ext / 2 : y;
-		for (const node of nodes) node.y = shiftY(node.y);
+		const shiftForCentroid = (cy: number) => cy > 0 ? ext / 2 : cy < 0 ? -ext / 2 : 0;
+		for (const node of nodes) {
+			node.y += shiftForCentroid(node.y);
+		}
 		for (const polys of Object.values(layers)) {
 			if (!polys) continue;
 			for (const poly of polys) {
-				poly.y = poly.y.map(shiftY);
+				const cy = poly.y.reduce((a, b) => a + b, 0) / poly.y.length;
+				const dy = shiftForCentroid(cy);
+				if (dy !== 0) poly.y = poly.y.map(y => y + dy);
 			}
 		}
 	}

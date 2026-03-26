@@ -275,15 +275,21 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 
 	const network: ConductorNetwork = { nodes: netNodes, segments: netSegments, vias: netVias, ports: netPorts };
 
-	// Apply aspect ratio — extend straight side segments (not corners)
+	// Apply aspect ratio — extend straight side segments, preserve 45° crossings
+	// Shift each polygon as a unit based on its centroid Y, not per-vertex,
+	// so crossings that span y=0 keep their internal 45° angles intact.
 	if (ar !== 1) {
 		const ext = Dout * (ar - 1);
-		const shiftY = (y: number) => y > 0 ? y + ext / 2 : y < 0 ? y - ext / 2 : y;
-		for (const node of netNodes) node.y = shiftY(node.y);
+		const shiftForCentroid = (cy: number) => cy > 0 ? ext / 2 : cy < 0 ? -ext / 2 : 0;
+		for (const node of netNodes) {
+			node.y += shiftForCentroid(node.y);
+		}
 		for (const polys of Object.values(layers)) {
 			if (!polys) continue;
 			for (const poly of polys) {
-				poly.y = poly.y.map(shiftY);
+				const cy = poly.y.reduce((a, b) => a + b, 0) / poly.y.length;
+				const dy = shiftForCentroid(cy);
+				if (dy !== 0) poly.y = poly.y.map(y => y + dy);
 			}
 		}
 	}

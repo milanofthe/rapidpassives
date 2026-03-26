@@ -209,20 +209,25 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 		}
 	}
 
-	// Apply aspect ratio — extend straight side segments (not corners)
-	// Shift all vertices by sign(y)*ext/2 so vertical sides get longer, corners stay same shape
+	// Apply aspect ratio — extend straight side segments, preserve corner angles
 	if (ar !== 1) {
 		const ext = Dout * (ar - 1);
-		const shiftY = (y: number) => y > 0 ? y + ext / 2 : y < 0 ? y - ext / 2 : y;
-		for (const node of nodes) node.y = shiftY(node.y);
+		const shiftForCentroid = (cy: number) => cy > 0 ? ext / 2 : cy < 0 ? -ext / 2 : 0;
+		for (const node of nodes) {
+			node.y += shiftForCentroid(node.y);
+		}
 		for (const seg of segments) {
-			if (seg.polygonOverride) {
-				seg.polygonOverride.y = seg.polygonOverride.y.map(shiftY);
+			if (seg.polygonOverride && seg.polygonOverride.y.length > 0) {
+				const cy = seg.polygonOverride.y.reduce((a, b) => a + b, 0) / seg.polygonOverride.y.length;
+				const dy = shiftForCentroid(cy);
+				if (dy !== 0) seg.polygonOverride.y = seg.polygonOverride.y.map(y => y + dy);
 			}
 		}
 		for (const via of network.vias) {
 			for (const poly of via.polygons) {
-				poly.y = poly.y.map(shiftY);
+				const cy = poly.y.reduce((a, b) => a + b, 0) / poly.y.length;
+				const dy = shiftForCentroid(cy);
+				if (dy !== 0) poly.y = poly.y.map(y => y + dy);
 			}
 		}
 	}
