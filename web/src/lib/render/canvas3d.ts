@@ -1033,6 +1033,13 @@ export function render3D(
 	const view = mat4LookAt(eye, camera.target as number[], [0, 0, 1]);
 	let vp = mat4Multiply(proj, view);
 
+	// Light follows camera — from eye direction, slightly offset upward
+	const ldx = eye[0] - (camera.target as number[])[0];
+	const ldy = eye[1] - (camera.target as number[])[1];
+	const ldz = eye[2] - (camera.target as number[])[2] + camera.distance * 0.3;
+	const ldLen = Math.sqrt(ldx * ldx + ldy * ldy + ldz * ldz);
+	const lightDir: [number, number, number] = [ldx / ldLen, ldy / ldLen, ldz / ldLen];
+
 	// Draw grid and axes first (behind geometry) — skip for transparent export
 	if (!transparent) {
 		gl.useProgram(state.lineProgram);
@@ -1055,7 +1062,7 @@ export function render3D(
 		const normalMat = mat3NormalFromMat4(view);
 		gl.uniformMatrix4fv(uMVP, false, vp);
 		gl.uniformMatrix3fv(uNormalMat, false, normalMat);
-		gl.uniform3f(uLightDir, LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]);
+		gl.uniform3f(uLightDir, lightDir[0], lightDir[1], lightDir[2]);
 		// Flat shading in ortho (2D) mode, lit shading in perspective (3D)
 		gl.uniform1f(uAmbient, 0.8 + 0.2 * orthoBlend);
 		gl.uniform1f(state.uZFlip, zFlip);
@@ -1070,7 +1077,7 @@ export function render3D(
 	if (state.instancedMeshes.length > 0) {
 		gl.useProgram(state.instProgram);
 		gl.uniformMatrix4fv(state.uInstMVP, false, vp);
-		gl.uniform3f(state.uInstLightDir, LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]);
+		gl.uniform3f(state.uInstLightDir, lightDir[0], lightDir[1], lightDir[2]);
 		gl.uniform1f(state.uInstAmbient, 0.8 + 0.2 * orthoBlend);
 		gl.uniform1f(state.uInstZFlip, zFlip);
 
@@ -1108,7 +1115,7 @@ export function render3D(
 			// Draw side walls
 			gl.useProgram(state.instSideProgram);
 			gl.uniformMatrix4fv(state.uInstSideMVP, false, vp);
-			gl.uniform3f(state.uInstSideLightDir, LIGHT_DIR[0], LIGHT_DIR[1], LIGHT_DIR[2]);
+			gl.uniform3f(state.uInstSideLightDir, lightDir[0], lightDir[1], lightDir[2]);
 			gl.uniform1f(state.uInstSideAmbient, 0.8 + 0.2 * orthoBlend);
 			gl.uniform1f(state.uInstSideZFlip, zFlip);
 			for (const mesh of visibleMeshes) {

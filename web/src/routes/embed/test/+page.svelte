@@ -59,8 +59,8 @@
 		},
 		{
 			title: 'Custom Colors',
-			attrs: `interactive config='${JSON.stringify({ colors: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dfe6e9', '#a29bfe', '#fd79a8'] })}'`,
-			desc: 'Color palette via config attribute',
+			attrs: `interactive config='${JSON.stringify({ colors: ['#c4a67a', '#8b6e4e', '#a3c1ad', '#5b8a72', '#d4a574', '#7c9885', '#b8956a', '#6b8f71'] })}'`,
+			desc: 'Earthy color palette via config attribute',
 		},
 	];
 
