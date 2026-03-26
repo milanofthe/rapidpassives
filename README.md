@@ -6,15 +6,68 @@ Browser-based layout generator and viewer for RFIC passive components. Configure
 
 ## Features
 
-- **Geometry generators** for spiral inductors, symmetric inductors, interleaved transformers, stacked transformers, and MOM capacitors
+- **Geometry generators** for spiral inductors, symmetric inductors, interleaved transformers, stacked transformers, MOM capacitors, patch antennas, and rat-race couplers
+- **Aspect ratio control** for non-square inductor shapes (extends straight segments, preserves corner geometry)
+- **Frequency-driven auto-design** for patch antennas and rat-race couplers (input GHz + substrate → computed dimensions)
 - **Unified WebGL renderer** with smooth animated transitions between 2D (orthographic) and 3D (perspective) views
 - **GDS-II viewer** — import and visualize GDS files with drag-and-drop or URL parameter (`/viewer?url=...`)
-- **GDS parsing in Web Worker** — off-thread record parsing, cell flattening, and coordinate scaling for large files
-- **Process stack editor** with configurable metal layers, vias, PGS, substrate
+- **GDS parsing in Web Worker** — off-thread record parsing, cell hierarchy walking, and coordinate scaling for large files
+- **Process stack presets** (SKY130, SG13G2, GF180MCU) with editable metal layers, vias, and substrate
 - **GDS-II export** directly from the browser
-- **Sub-pixel LOD** and viewport culling for smooth rendering of 100k+ polygon layouts
-- **Wireframe mode** in both 2D and 3D views
+- **Embeddable viewer** — `<gds-viewer>` web component for showcasing layouts on any website
 - **Fully static** — no server, no backend, deploys to GitHub Pages
+
+## Embeddable Viewer
+
+Embed a 3D GDS viewer on any website with a single script tag:
+
+```html
+<script src="https://rapidpassives.org/embed/gds-viewer.js"></script>
+<gds-viewer src="layout.gds" rotate explode></gds-viewer>
+```
+
+### Attributes
+
+| Attribute | Description |
+|-----------|-------------|
+| `src` | URL to a `.gds` file |
+| `width` | CSS width (default: `100%`) |
+| `height` | CSS height (default: `400px`) |
+| `rotate` | Enable continuous camera rotation |
+| `explode` | Enable layer explode/assemble animation |
+| `speed` | Animation speed multiplier (default: `1`) |
+| `config` | JSON string or URL for layer config |
+
+### Layer Configuration
+
+Customize colors, Z positions, and thickness per GDS layer:
+
+```html
+<gds-viewer src="layout.gds" rotate config='{
+  "layers": {
+    "1": { "color": "#6bbf8a", "z": 301, "thickness": 0.5 },
+    "2": { "color": "#d9513c", "z": 302, "thickness": 0.8 }
+  }
+}'></gds-viewer>
+```
+
+Or load from a URL:
+
+```html
+<gds-viewer src="layout.gds" config="layer-config.json"></gds-viewer>
+```
+
+## Geometry Generators
+
+| Generator | Description |
+|-----------|-------------|
+| **Spiral Inductor** | Single-ended octagonal spiral with underpass routing |
+| **Symmetric Inductor** | Differential octagonal spiral with optional center tap |
+| **Interleaved Transformer** | Interleaved primary/secondary with configurable N1:N2 ratio |
+| **Stacked Transformer** | Vertically stacked differential transformer on separate metal layers |
+| **MOM Capacitor** | Interdigitated metal-oxide-metal finger capacitor |
+| **Patch Antenna** | Microstrip patch with inset/edge feed and frequency-driven auto-sizing |
+| **Rat-Race Coupler** | Ring hybrid coupler (1.5λ ring, ports at 0/60/120/180°) |
 
 ## Tech Stack
 
@@ -23,35 +76,10 @@ Browser-based layout generator and viewer for RFIC passive components. Configure
 | Frontend | SvelteKit (Svelte 5 runes), adapter-static |
 | Geometry | TypeScript, centerline-first network builder |
 | Rendering | WebGL2 with earcut triangulation, orthographic/perspective projection |
-| GDS Import | Custom binary parser with Web Worker, handles SREF/AREF flattening |
-| GDS Export | Custom binary GDSII encoder (validated against gdstk) |
+| GDS Import | Custom binary parser with Web Worker, handles SREF/AREF hierarchy |
+| GDS Export | Custom binary GDSII encoder |
+| Embed | Standalone web component (`<gds-viewer>`), 26KB gzipped |
 | Deploy | GitHub Pages via Actions |
-
-## Geometry Types
-
-### Spiral Inductor
-Single-ended octagonal spiral with underpass return on lower metal. Configurable windings, width, spacing, outer diameter.
-
-### Symmetric Inductor
-Differential octagonal spiral with interleaved half-turns and optional center tap. Crossings on lower metal with via arrays.
-
-### Interleaved Transformer
-Interleaved primary/secondary windings with independent turn counts (N1, N2). Optional center taps on both windings.
-
-### Stacked Transformer
-Vertically stacked differential transformer on separate metal layers with configurable winding ratios.
-
-### MOM Capacitor
-Interdigitated metal-oxide-metal finger capacitor with configurable finger count, dimensions, and multi-layer stacking.
-
-## GDS Viewer
-
-Import GDS-II files for 2D and 3D visualization:
-
-- **Drag-and-drop** on the viewer page or **URL parameter**: `/viewer?url=https://example.com/layout.gds`
-- Per-layer visibility toggles, color coding, and polygon counts
-- Draggable layer reordering for 3D stack control
-- Editable layer thickness for 3D extrusion
 
 ## Project Structure
 
@@ -63,9 +91,10 @@ rapidpassives/
 │   │   │   ├── geometry/         # Layout generators + polygon utilities
 │   │   │   ├── render/           # WebGL 2D/3D renderer, Canvas 2D (cards)
 │   │   │   ├── gds/              # GDSII reader, writer, Web Worker
-│   │   │   ├── stack/            # Process stack model
-│   │   │   ├── components/       # Svelte UI components
-│   │   │   └── theme.ts          # Unified design tokens
+│   │   │   ├── stack/            # Process stack model + PDK presets
+│   │   │   ├── components/       # Svelte UI components (ParamField, etc.)
+│   │   │   └── theme.ts          # Design tokens (colors, fonts, spacing)
+│   │   ├── embed/                # Embeddable web component
 │   │   └── routes/
 │   │       ├── generator/        # Parametric generator pages
 │   │       └── viewer/           # GDS import viewer
@@ -82,6 +111,12 @@ npm run dev
 ```
 
 Open http://localhost:5173
+
+### Build the embeddable viewer
+
+```bash
+npm run build:embed    # outputs to static/embed/gds-viewer.js
+```
 
 ## Legacy
 

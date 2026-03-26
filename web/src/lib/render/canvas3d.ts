@@ -72,12 +72,14 @@ interface GLState {
 	uInstAmbient: WebGLUniformLocation;
 	uInstTopFace: WebGLUniformLocation;
 	uInstZFlip: WebGLUniformLocation;
+	uInstLayerZOffset: WebGLUniformLocation;
 	instSideProgram: WebGLProgram;
 	uInstSideMVP: WebGLUniformLocation;
 	uInstSideColor: WebGLUniformLocation;
 	uInstSideLightDir: WebGLUniformLocation;
 	uInstSideAmbient: WebGLUniformLocation;
 	uInstSideZFlip: WebGLUniformLocation;
+	uInstSideLayerZOffset: WebGLUniformLocation;
 	lineProgram: WebGLProgram;
 	uLineMVP: WebGLUniformLocation;
 	uLineColor: WebGLUniformLocation;
@@ -128,11 +130,12 @@ layout(location=2) in vec4 aInstRow1;     // per-instance: [c, d, ty, zTop]
 uniform mat4 uMVP;
 uniform float uTopFace;                   // 1.0 for top face pass, 0.0 for bottom
 uniform float uZFlip;
+uniform float uLayerZOffset;
 out vec3 vNormal;
 void main() {
 	float wx = aInstRow0.x * aPos.x + aInstRow0.y * aPos.y + aInstRow0.z;
 	float wy = aInstRow1.x * aPos.x + aInstRow1.y * aPos.y + aInstRow1.z;
-	float z = mix(aInstRow1.w, aInstRow0.w, uTopFace) * uZFlip;
+	float z = mix(aInstRow1.w, aInstRow0.w, uTopFace) * uZFlip + uLayerZOffset;
 	gl_Position = uMVP * vec4(wx, wy, z, 1.0);
 	vNormal = vec3(0.0, 0.0, (uTopFace > 0.5 ? 1.0 : -1.0) * uZFlip);
 }`;
@@ -147,11 +150,12 @@ layout(location=1) in vec4 aInstRow0;     // per-instance: [a, b, tx, zBottom]
 layout(location=2) in vec4 aInstRow1;     // per-instance: [c, d, ty, zTop]
 uniform mat4 uMVP;
 uniform float uZFlip;
+uniform float uLayerZOffset;
 out vec3 vNormal;
 void main() {
 	float wx = aInstRow0.x * aPos.x + aInstRow0.y * aPos.y + aInstRow0.z;
 	float wy = aInstRow1.x * aPos.x + aInstRow1.y * aPos.y + aInstRow1.z;
-	float z = mix(aInstRow1.w, aInstRow0.w, aZFlag) * uZFlip;
+	float z = mix(aInstRow1.w, aInstRow0.w, aZFlag) * uZFlip + uLayerZOffset;
 	gl_Position = uMVP * vec4(wx, wy, z, 1.0);
 	float tnx = aInstRow0.x * aNormalXY.x + aInstRow0.y * aNormalXY.y;
 	float tny = aInstRow1.x * aNormalXY.x + aInstRow1.y * aNormalXY.y;
@@ -489,6 +493,7 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uInstAmbient = gl.getUniformLocation(instProgram, 'uAmbient')!;
 	const uInstTopFace = gl.getUniformLocation(instProgram, 'uTopFace')!;
 	const uInstZFlip = gl.getUniformLocation(instProgram, 'uZFlip')!;
+	const uInstLayerZOffset = gl.getUniformLocation(instProgram, 'uLayerZOffset')!;
 
 	// Instanced side wall shader
 	const instSideProgram = linkProgramFromSource(gl, INST_SIDE_VS, INST_FS);
@@ -497,11 +502,12 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uInstSideLightDir = gl.getUniformLocation(instSideProgram, 'uLightDir')!;
 	const uInstSideAmbient = gl.getUniformLocation(instSideProgram, 'uAmbient')!;
 	const uInstSideZFlip = gl.getUniformLocation(instSideProgram, 'uZFlip')!;
+	const uInstSideLayerZOffset = gl.getUniformLocation(instSideProgram, 'uLayerZOffset')!;
 
 	return {
 		gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient, uZFlip,
-		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace, uInstZFlip,
-		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient, uInstSideZFlip,
+		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace, uInstZFlip, uInstLayerZOffset,
+		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient, uInstSideZFlip, uInstSideLayerZOffset,
 		lineProgram, uLineMVP, uLineColor,
 		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null,
 	};
@@ -960,6 +966,8 @@ export function render3D(
 	visibleGdsLayers?: Set<number> | null,
 	/** Z-axis scale: 1.0 normal, -1.0 flipped */
 	zFlip: number = 1.0,
+	/** Per-GDS-layer Z offset for explode animation */
+	layerZOffsets?: Map<number, number> | null,
 ): void {
 	const { gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient } = state;
 
@@ -1052,6 +1060,7 @@ export function render3D(
 		// Draw top faces
 		gl.uniform1f(state.uInstTopFace, 1.0);
 		for (const mesh of visibleMeshes) {
+			gl.uniform1f(state.uInstLayerZOffset, layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0);
 			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
 			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
@@ -1062,6 +1071,7 @@ export function render3D(
 			// Draw bottom faces
 			gl.uniform1f(state.uInstTopFace, 0.0);
 			for (const mesh of visibleMeshes) {
+				gl.uniform1f(state.uInstLayerZOffset, layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0);
 				gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 				gl.bindVertexArray(mesh.vao);
 				gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
@@ -1075,6 +1085,7 @@ export function render3D(
 			gl.uniform1f(state.uInstSideZFlip, zFlip);
 			for (const mesh of visibleMeshes) {
 				if (!mesh.sideVao || !mesh.sideVertCount) continue;
+				gl.uniform1f(state.uInstSideLayerZOffset, layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0);
 				gl.uniform3f(state.uInstSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 				gl.bindVertexArray(mesh.sideVao);
 				gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.sideVertCount, mesh.instanceCount);
