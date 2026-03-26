@@ -12,7 +12,7 @@
 	import { mergeLayers } from '$lib/geometry/merge';
 
 	function doExport() {
-		const data = exportGds(layers, { cellName: 'RatraceCoupler' });
+		const data = exportGds(layers, { stack, cellName: 'RatraceCoupler' });
 		downloadGds(data, 'ratrace_coupler.gds');
 	}
 

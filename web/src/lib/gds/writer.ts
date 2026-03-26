@@ -1,4 +1,5 @@
 import type { LayerMap, LayerName, Polygon } from '$lib/geometry/types';
+import type { ProcessStack } from '$lib/stack/types';
 
 /**
  * GDSII binary format writer.
@@ -25,27 +26,48 @@ const TEXT      = 0x0C00;
 const TEXTTYPE  = 0x1602;
 const STRING    = 0x1906;
 
-/** Default GDS layer number mapping */
-const DEFAULT_GDS_LAYERS: Record<LayerName, number> = {
-	guard_ring: 11,
-	windings: 1,
-	crossings: 2,
-	windings_m2: 6,
-	crossings_m1: 7,
-	windings_m4: 8,
-	vias: 3,
-	vias1: 3,
-	vias2: 5,
-	vias3: 9,
-	centertap: 4,
-	pgs: 10,
-};
+/** Derive GDS layer numbers from a process stack.
+ *  Each stack layer (bottom to top, skipping substrate) gets a sequential GDS layer number.
+ *  All LayerNames on the same stack layer share the same GDS number. */
+export function stackToGdsLayers(stack: ProcessStack): Record<LayerName, number> {
+	const map: Partial<Record<LayerName, number>> = {};
+	let gdsNum = 1;
+	for (const sl of stack.layers) {
+		if (sl.type === 'substrate') continue;
+		for (const ln of sl.gdsLayers) {
+			map[ln] = gdsNum;
+		}
+		gdsNum++;
+	}
+	return map as Record<LayerName, number>;
+}
+
+/** Fallback: derive from the default 4-metal stack so all layers are covered */
+function defaultGdsLayers(): Record<LayerName, number> {
+	// Import inline to avoid circular dependency
+	const layers = [
+		{ gdsLayers: ['pgs'] },
+		{ gdsLayers: ['centertap', 'crossings_m1', 'guard_ring'] },
+		{ gdsLayers: ['vias2'] },
+		{ gdsLayers: ['crossings', 'windings_m2'] },
+		{ gdsLayers: ['vias', 'vias1'] },
+		{ gdsLayers: ['windings'] },
+		{ gdsLayers: ['vias3'] },
+		{ gdsLayers: ['windings_m4'] },
+	];
+	const map: Partial<Record<LayerName, number>> = {};
+	layers.forEach((sl, i) => {
+		for (const ln of sl.gdsLayers) map[ln as LayerName] = i + 1;
+	});
+	return map as Record<LayerName, number>;
+}
 
 interface GdsExportOptions {
 	cellName?: string;
 	unit?: number;       // database unit in meters (default 1e-6 = 1um)
 	precision?: number;  // database precision in meters (default 1e-9 = 1nm)
 	gdsLayers?: Partial<Record<LayerName, number>>;
+	stack?: ProcessStack;
 	labels?: Array<{ text: string; x: number; y: number; layer: number }>;
 }
 
@@ -55,9 +77,9 @@ export function exportGds(layers: LayerMap, options: GdsExportOptions = {}): Uin
 		cellName = 'INDUCTOR',
 		unit = 1e-6,
 		precision = 1e-9,
-		gdsLayers = DEFAULT_GDS_LAYERS,
 		labels = [],
 	} = options;
+	const gdsLayers = options.gdsLayers ?? (options.stack ? stackToGdsLayers(options.stack) : defaultGdsLayers());
 
 	const scale = unit / precision; // coordinates multiplier
 	const buf = new GdsBuffer();
@@ -79,7 +101,7 @@ export function exportGds(layers: LayerMap, options: GdsExportOptions = {}): Uin
 	// Write polygons per layer
 	for (const [layerName, polys] of Object.entries(layers)) {
 		if (!polys || polys.length === 0) continue;
-		const gdsLayer = (gdsLayers as any)[layerName] ?? DEFAULT_GDS_LAYERS[layerName as LayerName];
+		const gdsLayer = (gdsLayers as any)[layerName];
 		if (gdsLayer === undefined) continue;
 
 		for (const poly of polys) {

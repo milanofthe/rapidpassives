@@ -11,7 +11,7 @@
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
 	function doExport() {
-		const data = exportGds(layers, { cellName: 'MomCapacitor' });
+		const data = exportGds(layers, { stack, cellName: 'MomCapacitor' });
 		downloadGds(data, 'mom_capacitor.gds');
 	}
 

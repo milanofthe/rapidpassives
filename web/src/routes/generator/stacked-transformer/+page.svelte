@@ -11,7 +11,7 @@
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
 	function doExport() {
-		const data = exportGds(layers, { cellName: 'StackedTransformer' });
+		const data = exportGds(layers, { stack, cellName: 'StackedTransformer' });
 		downloadGds(data, 'stacked_transformer.gds');
 	}
 

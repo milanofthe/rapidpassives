@@ -12,7 +12,7 @@
 	import { mergeLayers } from '$lib/geometry/merge';
 
 	function doExport() {
-		const data = exportGds(layers, { cellName: 'SpiralInductor' });
+		const data = exportGds(layers, { stack, cellName: 'SpiralInductor' });
 		downloadGds(data, 'spiral_inductor.gds');
 	}
 

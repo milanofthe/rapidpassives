@@ -11,7 +11,7 @@
 	import { mergeLayers } from '$lib/geometry/merge';
 
 	function doExport() {
-		const data = exportGds(layers, { cellName: 'PatchAntenna' });
+		const data = exportGds(layers, { stack, cellName: 'PatchAntenna' });
 		downloadGds(data, 'patch_antenna.gds');
 	}
 
