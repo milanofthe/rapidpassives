@@ -85,9 +85,10 @@
 </div>
 
 <style>
+	:global(main) {
+		overflow: auto !important;
+	}
 	.page {
-		height: 100%;
-		overflow-y: auto;
 		padding: 40px 40px 80px;
 		display: flex;
 		flex-direction: column;

@@ -751,6 +751,13 @@ export function buildInstancedMeshes(
 		minZ = Math.min(minZ, sl.z);
 		maxZ = Math.max(maxZ, sl.z + sl.thickness);
 	}
+	// Fall back to gdsLayerInfo Z bounds when stack has no metal layers (embed case)
+	if (!isFinite(minZ) && layerZMap.size > 0) {
+		for (const info of layerZMap.values()) {
+			minZ = Math.min(minZ, info.z);
+			maxZ = Math.max(maxZ, info.z + info.thickness);
+		}
+	}
 	const cz = isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
 
 	// Build grid

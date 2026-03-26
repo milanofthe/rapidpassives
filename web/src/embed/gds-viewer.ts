@@ -42,13 +42,17 @@ function assignLayerInfo(
 	for (const meshes of Object.values(scene.cellMeshes)) {
 		for (const key of Object.keys(meshes)) layerNums.add(parseInt(key));
 	}
-	[...layerNums].sort((a, b) => a - b).forEach((num, i) => {
+	const sorted = [...layerNums].sort((a, b) => a - b);
+	let z = 0.5;
+	const thickness = 0.5;
+	sorted.forEach((num) => {
 		const cfg = layerConfig?.[num];
 		info.set(num, {
-			z: cfg?.z ?? 301 + i * 1.5,
-			thickness: cfg?.thickness ?? 0.8,
-			color: cfg?.color ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length],
+			z: cfg?.z ?? z,
+			thickness: cfg?.thickness ?? thickness,
+			color: cfg?.color ?? DEFAULT_COLORS[sorted.indexOf(num) % DEFAULT_COLORS.length],
 		});
+		z += cfg?.thickness ?? thickness;
 	});
 	return info;
 }
@@ -64,6 +68,7 @@ class GdsViewerElement extends HTMLElement {
 	private scene: InstancedSceneData | null = null;
 	private gdsLayerInfo: Map<number, GdsLayerInfo> = new Map();
 	private layerNums: number[] = [];
+	private xyExtent: number = 1;
 	private isDragging = false;
 	private isRightDrag = false;
 	private lastMouse = { x: 0, y: 0 };
@@ -232,6 +237,17 @@ class GdsViewerElement extends HTMLElement {
 			const stack = createEmbedStack();
 			if (this.glState) {
 				buildInstancedMeshes(this.glState, this.scene, stack, undefined, undefined, this.gdsLayerInfo);
+				// Compute extent from built meshes for proportional animations
+				let bMinX = Infinity, bMaxX = -Infinity, bMinY = Infinity, bMaxY = -Infinity;
+				for (const m of this.glState.instancedMeshes) {
+					if (m.bbox) {
+						if (m.bbox[0] < bMinX) bMinX = m.bbox[0];
+						if (m.bbox[2] > bMaxX) bMaxX = m.bbox[2];
+						if (m.bbox[1] < bMinY) bMinY = m.bbox[1];
+						if (m.bbox[3] > bMaxY) bMaxY = m.bbox[3];
+					}
+				}
+				this.xyExtent = Math.max(isFinite(bMaxX) ? bMaxX - bMinX : 1, isFinite(bMaxY) ? bMaxY - bMinY : 1);
 			}
 
 			this.fitView();
@@ -283,9 +299,17 @@ class GdsViewerElement extends HTMLElement {
 		if (doExplode && this.layerNums.length > 1) {
 			layerZOffsets = new Map();
 			const t = time * 0.001 * speed;
-			const amplitude = 3.0;
-			const period = 4.0;
-			const phase = Math.sin(2 * Math.PI * t / period);
+			// Scale amplitude relative to geometry
+			const amplitude = this.xyExtent * 0.04;
+			const period = 6.0;
+			// Spline easing: hold at rest → ease out to spread → hold → ease back
+			const raw = (t % period) / period; // 0..1
+			let phase: number;
+			if (raw < 0.15) phase = 0; // hold at rest
+			else if (raw < 0.35) { const p = (raw - 0.15) / 0.2; phase = p * p * (3 - 2 * p); } // ease out
+			else if (raw < 0.65) phase = 1; // hold spread
+			else if (raw < 0.85) { const p = (raw - 0.65) / 0.2; phase = 1 - p * p * (3 - 2 * p); } // ease back
+			else phase = 0; // hold at rest
 			for (let i = 0; i < this.layerNums.length; i++) {
 				const centerIdx = (this.layerNums.length - 1) / 2;
 				layerZOffsets.set(this.layerNums[i], (i - centerIdx) * amplitude * phase);
