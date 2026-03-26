@@ -15,7 +15,9 @@ export interface RatraceCouplerParams {
 }
 
 /** Build a rat-race (ring hybrid) coupler.
- *  Ring circumference = 1.5λ, ports at 0°, 90°, 180°, 270°.
+ *  Ring circumference = 1.5λ.
+ *  Port separations: P1→P2 = λ/4 (60°), P2→P3 = λ/4 (60°), P3→P4 = λ/4 (60°), P4→P1 = 3λ/4 (180°).
+ *  Ports at 0°, 60°, 120°, 180°.
  */
 export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResult {
 	const { radius, ringWidth, portWidth, feedLength, sides } = params;
@@ -23,39 +25,44 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 	const rOut = radius + ringWidth / 2;
 	const rIn = radius - ringWidth / 2;
 
-	const portAngles = [0, PI / 2, PI, 3 * PI / 2];
-	const portNames = ['P1', 'P2', 'P3', 'P4'];
+	// Ports at 0°, 60°, 120°, 180° (λ/4 spacing on 1.5λ ring)
+	const portAngles = [0, PI / 3, 2 * PI / 3, PI];
+	const portNames = ['Σ', 'B', 'Δ', 'A'];
 
 	const polys: Polygon[] = [];
 
-	// Build ring as a single annular polygon using the "keyhole" technique:
-	// Trace outer boundary CCW, bridge to inner boundary, trace inner CW, bridge back.
-	// The bridge is placed at a non-port angle to avoid visual artifacts.
-	const bridgeAngle = PI / 4; // 45° — between port 1 and port 2
-	const bridgeIdx = Math.round(bridgeAngle / (2 * PI) * sides);
+	// Build ring as arc segments between ports.
+	// Each arc is a separate polygon strip to avoid merge issues.
+	// We skip merging in the page so overlapping feed rectangles visually connect.
+	for (let p = 0; p < 4; p++) {
+		const a0 = portAngles[p];
+		const a1 = portAngles[(p + 1) % 4];
+		const endAngle = a1 <= a0 ? a1 + 2 * PI : a1;
 
-	const ringX: number[] = [];
-	const ringY: number[] = [];
+		const arcFraction = (endAngle - a0) / (2 * PI);
+		const nSegs = Math.max(4, Math.round(sides * arcFraction));
 
-	// Outer boundary (CCW from bridge angle)
-	for (let i = 0; i <= sides; i++) {
-		const idx = (bridgeIdx + i) % sides;
-		const angle = (2 * PI * idx) / sides + PI / sides; // half-segment offset so flat sides face ports
-		ringX.push(rOut * Math.cos(angle));
-		ringY.push(rOut * Math.sin(angle));
+		const outerX: number[] = [];
+		const outerY: number[] = [];
+		const innerX: number[] = [];
+		const innerY: number[] = [];
+
+		for (let i = 0; i <= nSegs; i++) {
+			const angle = a0 + (endAngle - a0) * i / nSegs;
+			outerX.push(rOut * Math.cos(angle));
+			outerY.push(rOut * Math.sin(angle));
+			innerX.push(rIn * Math.cos(angle));
+			innerY.push(rIn * Math.sin(angle));
+		}
+
+		polys.push({
+			x: [...outerX, ...[...innerX].reverse()],
+			y: [...outerY, ...[...innerY].reverse()],
+		});
 	}
 
-	// Inner boundary (CW = reversed, from bridge angle)
-	for (let i = sides; i >= 0; i--) {
-		const idx = (bridgeIdx + i) % sides;
-		const angle = (2 * PI * idx) / sides + PI / sides;
-		ringX.push(rIn * Math.cos(angle));
-		ringY.push(rIn * Math.sin(angle));
-	}
-
-	polys.push({ x: ringX, y: ringY });
-
-	// Feed lines at each port
+	// Feed lines at each port — rectangles extending radially outward
+	// They overlap the ring arcs at the junction points for visual connectivity
 	const nodes: ConductorNode[] = [];
 	const ports: Port[] = [];
 
@@ -63,12 +70,12 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 		const angle = portAngles[i];
 		const cos = Math.cos(angle);
 		const sin = Math.sin(angle);
-		const px = -sin; // perpendicular
+		const px = -sin;
 		const py = cos;
 		const hw = portWidth / 2;
 
-		// Feed line from inner ring edge to beyond outer edge + feedLength
-		const startR = rIn;
+		// Start inside the ring, end beyond it
+		const startR = rIn - ringWidth / 2;
 		const endR = rOut + feedLength;
 		polys.push({
 			x: [
