@@ -62,8 +62,6 @@ export interface SymmetricTransformerParams {
 	via_width: number;
 	via_in_metal: number;
 	portSpacing?: number;
-	/** Aspect ratio: Y = Dout * aspectRatio. Default 1.0 (square). */
-	aspectRatio?: number;
 }
 
 export interface StackedTransformerParams {
@@ -80,8 +78,6 @@ export interface StackedTransformerParams {
 	via_width: number;
 	via_in_metal: number;
 	portSpacing?: number;
-	/** Aspect ratio: Y = Dout * aspectRatio. Default 1.0 (square). */
-	aspectRatio?: number;
 }
 
 export interface PatchAntennaParams {

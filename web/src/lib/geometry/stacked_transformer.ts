@@ -11,8 +11,6 @@ export function buildStackedTransformer(params: StackedTransformerParams): Geome
 	const { Dout, N1, N2, sides, width, spacing,
 		center_tap_primary, center_tap_secondary,
 		via_extent, via_spacing, via_width, via_in_metal } = params;
-	const ar = params.aspectRatio ?? 1;
-
 	const PI = Math.PI;
 	const SQRT2 = Math.SQRT2;
 	const v = width / Math.cos(PI / sides);
@@ -73,23 +71,6 @@ export function buildStackedTransformer(params: StackedTransformerParams): Geome
 			})),
 		],
 	};
-
-	// Apply aspect ratio — extend straight side segments, preserve 45° crossings
-	if (ar !== 1) {
-		const ext = Dout * (ar - 1);
-		const shiftForCentroid = (cy: number) => cy > 0 ? ext / 2 : cy < 0 ? -ext / 2 : 0;
-		for (const node of network.nodes) {
-			node.y += shiftForCentroid(node.y);
-		}
-		for (const polys of Object.values(layers)) {
-			if (!polys) continue;
-			for (const poly of polys) {
-				const cy = poly.y.reduce((a, b) => a + b, 0) / poly.y.length;
-				const dy = shiftForCentroid(cy);
-				if (dy !== 0) poly.y = poly.y.map(y => y + dy);
-			}
-		}
-	}
 
 	return { network, layers };
 }

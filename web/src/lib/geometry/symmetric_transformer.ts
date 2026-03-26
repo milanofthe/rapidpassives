@@ -5,8 +5,6 @@ import { viaGrid, routingGeometric45 } from './utils';
 export function buildSymmetricTransformer(params: SymmetricTransformerParams): GeometryResult {
 	const { Dout, N1, N2, sides, width, spacing, center_tap_primary, center_tap_secondary,
 		via_extent, via_spacing, via_width, via_in_metal } = params;
-	const ar = params.aspectRatio ?? 1;
-
 	const PI = Math.PI;
 	const SQRT2 = Math.SQRT2;
 	const N = N1 + N2;
@@ -274,25 +272,6 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 	}
 
 	const network: ConductorNetwork = { nodes: netNodes, segments: netSegments, vias: netVias, ports: netPorts };
-
-	// Apply aspect ratio — extend straight side segments, preserve 45° crossings
-	// Shift each polygon as a unit based on its centroid Y, not per-vertex,
-	// so crossings that span y=0 keep their internal 45° angles intact.
-	if (ar !== 1) {
-		const ext = Dout * (ar - 1);
-		const shiftForCentroid = (cy: number) => cy > 0 ? ext / 2 : cy < 0 ? -ext / 2 : 0;
-		for (const node of netNodes) {
-			node.y += shiftForCentroid(node.y);
-		}
-		for (const polys of Object.values(layers)) {
-			if (!polys) continue;
-			for (const poly of polys) {
-				const cy = poly.y.reduce((a, b) => a + b, 0) / poly.y.length;
-				const dy = shiftForCentroid(cy);
-				if (dy !== 0) poly.y = poly.y.map(y => y + dy);
-			}
-		}
-	}
 
 	return { network, layers };
 }

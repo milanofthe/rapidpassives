@@ -76,7 +76,6 @@
 			<div class="param-section"><h4>Geometry</h4>
 				<div class="f"><span>Dout</span><div class="fi"><button onclick={() => nud('Dout',-1,1)}>-</button><input type="number" value={p.Dout} oninput={e => inp('Dout',e)}/><button onclick={() => nud('Dout',1,1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>Sides</span><div class="fi"><button onclick={() => nud('sides',-4,4,64)}>-</button><input type="number" value={p.sides} oninput={e => inp('sides',e)}/><button onclick={() => nud('sides',4,4,64)}>+</button><em></em></div></div>
-				<div class="f"><span>Aspect</span><div class="fi"><button onclick={() => set('aspectRatio', Math.round(Math.max(0.1, (p.aspectRatio ?? 1) - 0.1) * 10) / 10)}>-</button><input type="number" value={p.aspectRatio ?? ''} placeholder="1.0" step="0.1" oninput={e => { const v = parseInput(e); set('aspectRatio', v && v > 0 ? v : undefined); }}/><button onclick={() => set('aspectRatio', Math.round(((p.aspectRatio ?? 1) + 0.1) * 10) / 10)}>+</button><em></em></div></div>
 				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('width',-0.5,0.1)}>-</button><input type="number" value={p.width} oninput={e => inp('width',e)}/><button onclick={() => nud('width',0.5,0.1)}>+</button><em>um</em></div></div>
 				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('spacing',-0.5,0.1)}>-</button><input type="number" value={p.spacing} oninput={e => inp('spacing',e)}/><button onclick={() => nud('spacing',0.5,0.1)}>+</button><em>um</em></div></div>
 			</div>
