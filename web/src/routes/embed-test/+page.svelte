@@ -1,15 +1,62 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import CodeSnippet from '$lib/components/CodeSnippet.svelte';
 
-	// Dynamically load the embed script so it registers the custom element
 	onMount(() => {
 		const script = document.createElement('script');
 		script.src = '/embed/gds-viewer.js';
 		document.head.appendChild(script);
 	});
 
-	// Use a known public GDS file for testing
 	const testUrl = 'https://raw.githubusercontent.com/google/skywater-pdk-libs-sky130_fd_sc_hd/main/cells/inv/sky130_fd_sc_hd__inv_1.gds';
+
+	const examples = [
+		{
+			title: 'Default',
+			attrs: '',
+			desc: 'Static 3D view, no interaction',
+		},
+		{
+			title: 'Interactive',
+			attrs: 'interactive',
+			desc: 'Orbit, pan, zoom with mouse. Double-click to fit.',
+		},
+		{
+			title: 'Rotate',
+			attrs: 'rotate',
+			desc: 'Continuous camera orbit',
+		},
+		{
+			title: 'Rotate + Explode',
+			attrs: 'rotate explode',
+			desc: 'Layer breathing animation with orbit',
+		},
+		{
+			title: 'Interactive + Rotate',
+			attrs: 'interactive rotate',
+			desc: 'Auto-orbit pauses while dragging',
+		},
+		{
+			title: 'Transparent',
+			attrs: 'interactive transparent',
+			desc: 'No background, blends with page',
+			transparent: true,
+		},
+		{
+			title: 'Slow Animation',
+			attrs: 'rotate explode speed="0.3"',
+			desc: 'Gentle animation speed',
+		},
+		{
+			title: 'Top-Down View',
+			attrs: 'interactive theta="0" phi="85"',
+			desc: 'Custom initial camera angle',
+		},
+	];
+
+	function buildSnippet(attrs: string): string {
+		return `<script src="https://rapidpassives.org/embed/gds-viewer.js"><\/script>\n<gds-viewer\n  src="${testUrl}"${attrs ? '\n  ' + attrs.split(' ').join('\n  ') : ''}\n  width="100%" height="300px"\n><\/gds-viewer>`;
+	}
 </script>
 
 <svelte:head>
@@ -18,60 +65,23 @@
 </svelte:head>
 
 <div class="page">
-	<h1>Embed Test</h1>
-	<p class="desc">Testing <code>&lt;gds-viewer&gt;</code> web component with different configurations.</p>
+	<div class="header">
+		<h1>Embeddable GDS Viewer</h1>
+		<p>Showcase RFIC layouts on any website with a single script tag.</p>
+	</div>
 
-	<div class="grid">
-		<div class="card">
-			<h3>Default (static)</h3>
-			<code>&lt;gds-viewer src="..."&gt;</code>
-			<gds-viewer src={testUrl} width="100%" height="280px"></gds-viewer>
-		</div>
-
-		<div class="card">
-			<h3>Interactive</h3>
-			<code>&lt;gds-viewer src="..." interactive&gt;</code>
-			<gds-viewer src={testUrl} width="100%" height="280px" interactive></gds-viewer>
-		</div>
-
-		<div class="card">
-			<h3>Rotate</h3>
-			<code>&lt;gds-viewer src="..." rotate&gt;</code>
-			<gds-viewer src={testUrl} width="100%" height="280px" rotate></gds-viewer>
-		</div>
-
-		<div class="card">
-			<h3>Rotate + Explode</h3>
-			<code>&lt;gds-viewer src="..." rotate explode&gt;</code>
-			<gds-viewer src={testUrl} width="100%" height="280px" rotate explode></gds-viewer>
-		</div>
-
-		<div class="card">
-			<h3>Interactive + Rotate</h3>
-			<code>&lt;gds-viewer src="..." interactive rotate&gt;</code>
-			<gds-viewer src={testUrl} width="100%" height="280px" interactive rotate></gds-viewer>
-		</div>
-
-		<div class="card">
-			<h3>Transparent BG</h3>
-			<code>&lt;gds-viewer src="..." interactive transparent&gt;</code>
-			<div class="checkerboard">
-				<gds-viewer src={testUrl} width="100%" height="280px" interactive transparent></gds-viewer>
+	{#each examples as ex}
+		<div class="example">
+			<div class="example-info">
+				<h3>{ex.title}</h3>
+				<p>{ex.desc}</p>
+				<CodeSnippet code={buildSnippet(ex.attrs)} />
+			</div>
+			<div class="example-preview" class:checkerboard={ex.transparent}>
+				{@html `<gds-viewer src="${testUrl}" ${ex.attrs} width="100%" height="300px"></gds-viewer>`}
 			</div>
 		</div>
-
-		<div class="card">
-			<h3>Slow Rotate + Explode</h3>
-			<code>&lt;gds-viewer src="..." rotate explode speed="0.3"&gt;</code>
-			<gds-viewer src={testUrl} width="100%" height="280px" rotate explode speed="0.3"></gds-viewer>
-		</div>
-
-		<div class="card">
-			<h3>Custom Angle</h3>
-			<code>&lt;gds-viewer src="..." theta="0" phi="90"&gt;</code>
-			<gds-viewer src={testUrl} width="100%" height="280px" interactive theta="0" phi="85"></gds-viewer>
-		</div>
-	</div>
+	{/each}
 </div>
 
 <style>
@@ -79,43 +89,50 @@
 		height: 100%;
 		overflow-y: auto;
 		padding: 40px;
-		font-family: var(--font-mono);
-	}
-	h1 {
-		font-size: var(--fs-lg);
-		color: var(--accent);
-		margin-bottom: 8px;
-	}
-	.desc {
-		font-size: var(--fs-sm);
-		color: var(--text-dim);
-		margin-bottom: 32px;
-	}
-	.desc code {
-		color: var(--text-muted);
-	}
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-		gap: 20px;
-	}
-	.card {
-		background: var(--bg-surface);
-		border: 1px solid var(--border-subtle);
-		padding: 16px;
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: 40px;
+		max-width: 1100px;
+		margin: 0 auto;
 	}
-	.card h3 {
+	.header h1 {
+		font-size: var(--fs-lg);
+		font-family: var(--font-mono);
+		color: var(--accent);
+		margin-bottom: 6px;
+	}
+	.header p {
 		font-size: var(--fs-sm);
+		font-family: var(--font-mono);
+		color: var(--text-dim);
+	}
+	.example {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 16px;
+		border: 1px solid var(--border-subtle);
+		background: var(--bg-surface);
+		padding: 16px;
+	}
+	.example-info {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.example-info h3 {
+		font-size: var(--fs-sm);
+		font-family: var(--font-mono);
 		color: var(--accent);
 		font-weight: 600;
 	}
-	.card code {
-		font-size: 9px;
+	.example-info p {
+		font-size: var(--fs-xs);
+		font-family: var(--font-mono);
 		color: var(--text-dim);
-		word-break: break-all;
+	}
+	.example-preview {
+		min-height: 300px;
+		overflow: hidden;
 	}
 	.checkerboard {
 		background-image: linear-gradient(45deg, #222 25%, transparent 25%),
@@ -123,7 +140,13 @@
 			linear-gradient(45deg, transparent 75%, #222 75%),
 			linear-gradient(-45deg, transparent 75%, #222 75%);
 		background-size: 16px 16px;
-		background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+		background-position: 0 0, 0 8px, 8px -8px, -8px 0;
 		background-color: #1a1a1a;
+	}
+
+	@media (max-width: 800px) {
+		.example {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>
