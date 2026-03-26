@@ -26,6 +26,8 @@ Embed a 3D GDS viewer on any website with a single script tag:
 <gds-viewer src="layout.gds" rotate explode></gds-viewer>
 ```
 
+See the [live demo](https://rapidpassives.org/embed/test) for interactive examples.
+
 ### Attributes
 
 | Attribute | Description |
@@ -34,8 +36,12 @@ Embed a 3D GDS viewer on any website with a single script tag:
 | `width` | CSS width (default: `100%`) |
 | `height` | CSS height (default: `400px`) |
 | `rotate` | Enable continuous camera rotation |
-| `explode` | Enable layer explode/assemble animation |
+| `explode` | Enable sequential layer explode/assemble animation |
+| `interactive` | Enable mouse orbit, pan, zoom (double-click to fit) |
+| `transparent` | Transparent background instead of dark fill |
 | `speed` | Animation speed multiplier (default: `1`) |
+| `theta` | Initial camera azimuth in degrees (default: `45`) |
+| `phi` | Initial camera elevation in degrees (default: `45`) |
 | `config` | JSON string or URL for layer config |
 
 ### Layer Configuration
@@ -45,13 +51,21 @@ Customize colors, Z positions, and thickness per GDS layer:
 ```html
 <gds-viewer src="layout.gds" rotate config='{
   "layers": {
-    "1": { "color": "#6bbf8a", "z": 301, "thickness": 0.5 },
-    "2": { "color": "#d9513c", "z": 302, "thickness": 0.8 }
+    "1": { "color": "#6bbf8a", "z": 0.0, "thickness": 0.5 },
+    "2": { "color": "#d9513c", "z": 0.5, "thickness": 0.5 }
   }
 }'></gds-viewer>
 ```
 
-Or load from a URL:
+Or just override the color palette:
+
+```html
+<gds-viewer src="layout.gds" config='{
+  "colors": ["#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4"]
+}'></gds-viewer>
+```
+
+Or load configuration from a URL:
 
 ```html
 <gds-viewer src="layout.gds" config="layer-config.json"></gds-viewer>

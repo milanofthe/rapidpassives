@@ -112,6 +112,10 @@
 				</div>
 			</a>
 		</div>
+		<a class="embed-hint" href="/embed/test">
+			<span class="embed-tag">&lt;gds-viewer&gt;</span>
+			<span>Embed 3D layouts on your website</span>
+		</a>
 	</div>
 	<footer class="landing-footer">
 		<a href="https://github.com/milanofthe/rapidpassives" target="_blank" rel="noopener">GitHub</a>
@@ -210,6 +214,30 @@
 		transition: color var(--transition);
 	}
 	.card:hover .viewer-preview {
+		color: var(--accent);
+	}
+	.embed-hint {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		text-decoration: none;
+		font-family: var(--font-mono);
+		font-size: var(--fs-xs);
+		color: var(--text-dim);
+		transition: color var(--transition);
+	}
+	.embed-hint:hover {
+		color: var(--accent);
+	}
+	.embed-tag {
+		font-weight: 600;
+		color: var(--text-muted);
+		border: 1px solid var(--border);
+		padding: 3px 8px;
+		transition: border-color var(--transition), color var(--transition);
+	}
+	.embed-hint:hover .embed-tag {
+		border-color: var(--accent);
 		color: var(--accent);
 	}
 	.landing-footer {

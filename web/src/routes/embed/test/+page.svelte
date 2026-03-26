@@ -57,6 +57,11 @@
 			attrs: 'interactive theta="0" phi="85"',
 			desc: 'Custom initial camera angle',
 		},
+		{
+			title: 'Custom Colors',
+			attrs: `interactive config='${JSON.stringify({ colors: ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dfe6e9', '#a29bfe', '#fd79a8'] })}'`,
+			desc: 'Color palette via config attribute',
+		},
 	];
 
 	function buildSnippet(attrs: string): string {

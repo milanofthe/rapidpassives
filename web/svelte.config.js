@@ -5,7 +5,14 @@ const config = {
 	kit: {
 		adapter: adapter({
 			fallback: '404.html'
-		})
+		}),
+		prerender: {
+			handleHttpError: ({ path }) => {
+				// Static files in /embed/ are served at runtime, not during prerender
+				if (path.startsWith('/embed/')) return;
+				throw new Error(`404: ${path}`);
+			}
+		}
 	},
 	vitePlugin: {
 		dynamicCompileOptions: ({ filename }) =>

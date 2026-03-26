@@ -16,7 +16,10 @@
  *   speed       — animation speed multiplier (default: 1)
  *   theta       — initial camera theta in degrees (default: 45)
  *   phi         — initial camera phi in degrees (default: 45)
- *   config      — JSON string or URL for layer config
+ *   config      — JSON string or URL for layer config:
+ *                  { "layers": { "1": { "color": "#6bbf8a", "z": 0, "thickness": 0.5 }, ... } }
+ *                  Or shorthand colors-only: { "colors": ["#6bbf8a", "#d9513c", ...] }
+ *                  Or per-layer with names: { "layers": { "1": { "color": "#f00", "name": "M1" }, ... } }
  */
 
 import { initGL, buildInstancedMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera, type InstancedSceneData, type GdsLayerInfo } from '../lib/render/canvas3d';
@@ -35,7 +38,7 @@ function createEmbedStack(): ProcessStack {
 
 function assignLayerInfo(
 	scene: InstancedSceneData,
-	layerConfig?: Record<number, { color?: string; z?: number; thickness?: number }>,
+	config?: any,
 ): Map<number, GdsLayerInfo> {
 	const info = new Map<number, GdsLayerInfo>();
 	const layerNums = new Set<number>();
@@ -43,14 +46,20 @@ function assignLayerInfo(
 		for (const key of Object.keys(meshes)) layerNums.add(parseInt(key));
 	}
 	const sorted = [...layerNums].sort((a, b) => a - b);
+
+	// Parse config formats
+	const layerConfig = config?.layers as Record<string, { color?: string; z?: number; thickness?: number }> | undefined;
+	const colorList = config?.colors as string[] | undefined;
+
 	let z = 0.5;
 	const thickness = 0.5;
-	sorted.forEach((num) => {
-		const cfg = layerConfig?.[num];
+	sorted.forEach((num, i) => {
+		const cfg = layerConfig?.[String(num)];
+		const color = cfg?.color ?? colorList?.[i] ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length];
 		info.set(num, {
 			z: cfg?.z ?? z,
 			thickness: cfg?.thickness ?? thickness,
-			color: cfg?.color ?? DEFAULT_COLORS[sorted.indexOf(num) % DEFAULT_COLORS.length],
+			color,
 		});
 		z += cfg?.thickness ?? thickness;
 	});
@@ -223,15 +232,15 @@ class GdsViewerElement extends HTMLElement {
 			this.scene = { cellMeshes: result.cellMeshes, cellEdges: result.cellEdges, cellInstances: result.cellInstances };
 
 			// Parse config
-			let layerConfig: Record<number, { color?: string; z?: number; thickness?: number }> | undefined;
+			let config: any;
 			const cfgAttr = this.getAttribute('config');
 			if (cfgAttr) {
 				try {
-					layerConfig = (cfgAttr.startsWith('{') ? JSON.parse(cfgAttr) : await (await fetch(cfgAttr)).json())?.layers;
+					config = cfgAttr.startsWith('{') ? JSON.parse(cfgAttr) : await (await fetch(cfgAttr)).json();
 				} catch { /* ignore */ }
 			}
 
-			this.gdsLayerInfo = assignLayerInfo(this.scene, layerConfig);
+			this.gdsLayerInfo = assignLayerInfo(this.scene, config);
 			this.layerNums = [...this.gdsLayerInfo.keys()].sort((a, b) => a - b);
 
 			const stack = createEmbedStack();
