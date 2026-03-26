@@ -372,13 +372,14 @@
 		layers;
 		instancedScene;
 		if (mounted && glState) {
+			const sceneChanged = instancedScene !== lastSceneRef;
+			lastSceneRef = instancedScene;
 			needsRebuild = true;
-			// Auto fit-to-view when scene data changes (new file loaded)
-			if (instancedScene !== lastSceneRef) {
-				lastSceneRef = instancedScene;
+			renderFrame();
+			// Auto fit-to-view after rebuild so bboxes are available
+			if (sceneChanged) {
 				resetView();
 			}
-			renderFrame();
 		}
 	});
 
