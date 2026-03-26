@@ -79,7 +79,6 @@
 			<h1>RapidPassives</h1>
 			<p>Browser-based RFIC passive layout generator. Configure geometry, preview in real time, and export production-ready GDS-II.</p>
 		</div>
-		<hr class="divider" />
 		<div class="cards">
 			{#each cards as card, i}
 				<a class="card" href={card.href}>
@@ -105,11 +104,6 @@
 					<p>Import and visualize GDS-II files in 2D and 3D</p>
 				</div>
 			</a>
-		</div>
-		<div class="features">
-			<span class="pill">Real-time Preview</span>
-			<span class="pill">GDS Export</span>
-			<span class="pill">Process Stack</span>
 		</div>
 	</div>
 	<footer class="landing-footer">
@@ -151,12 +145,6 @@
 		max-width: 480px;
 		font-family: var(--font-mono);
 		line-height: 1.5;
-	}
-	.divider {
-		width: calc(100% + 80px);
-		margin: 0 -40px;
-		border: none;
-		border-top: 1px solid var(--border);
 	}
 	.cards {
 		display: flex;
@@ -214,25 +202,6 @@
 		transition: color 0.15s;
 	}
 	.card:hover .viewer-preview {
-		color: var(--accent);
-	}
-	.features {
-		display: flex;
-		gap: 8px;
-		flex-wrap: wrap;
-		justify-content: center;
-	}
-	.pill {
-		font-size: var(--fs-xs);
-		font-family: var(--font-mono);
-		color: var(--text-muted);
-		border: 1px solid var(--border);
-		padding: 4px 12px;
-		letter-spacing: 0.3px;
-		transition: border-color 0.15s, color 0.15s;
-	}
-	.pill:hover {
-		border-color: var(--accent);
 		color: var(--accent);
 	}
 	.landing-footer {
