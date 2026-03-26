@@ -20,7 +20,7 @@
  */
 
 import { initGL, buildInstancedMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera, type InstancedSceneData, type GdsLayerInfo } from '../lib/render/canvas3d';
-import { readGds, buildInstancedScene } from '../lib/gds/reader';
+import { readGds, buildInstancedScene, sceneToInstancedData } from '../lib/gds/reader';
 import type { ProcessStack } from '../lib/stack/types';
 
 const DEFAULT_COLORS = ['#6bbf8a', '#d9513c', '#e8944a', '#f0b86a', '#7b5e8a', '#5a8fd9', '#d95a8f', '#8fd95a', '#5ad9c7', '#d9c75a'];
@@ -211,7 +211,9 @@ class GdsViewerElement extends HTMLElement {
 			if (this.loadingEl) this.loadingEl.textContent = 'Parsing...';
 
 			const gds = readGds(new Uint8Array(buf));
-			this.scene = buildInstancedScene(gds);
+			const rawScene = buildInstancedScene(gds);
+			const data = sceneToInstancedData(rawScene);
+			this.scene = { cellMeshes: data.cellMeshes, cellEdges: data.cellEdges, cellInstances: data.cellInstances };
 
 			// Parse config
 			let layerConfig: Record<number, { color?: string; z?: number; thickness?: number }> | undefined;

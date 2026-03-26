@@ -84,6 +84,7 @@
 				html(),
 				lineNumbers(),
 				drawSelection(),
+				EditorView.lineWrapping,
 				EditorState.readOnly.of(true),
 				EditorView.editable.of(false),
 			],
@@ -97,7 +98,18 @@
 <div class="snippet">
 	<div class="snippet-header">
 		<span>HTML</span>
-		<button onclick={copyCode}>{copied ? 'Copied' : 'Copy'}</button>
+		<button class="copy-btn" onclick={copyCode} title={copied ? 'Copied!' : 'Copy to clipboard'}>
+			{#if copied}
+				<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+					<polyline points="3 8 7 12 13 4" />
+				</svg>
+			{:else}
+				<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+					<rect x="5" y="5" width="9" height="9" rx="1" />
+					<path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2" />
+				</svg>
+			{/if}
+		</button>
 	</div>
 	<div class="snippet-editor" bind:this={editorEl}></div>
 </div>
@@ -123,15 +135,35 @@
 		letter-spacing: 1px;
 		font-weight: 600;
 	}
-	.snippet-header button {
-		font-size: 9px;
-		font-family: var(--font-mono);
-		padding: 2px 8px;
-		text-transform: none;
-		letter-spacing: 0;
+	.copy-btn {
+		width: 24px;
+		height: 24px;
+		padding: 0;
+		border: 1px solid var(--border);
+		background: var(--bg-surface);
+		color: var(--text-dim);
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: border-color var(--transition), color var(--transition);
+	}
+	.copy-btn:hover {
+		border-color: var(--accent);
+		color: var(--text);
 	}
 	.snippet-editor {
 		max-height: 200px;
 		overflow: auto;
+	}
+	.snippet-editor :global(.cm-editor) {
+		max-width: 100%;
+	}
+	.snippet-editor :global(.cm-content) {
+		white-space: pre-wrap;
+		word-break: break-all;
+	}
+	.snippet-editor :global(.cm-line) {
+		word-break: break-all;
 	}
 </style>

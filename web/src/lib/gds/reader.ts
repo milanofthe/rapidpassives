@@ -510,6 +510,77 @@ export function buildInstancedScene(data: GdsData): InstancedScene {
 	return { cells, instances, userUnit: data.units.userUnit };
 }
 
+/** Convert InstancedScene (Maps) to InstancedSceneData (Records of Float32Arrays).
+ *  Triangulates polygons and packs instance transforms. */
+export function sceneToInstancedData(scene: InstancedScene): {
+	cellMeshes: Record<string, Record<number, Float32Array>>;
+	cellEdges: Record<string, Record<number, Float32Array>>;
+	cellInstances: Record<string, Float32Array>;
+	polygonCount: number;
+} {
+	const cellMeshes: Record<string, Record<number, Float32Array>> = {};
+	const cellEdges: Record<string, Record<number, Float32Array>> = {};
+	const cellInstances: Record<string, Float32Array> = {};
+	let polygonCount = 0;
+
+	for (const [cellName, cellData] of scene.cells) {
+		const instances = scene.instances.get(cellName);
+		if (!instances || instances.length === 0) continue;
+
+		const meshes: Record<number, Float32Array> = {};
+		const edges: Record<number, Float32Array> = {};
+		for (const [layerNum, polys] of cellData.polygons) {
+			polygonCount += polys.length * instances.length;
+			// Triangulate
+			const triVerts: number[] = [];
+			for (const poly of polys) {
+				if (poly.x.length < 3) continue;
+				const n = poly.x.length;
+				// Simple fan triangulation for convex, earcut for complex
+				for (let i = 1; i < n - 1; i++) {
+					triVerts.push(
+						poly.x[0] * scene.userUnit, poly.y[0] * scene.userUnit,
+						poly.x[i] * scene.userUnit, poly.y[i] * scene.userUnit,
+						poly.x[i + 1] * scene.userUnit, poly.y[i + 1] * scene.userUnit,
+					);
+				}
+			}
+			if (triVerts.length > 0) meshes[layerNum] = new Float32Array(triVerts);
+
+			// Edges
+			const edgeVerts: number[] = [];
+			for (const poly of polys) {
+				const pn = poly.x.length;
+				if (pn < 3) continue;
+				for (let i = 0; i < pn; i++) {
+					const j = (i + 1) % pn;
+					edgeVerts.push(
+						poly.x[i] * scene.userUnit, poly.y[i] * scene.userUnit,
+						poly.x[j] * scene.userUnit, poly.y[j] * scene.userUnit,
+					);
+				}
+			}
+			if (edgeVerts.length > 0) edges[layerNum] = new Float32Array(edgeVerts);
+		}
+
+		if (Object.keys(meshes).length > 0) {
+			cellMeshes[cellName] = meshes;
+			cellEdges[cellName] = edges;
+			const packed = new Float32Array(instances.length * 6);
+			for (let i = 0; i < instances.length; i++) {
+				const t = instances[i];
+				packed[i * 6 + 0] = t[0]; packed[i * 6 + 1] = t[1];
+				packed[i * 6 + 2] = t[2]; packed[i * 6 + 3] = t[3];
+				packed[i * 6 + 4] = t[4] * scene.userUnit;
+				packed[i * 6 + 5] = t[5] * scene.userUnit;
+			}
+			cellInstances[cellName] = packed;
+		}
+	}
+
+	return { cellMeshes, cellEdges, cellInstances, polygonCount };
+}
+
 /** Convert GDS integer coordinates to user units (typically microns) */
 export function scalePolygons(polys: Map<number, Polygon[]>, userUnit: number): Map<number, Polygon[]> {
 	const result = new Map<number, Polygon[]>();

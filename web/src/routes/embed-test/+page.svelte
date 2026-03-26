@@ -88,7 +88,7 @@
 	.page {
 		height: 100%;
 		overflow-y: auto;
-		padding: 40px;
+		padding: 40px 40px 80px;
 		display: flex;
 		flex-direction: column;
 		gap: 40px;
