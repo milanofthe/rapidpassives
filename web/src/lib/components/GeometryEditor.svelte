@@ -275,7 +275,7 @@
 		cursor: col-resize;
 		background: var(--border);
 		flex-shrink: 0;
-		transition: background 0.15s;
+		transition: background var(--transition);
 	}
 	.resize-handle-v:hover, .resize-handle-v:active {
 		background: var(--accent);
@@ -285,7 +285,7 @@
 		cursor: row-resize;
 		background: var(--border);
 		flex-shrink: 0;
-		transition: background 0.15s;
+		transition: background var(--transition);
 	}
 	.resize-handle-h:hover, .resize-handle-h:active {
 		background: var(--accent);
@@ -307,7 +307,7 @@
 		color: var(--text-dim);
 		border: none;
 		cursor: pointer;
-		transition: color 0.15s;
+		transition: color var(--transition);
 	}
 	.stab:hover {
 		color: var(--text-muted);
@@ -364,7 +364,7 @@
 		color: var(--text-dim);
 		border: 2px dashed var(--border);
 		padding: 30px 50px;
-		transition: border-color 0.15s, color 0.15s;
+		transition: border-color var(--transition), color var(--transition);
 	}
 	.viewer-drop-overlay:not(:has(.drop-phase)) .drop-prompt {
 		border-color: var(--accent);
@@ -410,7 +410,7 @@
 		align-items: center;
 		justify-content: center;
 		padding: 0;
-		transition: background 0.15s, border-color 0.15s, color 0.15s;
+		transition: background var(--transition), border-color var(--transition), color var(--transition);
 	}
 	.tb:hover {
 		background: var(--bg-panel);

@@ -62,7 +62,7 @@
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
-	transition: background 0.1s, color 0.1s;
+	transition: background var(--transition), color var(--transition);
 	flex-shrink: 0;
 }
 .fi button:hover {
@@ -80,7 +80,7 @@
 	text-transform: none;
 	letter-spacing: 0.5px;
 	cursor: pointer;
-	transition: background 0.1s, color 0.1s;
+	transition: background var(--transition), color var(--transition);
 }
 .toggle-btn.active {
 	background: var(--accent);

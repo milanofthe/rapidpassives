@@ -167,7 +167,7 @@
 		border: 1px solid var(--border-subtle);
 		text-decoration: none;
 		color: inherit;
-		transition: border-color 0.15s, transform 0.15s;
+		transition: border-color var(--transition), transform var(--transition);
 		display: flex;
 		flex-direction: column;
 	}
@@ -207,7 +207,7 @@
 	}
 	.viewer-preview {
 		color: var(--text-dim);
-		transition: color 0.15s;
+		transition: color var(--transition);
 	}
 	.card:hover .viewer-preview {
 		color: var(--accent);
@@ -233,7 +233,7 @@
 		color: var(--text-dim);
 		text-decoration: none;
 		letter-spacing: 0.3px;
-		transition: color 0.15s;
+		transition: color var(--transition);
 	}
 	.landing-footer a:hover {
 		color: var(--accent);

@@ -134,7 +134,7 @@
 		letter-spacing: 0.5px;
 		color: var(--text-dim);
 		text-decoration: none;
-		transition: color 0.15s;
+		transition: color var(--transition);
 	}
 	.tab:hover {
 		color: var(--text-muted);

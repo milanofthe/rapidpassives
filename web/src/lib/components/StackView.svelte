@@ -151,7 +151,7 @@
 	}
 	.cs-row {
 		cursor: pointer;
-		transition: opacity 0.15s;
+		transition: opacity var(--transition);
 	}
 	.cs-row.dimmed {
 		opacity: 0.15;

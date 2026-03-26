@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
+	import ParamField from '$lib/components/ParamField.svelte';
 	import type { MomCapacitorParams, GuardRingParams, LayerMap } from '$lib/geometry/types';
 	import { buildMomCapacitor, isMomCapacitorValid } from '$lib/geometry/mom_capacitor';
 	import { guardRing } from '$lib/geometry/utils';
@@ -7,7 +8,6 @@
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackView from '$lib/components/StackView.svelte';
-	import { nudgeValue, parseInput } from '$lib/components/fields';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
 	function doExport() {
@@ -24,13 +24,8 @@
 	let gr = $state<GuardRingParams>({ enabled: false, margin: 5, ringWidth: 3 });
 	let stack = $state(createDefaultStack());
 
-	function set(k: keyof MomCapacitorParams, v: any) { p = { ...p, [k]: v }; }
-	function nud(k: keyof MomCapacitorParams, s: number, mn?: number, mx?: number) { set(k, nudgeValue(p[k] as number, s, mn, mx)); }
-	function inp(k: keyof MomCapacitorParams, e: Event) { const v = parseInput(e); if (v !== null) set(k, v); }
-
-	function setGR(k: keyof GuardRingParams, v: any) { gr = { ...gr, [k]: v }; }
-	function nudGR(k: keyof GuardRingParams, s: number, mn?: number, mx?: number) { setGR(k, nudgeValue(gr[k] as number, s, mn, mx)); }
-	function inpGR(k: keyof GuardRingParams, e: Event) { const v = parseInput(e); if (v !== null) setGR(k, v); }
+	function set<K extends keyof MomCapacitorParams>(k: K, v: MomCapacitorParams[K]) { p = { ...p, [k]: v }; }
+	function setGR<K extends keyof GuardRingParams>(k: K, v: GuardRingParams[K]) { gr = { ...gr, [k]: v }; }
 
 	let result = $derived.by(() => {
 		try { return buildMomCapacitor({ ...p }); } catch { return null; }
@@ -75,32 +70,41 @@
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
 			<div class="param-section"><h4>Fingers</h4>
-				<div class="f"><span>Count</span><div class="fi"><button onclick={() => nud('nFingers',-2,2)}>-</button><input type="number" value={p.nFingers} oninput={e => inp('nFingers',e)}/><button onclick={() => nud('nFingers',2,2)}>+</button><em></em></div></div>
-				<div class="f"><span>Length</span><div class="fi"><button onclick={() => nud('fingerLength',-1,1)}>-</button><input type="number" value={p.fingerLength} oninput={e => inp('fingerLength',e)}/><button onclick={() => nud('fingerLength',1,1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('fingerWidth',-0.1,0.1)}>-</button><input type="number" value={p.fingerWidth} oninput={e => inp('fingerWidth',e)}/><button onclick={() => nud('fingerWidth',0.1,0.1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('fingerSpacing',-0.1,0.1)}>-</button><input type="number" value={p.fingerSpacing} oninput={e => inp('fingerSpacing',e)}/><button onclick={() => nud('fingerSpacing',0.1,0.1)}>+</button><em>um</em></div></div>
+				<ParamField label="Count" value={p.nFingers} step={2} min={2} onchange={v => set('nFingers', v ?? 21)} />
+				<ParamField label="Length" value={p.fingerLength} unit="um" step={1} min={1} onchange={v => set('fingerLength', v ?? 40)} />
+				<ParamField label="Width" value={p.fingerWidth} unit="um" step={0.1} min={0.1} onchange={v => set('fingerWidth', v ?? 1)} />
+				<ParamField label="Spacing" value={p.fingerSpacing} unit="um" step={0.1} min={0.1} onchange={v => set('fingerSpacing', v ?? 1)} />
 			</div>
 			<div class="param-section"><h4>Structure</h4>
-				<div class="f"><span>Bus Width</span><div class="fi"><button onclick={() => nud('busWidth',-0.5,0.5)}>-</button><input type="number" value={p.busWidth} oninput={e => inp('busWidth',e)}/><button onclick={() => nud('busWidth',0.5,0.5)}>+</button><em>um</em></div></div>
-				<div class="f"><span>Layers</span><div class="fi"><button onclick={() => nud('nLayers',-1,1,3)}>-</button><input type="number" value={p.nLayers} oninput={e => inp('nLayers',e)}/><button onclick={() => nud('nLayers',1,1,3)}>+</button><em></em></div></div>
+				<ParamField label="Bus Width" value={p.busWidth} unit="um" step={0.5} min={0.5} onchange={v => set('busWidth', v ?? 4)} />
+				<ParamField label="Layers" value={p.nLayers} step={1} min={1} max={3} onchange={v => set('nLayers', v ?? 3)} />
 			</div>
 			<div class="param-section"><h4>Vias</h4>
-				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('via_spacing',-0.1,0.1)}>-</button><input type="number" value={p.via_spacing} oninput={e => inp('via_spacing',e)}/><button onclick={() => nud('via_spacing',0.1,0.1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('via_width',-0.1,0.1)}>-</button><input type="number" value={p.via_width} oninput={e => inp('via_width',e)}/><button onclick={() => nud('via_width',0.1,0.1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>In Metal</span><div class="fi"><button onclick={() => nud('via_in_metal',-0.05,0)}>-</button><input type="number" value={p.via_in_metal} oninput={e => inp('via_in_metal',e)}/><button onclick={() => nud('via_in_metal',0.05,0)}>+</button><em>um</em></div></div>
+				<ParamField label="Spacing" value={p.via_spacing} unit="um" step={0.1} min={0.1} onchange={v => set('via_spacing', v ?? 0.8)} />
+				<ParamField label="Width" value={p.via_width} unit="um" step={0.1} min={0.1} onchange={v => set('via_width', v ?? 1)} />
+				<ParamField label="In Metal" value={p.via_in_metal} unit="um" step={0.05} min={0} onchange={v => set('via_in_metal', v ?? 0.45)} />
 			</div>
 			<div class="param-section"><h4>Guard Ring</h4>
 				<div class="f"><span>Enabled</span><div class="fi"><button class="toggle-btn" class:active={gr.enabled} onclick={() => setGR('enabled', !gr.enabled)}>{gr.enabled ? 'ON' : 'OFF'}</button><em></em></div></div>
 				{#if gr.enabled}
-					<div class="f"><span>Margin</span><div class="fi"><button onclick={() => nudGR('margin',-1,1)}>-</button><input type="number" value={gr.margin} oninput={e => inpGR('margin',e)}/><button onclick={() => nudGR('margin',1,1)}>+</button><em>um</em></div></div>
-					<div class="f"><span>Ring Width</span><div class="fi"><button onclick={() => nudGR('ringWidth',-0.5,0.5)}>-</button><input type="number" value={gr.ringWidth} oninput={e => inpGR('ringWidth',e)}/><button onclick={() => nudGR('ringWidth',0.5,0.5)}>+</button><em>um</em></div></div>
+					<ParamField label="Margin" value={gr.margin} unit="um" step={1} min={1} onchange={v => setGR('margin', v ?? 5)} />
+					<ParamField label="Ring Width" value={gr.ringWidth} unit="um" step={0.5} min={0.5} onchange={v => setGR('ringWidth', v ?? 3)} />
 				{/if}
 			</div>
 		</ParamSidebar>
 	{/snippet}
 	{#snippet stackPanel()}
-		<div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+		<div class="stack-wrapper">
 			<StackView bind:stack />
 		</div>
 	{/snippet}
 </GeometryEditor>
+
+<style>
+	.stack-wrapper {
+		padding: var(--space-lg);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-lg);
+	}
+</style>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
+	import ParamField from '$lib/components/ParamField.svelte';
 	import type { LayerMap } from '$lib/geometry/types';
 	import type { RatraceCouplerParams } from '$lib/geometry/ratrace_coupler';
 	import { buildRatraceCoupler, isRatraceCouplerValid } from '$lib/geometry/ratrace_coupler';
@@ -7,7 +8,6 @@
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackView from '$lib/components/StackView.svelte';
-	import { nudgeValue, parseInput } from '$lib/components/fields';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
 
@@ -22,9 +22,7 @@
 
 	let stack = $state(create2MetalStack());
 
-	function set(k: keyof RatraceCouplerParams, v: any) { p = { ...p, [k]: v }; }
-	function nud(k: keyof RatraceCouplerParams, s: number, mn?: number, mx?: number) { set(k, nudgeValue(p[k] as number, s, mn, mx)); }
-	function inp(k: keyof RatraceCouplerParams, e: Event) { const v = parseInput(e); if (v !== null) set(k, v); }
+	function set<K extends keyof RatraceCouplerParams>(k: K, v: RatraceCouplerParams[K]) { p = { ...p, [k]: v }; }
 
 	let result = $derived.by(() => {
 		try { return buildRatraceCoupler({ ...p }); } catch { return null; }
@@ -55,18 +53,27 @@
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
 			<div class="param-section"><h4>Ring</h4>
-				<div class="f"><span>Radius</span><div class="fi"><button onclick={() => nud('radius',-5,1)}>-</button><input type="number" value={p.radius} oninput={e => inp('radius',e)}/><button onclick={() => nud('radius',5,1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('ringWidth',-0.5,0.1)}>-</button><input type="number" value={p.ringWidth} oninput={e => inp('ringWidth',e)}/><button onclick={() => nud('ringWidth',0.5,0.1)}>+</button><em>um</em></div></div>
+				<ParamField label="Radius" value={p.radius} unit="um" step={5} min={1} onchange={v => set('radius', v ?? 120)} />
+				<ParamField label="Width" value={p.ringWidth} unit="um" step={0.5} min={0.1} onchange={v => set('ringWidth', v ?? 8)} />
 			</div>
 			<div class="param-section"><h4>Ports</h4>
-				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('portWidth',-0.5,0.1)}>-</button><input type="number" value={p.portWidth} oninput={e => inp('portWidth',e)}/><button onclick={() => nud('portWidth',0.5,0.1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>Feed Length</span><div class="fi"><button onclick={() => nud('feedLength',-5,1)}>-</button><input type="number" value={p.feedLength} oninput={e => inp('feedLength',e)}/><button onclick={() => nud('feedLength',5,1)}>+</button><em>um</em></div></div>
+				<ParamField label="Width" value={p.portWidth} unit="um" step={0.5} min={0.1} onchange={v => set('portWidth', v ?? 10)} />
+				<ParamField label="Feed Length" value={p.feedLength} unit="um" step={5} min={1} onchange={v => set('feedLength', v ?? 40)} />
 			</div>
 		</ParamSidebar>
 	{/snippet}
 	{#snippet stackPanel()}
-		<div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+		<div class="stack-wrapper">
 			<StackView bind:stack />
 		</div>
 	{/snippet}
 </GeometryEditor>
+
+<style>
+	.stack-wrapper {
+		padding: var(--space-lg);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-lg);
+	}
+</style>

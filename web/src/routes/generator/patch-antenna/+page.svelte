@@ -1,12 +1,12 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
+	import ParamField from '$lib/components/ParamField.svelte';
 	import type { PatchAntennaParams, LayerMap } from '$lib/geometry/types';
 	import { buildPatchAntenna, isPatchAntennaValid, designPatchAntenna } from '$lib/geometry/patch_antenna';
 	import { create2MetalStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackView from '$lib/components/StackView.svelte';
-	import { nudgeValue, parseInput } from '$lib/components/fields';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
 
@@ -34,9 +34,7 @@
 		p = { ...p, W: d.W, L: d.L, insetDepth: d.insetDepth, feedType: 'inset' };
 	}
 
-	function set(k: keyof PatchAntennaParams, v: any) { p = { ...p, [k]: v }; }
-	function nud(k: keyof PatchAntennaParams, s: number, mn?: number, mx?: number) { set(k, nudgeValue(p[k] as number, s, mn, mx)); }
-	function inp(k: keyof PatchAntennaParams, e: Event) { const v = parseInput(e); if (v !== null) set(k, v); }
+	function set<K extends keyof PatchAntennaParams>(k: K, v: PatchAntennaParams[K]) { p = { ...p, [k]: v }; }
 
 	let result = $derived.by(() => {
 		try { return buildPatchAntenna({ ...p }); } catch { return null; }
@@ -67,31 +65,40 @@
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
 			<div class="param-section"><h4>Design</h4>
-				<div class="f"><span>Frequency</span><div class="fi"><button onclick={() => { designFreq = Math.max(0.1, Math.round((designFreq - 0.1) * 10) / 10); autoDesign(); }}>-</button><input type="number" value={designFreq} step="0.1" oninput={e => { const v = parseInput(e); if (v && v > 0) { designFreq = v; autoDesign(); } }}/><button onclick={() => { designFreq = Math.round((designFreq + 0.1) * 10) / 10; autoDesign(); }}>+</button><em>GHz</em></div></div>
-				<div class="f"><span>εr</span><div class="fi"><button onclick={() => { designEr = Math.max(1, Math.round((designEr - 0.1) * 10) / 10); autoDesign(); }}>-</button><input type="number" value={designEr} step="0.1" oninput={e => { const v = parseInput(e); if (v && v >= 1) { designEr = v; autoDesign(); } }}/><button onclick={() => { designEr = Math.round((designEr + 0.1) * 10) / 10; autoDesign(); }}>+</button><em></em></div></div>
-				<div class="f"><span>Height</span><div class="fi"><button onclick={() => { designH = Math.max(0.1, Math.round((designH - 0.1) * 10) / 10); autoDesign(); }}>-</button><input type="number" value={designH} step="0.1" oninput={e => { const v = parseInput(e); if (v && v > 0) { designH = v; autoDesign(); } }}/><button onclick={() => { designH = Math.round((designH + 0.1) * 10) / 10; autoDesign(); }}>+</button><em>mm</em></div></div>
+				<ParamField label="Frequency" value={designFreq} unit="GHz" step={0.1} min={0.1} onchange={v => { if (v && v > 0) { designFreq = v; autoDesign(); } }} />
+				<ParamField label="εr" value={designEr} step={0.1} min={1} onchange={v => { if (v && v >= 1) { designEr = v; autoDesign(); } }} />
+				<ParamField label="Height" value={designH} unit="mm" step={0.1} min={0.1} onchange={v => { if (v && v > 0) { designH = v; autoDesign(); } }} />
 			</div>
 			<div class="param-section"><h4>Patch</h4>
-				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('W',-5,1)}>-</button><input type="number" value={p.W} oninput={e => inp('W',e)}/><button onclick={() => nud('W',5,1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>Length</span><div class="fi"><button onclick={() => nud('L',-5,1)}>-</button><input type="number" value={p.L} oninput={e => inp('L',e)}/><button onclick={() => nud('L',5,1)}>+</button><em>um</em></div></div>
+				<ParamField label="Width" value={p.W} unit="um" step={5} min={1} onchange={v => set('W', v ?? 200)} />
+				<ParamField label="Length" value={p.L} unit="um" step={5} min={1} onchange={v => set('L', v ?? 160)} />
 			</div>
 			<div class="param-section"><h4>Feed</h4>
 				<div class="f"><span>Type</span><div class="fi"><button class="toggle-btn" class:active={p.feedType === 'inset'} onclick={() => set('feedType', p.feedType === 'inset' ? 'edge' : 'inset')}>{p.feedType === 'inset' ? 'Inset' : 'Edge'}</button><em></em></div></div>
-				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('feedWidth',-1,0.5)}>-</button><input type="number" value={p.feedWidth} oninput={e => inp('feedWidth',e)}/><button onclick={() => nud('feedWidth',1,0.5)}>+</button><em>um</em></div></div>
-				<div class="f"><span>Length</span><div class="fi"><button onclick={() => nud('feedLength',-5,1)}>-</button><input type="number" value={p.feedLength} oninput={e => inp('feedLength',e)}/><button onclick={() => nud('feedLength',5,1)}>+</button><em>um</em></div></div>
+				<ParamField label="Width" value={p.feedWidth} unit="um" step={1} min={0.5} onchange={v => set('feedWidth', v ?? 10)} />
+				<ParamField label="Length" value={p.feedLength} unit="um" step={5} min={1} onchange={v => set('feedLength', v ?? 80)} />
 				{#if p.feedType === 'inset'}
-					<div class="f"><span>Inset Depth</span><div class="fi"><button onclick={() => nud('insetDepth',-1,0)}>-</button><input type="number" value={p.insetDepth} oninput={e => inp('insetDepth',e)}/><button onclick={() => nud('insetDepth',1,0)}>+</button><em>um</em></div></div>
-					<div class="f"><span>Inset Gap</span><div class="fi"><button onclick={() => nud('insetGap',-0.5,0.1)}>-</button><input type="number" value={p.insetGap} oninput={e => inp('insetGap',e)}/><button onclick={() => nud('insetGap',0.5,0.1)}>+</button><em>um</em></div></div>
+					<ParamField label="Inset Depth" value={p.insetDepth} unit="um" step={1} min={0} onchange={v => set('insetDepth', v ?? 40)} />
+					<ParamField label="Inset Gap" value={p.insetGap} unit="um" step={0.5} min={0.1} onchange={v => set('insetGap', v ?? 2)} />
 				{/if}
 			</div>
 			<div class="param-section"><h4>Ground</h4>
-				<div class="f"><span>Margin</span><div class="fi"><button onclick={() => nud('groundMargin',-5,1)}>-</button><input type="number" value={p.groundMargin} oninput={e => inp('groundMargin',e)}/><button onclick={() => nud('groundMargin',5,1)}>+</button><em>um</em></div></div>
+				<ParamField label="Margin" value={p.groundMargin} unit="um" step={5} min={1} onchange={v => set('groundMargin', v ?? 60)} />
 			</div>
 		</ParamSidebar>
 	{/snippet}
 	{#snippet stackPanel()}
-		<div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+		<div class="stack-wrapper">
 			<StackView bind:stack />
 		</div>
 	{/snippet}
 </GeometryEditor>
+
+<style>
+	.stack-wrapper {
+		padding: var(--space-lg);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-lg);
+	}
+</style>

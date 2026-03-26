@@ -6,8 +6,8 @@
 	import { create2MetalStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
+	import ParamField from '$lib/components/ParamField.svelte';
 	import StackView from '$lib/components/StackView.svelte';
-	import { nudgeValue, parseInput } from '$lib/components/fields';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
 
@@ -25,17 +25,7 @@
 	let gr = $state<GuardRingParams>({ enabled: false, margin: 10, ringWidth: 5 });
 	let stack = $state(create2MetalStack());
 
-	function set(k: keyof SpiralInductorParams, v: any) { p = { ...p, [k]: v }; }
-	function nud(k: keyof SpiralInductorParams, s: number, mn?: number, mx?: number) { set(k, nudgeValue(p[k] as number, s, mn, mx)); }
-	function inp(k: keyof SpiralInductorParams, e: Event) { const v = parseInput(e); if (v !== null) set(k, v); }
-
-	function setPgs(k: keyof PgsParams, v: any) { pgs = { ...pgs, [k]: v }; }
-	function nudPgs(k: keyof PgsParams, s: number, mn?: number, mx?: number) { setPgs(k, nudgeValue(pgs[k] as number, s, mn, mx)); }
-	function inpPgs(k: keyof PgsParams, e: Event) { const v = parseInput(e); if (v !== null) setPgs(k, v); }
-
-	function setGR(k: keyof GuardRingParams, v: any) { gr = { ...gr, [k]: v }; }
-	function nudGR(k: keyof GuardRingParams, s: number, mn?: number, mx?: number) { setGR(k, nudgeValue(gr[k] as number, s, mn, mx)); }
-	function inpGR(k: keyof GuardRingParams, e: Event) { const v = parseInput(e); if (v !== null) setGR(k, v); }
+	function set<K extends keyof SpiralInductorParams>(k: K, v: SpiralInductorParams[K]) { p = { ...p, [k]: v }; }
 
 	let result = $derived.by(() => {
 		try { return buildSpiralInductor({ ...p }); } catch { return null; }
@@ -74,41 +64,50 @@
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
 			<div class="param-section"><h4>Geometry</h4>
-				<div class="f"><span>Dout</span><div class="fi"><button onclick={() => nud('Dout',-1,1)}>-</button><input type="number" value={p.Dout} oninput={e => inp('Dout',e)}/><button onclick={() => nud('Dout',1,1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>N</span><div class="fi"><button onclick={() => nud('N',-1,1,20)}>-</button><input type="number" value={p.N} oninput={e => inp('N',e)}/><button onclick={() => nud('N',1,1,20)}>+</button><em>turns</em></div></div>
-				<div class="f"><span>Sides</span><div class="fi"><button onclick={() => nud('sides',-2,4,64)}>-</button><input type="number" value={p.sides} oninput={e => inp('sides',e)}/><button onclick={() => nud('sides',2,4,64)}>+</button><em></em></div></div>
-				<div class="f"><span>Aspect</span><div class="fi"><button onclick={() => set('aspectRatio', Math.round(Math.max(0.1, (p.aspectRatio ?? 1) - 0.1) * 10) / 10)}>-</button><input type="number" value={p.aspectRatio ?? ''} placeholder="1.0" step="0.1" oninput={e => { const v = parseInput(e); set('aspectRatio', v && v > 0 ? v : undefined); }}/><button onclick={() => set('aspectRatio', Math.round(((p.aspectRatio ?? 1) + 0.1) * 10) / 10)}>+</button><em></em></div></div>
-				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('width',-0.5,0.1)}>-</button><input type="number" value={p.width} oninput={e => inp('width',e)}/><button onclick={() => nud('width',0.5,0.1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('spacing',-0.5,0.1)}>-</button><input type="number" value={p.spacing} oninput={e => inp('spacing',e)}/><button onclick={() => nud('spacing',0.5,0.1)}>+</button><em>um</em></div></div>
+				<ParamField label="Dout" value={p.Dout} unit="um" step={1} min={1} onchange={v => set('Dout', v ?? 130)} />
+				<ParamField label="N" value={p.N} unit="turns" step={1} min={1} max={20} onchange={v => set('N', v ?? 3)} />
+				<ParamField label="Sides" value={p.sides} step={2} min={4} max={64} onchange={v => set('sides', v ?? 8)} />
+				<ParamField label="Aspect" value={p.aspectRatio ?? ''} placeholder="1.0" step={0.1} min={0.1} onchange={v => set('aspectRatio', v && v > 0 ? v : undefined)} />
+				<ParamField label="Width" value={p.width} unit="um" step={0.5} min={0.1} onchange={v => set('width', v ?? 10)} />
+				<ParamField label="Spacing" value={p.spacing} unit="um" step={0.5} min={0.1} onchange={v => set('spacing', v ?? 4)} />
 			</div>
 			<div class="param-section"><h4>Ports</h4>
 				<div class="f"><span>Layout</span><div class="fi"><button class="toggle-btn" class:active={p.portSide === 'opposite'} onclick={() => set('portSide', p.portSide === 'opposite' ? 'same' : 'opposite')}>{p.portSide === 'opposite' ? 'Opposite' : 'Same Side'}</button><em></em></div></div>
 			</div>
 			<div class="param-section"><h4>Vias</h4>
-				<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nud('via_spacing',-0.1,0.1)}>-</button><input type="number" value={p.via_spacing} oninput={e => inp('via_spacing',e)}/><button onclick={() => nud('via_spacing',0.1,0.1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>Width</span><div class="fi"><button onclick={() => nud('via_width',-0.1,0.1)}>-</button><input type="number" value={p.via_width} oninput={e => inp('via_width',e)}/><button onclick={() => nud('via_width',0.1,0.1)}>+</button><em>um</em></div></div>
-				<div class="f"><span>In Metal</span><div class="fi"><button onclick={() => nud('via_in_metal',-0.05,0)}>-</button><input type="number" value={p.via_in_metal} oninput={e => inp('via_in_metal',e)}/><button onclick={() => nud('via_in_metal',0.05,0)}>+</button><em>um</em></div></div>
+				<ParamField label="Spacing" value={p.via_spacing} unit="um" step={0.1} min={0.1} onchange={v => set('via_spacing', v ?? 0.8)} />
+				<ParamField label="Width" value={p.via_width} unit="um" step={0.1} min={0.1} onchange={v => set('via_width', v ?? 1)} />
+				<ParamField label="In Metal" value={p.via_in_metal} unit="um" step={0.05} min={0} onchange={v => set('via_in_metal', v ?? 0.45)} />
 			</div>
 			<div class="param-section"><h4>PGS</h4>
-				<div class="f"><span>Enabled</span><div class="fi"><button class="toggle-btn" class:active={pgs.enabled} onclick={() => setPgs('enabled', !pgs.enabled)}>{pgs.enabled ? 'ON' : 'OFF'}</button><em></em></div></div>
+				<ParamField label="Enabled" value={pgs.enabled ? 1 : 0} type="toggle" onchange={() => pgs = { ...pgs, enabled: !pgs.enabled }} />
 				{#if pgs.enabled}
-					<div class="f"><span>Diameter</span><div class="fi"><button onclick={() => nudPgs('D',-1,1)}>-</button><input type="number" value={pgs.D} oninput={e => inpPgs('D',e)}/><button onclick={() => nudPgs('D',1,1)}>+</button><em>um</em></div></div>
-					<div class="f"><span>Width</span><div class="fi"><button onclick={() => nudPgs('width',-0.5,0.1)}>-</button><input type="number" value={pgs.width} oninput={e => inpPgs('width',e)}/><button onclick={() => nudPgs('width',0.5,0.1)}>+</button><em>um</em></div></div>
-					<div class="f"><span>Spacing</span><div class="fi"><button onclick={() => nudPgs('spacing',-0.5,0.1)}>-</button><input type="number" value={pgs.spacing} oninput={e => inpPgs('spacing',e)}/><button onclick={() => nudPgs('spacing',0.5,0.1)}>+</button><em>um</em></div></div>
+					<ParamField label="Diameter" value={pgs.D} unit="um" step={1} min={1} onchange={v => pgs = { ...pgs, D: v ?? 150 }} />
+					<ParamField label="Width" value={pgs.width} unit="um" step={0.5} min={0.1} onchange={v => pgs = { ...pgs, width: v ?? 2 }} />
+					<ParamField label="Spacing" value={pgs.spacing} unit="um" step={0.5} min={0.1} onchange={v => pgs = { ...pgs, spacing: v ?? 1 }} />
 				{/if}
 			</div>
 			<div class="param-section"><h4>Guard Ring</h4>
-				<div class="f"><span>Enabled</span><div class="fi"><button class="toggle-btn" class:active={gr.enabled} onclick={() => setGR('enabled', !gr.enabled)}>{gr.enabled ? 'ON' : 'OFF'}</button><em></em></div></div>
+				<ParamField label="Enabled" value={gr.enabled ? 1 : 0} type="toggle" onchange={() => gr = { ...gr, enabled: !gr.enabled }} />
 				{#if gr.enabled}
-					<div class="f"><span>Margin</span><div class="fi"><button onclick={() => nudGR('margin',-1,1)}>-</button><input type="number" value={gr.margin} oninput={e => inpGR('margin',e)}/><button onclick={() => nudGR('margin',1,1)}>+</button><em>um</em></div></div>
-					<div class="f"><span>Ring Width</span><div class="fi"><button onclick={() => nudGR('ringWidth',-0.5,0.5)}>-</button><input type="number" value={gr.ringWidth} oninput={e => inpGR('ringWidth',e)}/><button onclick={() => nudGR('ringWidth',0.5,0.5)}>+</button><em>um</em></div></div>
+					<ParamField label="Margin" value={gr.margin} unit="um" step={1} min={1} onchange={v => gr = { ...gr, margin: v ?? 10 }} />
+					<ParamField label="Ring Width" value={gr.ringWidth} unit="um" step={0.5} min={0.5} onchange={v => gr = { ...gr, ringWidth: v ?? 5 }} />
 				{/if}
 			</div>
 		</ParamSidebar>
 	{/snippet}
 	{#snippet stackPanel()}
-		<div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+		<div class="stack-wrapper">
 			<StackView bind:stack />
 		</div>
 	{/snippet}
 </GeometryEditor>
+
+<style>
+	.stack-wrapper {
+		padding: var(--space-lg);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-lg);
+	}
+</style>

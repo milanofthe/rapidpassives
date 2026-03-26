@@ -30,6 +30,14 @@
 	--fs-sm: 12px;
 	--fs-md: 14px;
 	--fs-lg: 20px;
+	--space-xs: 2px;
+	--space-sm: 4px;
+	--space-md: 8px;
+	--space-lg: 10px;
+	--space-xl: 16px;
+	--space-2xl: 24px;
+	--space-3xl: 40px;
+	--transition: 0.15s;
 }
 
 * {
@@ -56,7 +64,7 @@ input[type="number"], input[type="text"], select {
 	font-size: var(--fs-sm);
 	font-family: var(--font-mono);
 	width: 100%;
-	transition: border-color 0.15s;
+	transition: border-color var(--transition);
 }
 
 input[type="number"]:focus, select:focus {
@@ -91,7 +99,7 @@ button {
 	font-family: var(--font-body);
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
-	transition: background 0.15s;
+	transition: background var(--transition);
 }
 
 button:hover {
