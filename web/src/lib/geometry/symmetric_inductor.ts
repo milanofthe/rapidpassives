@@ -7,6 +7,7 @@ import { createDefaultStack } from '$lib/stack/types';
 
 export function buildSymmetricInductor(params: SymmetricInductorParams): GeometryResult {
 	const { Dout, N, sides, width, spacing, center_tap, via_extent, via_spacing, via_width, via_in_metal } = params;
+	const ar = params.aspectRatio ?? 1;
 
 	const PI = Math.PI;
 	const SQRT2 = Math.SQRT2;
@@ -209,8 +210,18 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 	const network: ConductorNetwork = { nodes, segments, vias, ports };
 
 	// --- Generate polygons from legacy code for exact visual match ---
-	// (reuse the original polygon generation)
 	const layers = generateLegacyPolygons(params);
+
+	// Apply aspect ratio — scale all Y coordinates
+	if (ar !== 1) {
+		for (const node of nodes) node.y *= ar;
+		for (const polys of Object.values(layers)) {
+			if (!polys) continue;
+			for (const poly of polys) {
+				poly.y = poly.y.map(y => y * ar);
+			}
+		}
+	}
 
 	return { network, layers };
 }

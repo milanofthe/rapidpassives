@@ -5,6 +5,7 @@ import { viaGrid, routingGeometric45 } from './utils';
 export function buildSymmetricTransformer(params: SymmetricTransformerParams): GeometryResult {
 	const { Dout, N1, N2, sides, width, spacing, center_tap_primary, center_tap_secondary,
 		via_extent, via_spacing, via_width, via_in_metal } = params;
+	const ar = params.aspectRatio ?? 1;
 
 	const PI = Math.PI;
 	const SQRT2 = Math.SQRT2;
@@ -273,6 +274,18 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 	}
 
 	const network: ConductorNetwork = { nodes: netNodes, segments: netSegments, vias: netVias, ports: netPorts };
+
+	// Apply aspect ratio — scale all Y coordinates
+	if (ar !== 1) {
+		for (const node of netNodes) node.y *= ar;
+		for (const polys of Object.values(layers)) {
+			if (!polys) continue;
+			for (const poly of polys) {
+				poly.y = poly.y.map(y => y * ar);
+			}
+		}
+	}
+
 	return { network, layers };
 }
 

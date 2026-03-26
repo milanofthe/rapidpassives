@@ -28,6 +28,8 @@ export interface SpiralInductorParams {
 	via_width: number;
 	via_in_metal: number;
 	portSide?: 'same' | 'opposite';
+	/** Aspect ratio: Y = Dout * aspectRatio. Default 1.0 (square). */
+	aspectRatio?: number;
 }
 
 export interface SymmetricInductorParams {
@@ -42,6 +44,8 @@ export interface SymmetricInductorParams {
 	via_width: number;
 	via_in_metal: number;
 	portSpacing?: number;
+	/** Aspect ratio: Y = Dout * aspectRatio. Default 1.0 (square). */
+	aspectRatio?: number;
 }
 
 export interface SymmetricTransformerParams {
@@ -58,6 +62,8 @@ export interface SymmetricTransformerParams {
 	via_width: number;
 	via_in_metal: number;
 	portSpacing?: number;
+	/** Aspect ratio: Y = Dout * aspectRatio. Default 1.0 (square). */
+	aspectRatio?: number;
 }
 
 export interface StackedTransformerParams {
@@ -74,6 +80,8 @@ export interface StackedTransformerParams {
 	via_width: number;
 	via_in_metal: number;
 	portSpacing?: number;
+	/** Aspect ratio: Y = Dout * aspectRatio. Default 1.0 (square). */
+	aspectRatio?: number;
 }
 
 export interface PatchAntennaParams {

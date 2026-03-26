@@ -8,6 +8,7 @@ import { createDefaultStack } from '$lib/stack/types';
 /** Build spiral inductor geometry using network-first approach */
 export function buildSpiralInductor(params: SpiralInductorParams): GeometryResult {
 	const { Dout, N, sides, width, spacing, via_spacing, via_width, via_in_metal } = params;
+	const ar = params.aspectRatio ?? 1;
 
 	const PI = Math.PI;
 	const v = width / Math.cos(PI / sides);
@@ -205,6 +206,21 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 		for (let i = 1; i < windingSegs.length; i++) {
 			windingSegs[i].pathId = 'winding_topology_only';
 			windingSegs[i].polygonOverride = { x: [], y: [] };
+		}
+	}
+
+	// Apply aspect ratio — scale all Y coordinates
+	if (ar !== 1) {
+		for (const node of nodes) node.y *= ar;
+		for (const seg of segments) {
+			if (seg.polygonOverride) {
+				seg.polygonOverride.y = seg.polygonOverride.y.map(y => y * ar);
+			}
+		}
+		for (const via of network.vias) {
+			for (const poly of via.polygons) {
+				poly.y = poly.y.map(y => y * ar);
+			}
 		}
 	}
 
