@@ -299,20 +299,38 @@ class GdsViewerElement extends HTMLElement {
 		if (doExplode && this.layerNums.length > 1) {
 			layerZOffsets = new Map();
 			const t = time * 0.001 * speed;
-			// Scale amplitude relative to geometry
-			const amplitude = this.xyExtent * 0.04;
-			const period = 6.0;
-			// Spline easing: hold at rest → ease out to spread → hold → ease back
-			const raw = (t % period) / period; // 0..1
-			let phase: number;
-			if (raw < 0.15) phase = 0; // hold at rest
-			else if (raw < 0.35) { const p = (raw - 0.15) / 0.2; phase = p * p * (3 - 2 * p); } // ease out
-			else if (raw < 0.65) phase = 1; // hold spread
-			else if (raw < 0.85) { const p = (raw - 0.65) / 0.2; phase = 1 - p * p * (3 - 2 * p); } // ease back
-			else phase = 0; // hold at rest
-			for (let i = 0; i < this.layerNums.length; i++) {
-				const centerIdx = (this.layerNums.length - 1) / 2;
-				layerZOffsets.set(this.layerNums[i], (i - centerIdx) * amplitude * phase);
+			const n = this.layerNums.length;
+			const gap = this.xyExtent * 0.15; // large gap per layer
+			// Total cycle: assemble one layer at a time, hold, disassemble one at a time, hold
+			const layerDur = 0.3; // seconds per layer transition
+			const holdDur = 2.0; // seconds to hold fully spread / fully assembled
+			const halfCycle = n * layerDur + holdDur;
+			const fullCycle = 2 * halfCycle;
+			const ct = t % fullCycle;
+
+			for (let i = 0; i < n; i++) {
+				// Each layer lifts off sequentially from bottom (i=0) to top
+				// layerT: 0 = assembled, 1 = fully exploded
+				let layerT: number;
+				if (ct < halfCycle) {
+					// Spreading phase: layers peel off one at a time from top
+					const startTime = (n - 1 - i) * layerDur;
+					if (ct < startTime) layerT = 0;
+					else if (ct < startTime + layerDur) {
+						const p = (ct - startTime) / layerDur;
+						layerT = p * p * (3 - 2 * p); // smoothstep
+					} else layerT = 1;
+				} else {
+					// Assembling phase: layers come back one at a time from bottom
+					const ct2 = ct - halfCycle;
+					const startTime = i * layerDur;
+					if (ct2 < startTime) layerT = 1;
+					else if (ct2 < startTime + layerDur) {
+						const p = (ct2 - startTime) / layerDur;
+						layerT = 1 - p * p * (3 - 2 * p); // reverse smoothstep
+					} else layerT = 0;
+				}
+				layerZOffsets.set(this.layerNums[i], i * gap * layerT);
 			}
 		}
 

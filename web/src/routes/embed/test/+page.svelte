@@ -27,9 +27,14 @@
 			desc: 'Continuous camera orbit',
 		},
 		{
+			title: 'Explode',
+			attrs: 'explode',
+			desc: 'Sequential layer explode/assemble, no rotation',
+		},
+		{
 			title: 'Rotate + Explode',
 			attrs: 'rotate explode',
-			desc: 'Layer breathing animation with orbit',
+			desc: 'Layer explode animation with orbit',
 		},
 		{
 			title: 'Interactive + Rotate',
