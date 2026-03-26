@@ -201,9 +201,10 @@
 					{instancedScene} {gdsLayerInfo} {visibleGdsLayers} />
 			{/if}
 			<div class="viewer-toolbar">
-				<button class="tb" onclick={doZoomIn} title="Zoom in (+)">+</button>
-				<button class="tb" onclick={doZoomOut} title="Zoom out (-)">&minus;</button>
-				<button class="tb" onclick={doReset} title="Fit to view (F)">
+				<button class="tb" onclick={doZoomIn}><span class="tip">Zoom in<kbd>+</kbd></span>+</button>
+				<button class="tb" onclick={doZoomOut}><span class="tip">Zoom out<kbd>-</kbd></span>&minus;</button>
+				<button class="tb" onclick={doReset}>
+					<span class="tip">Fit view<kbd>F</kbd></span>
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
 						<polyline points="1,5 1,1 5,1" />
 						<polyline points="11,1 15,1 15,5" />
@@ -212,20 +213,24 @@
 						<rect x="5" y="5" width="6" height="6" rx="0.5" />
 					</svg>
 				</button>
-				<button class="tb" onclick={() => viewer?.rotate90()} title="Rotate 90° (R)">
+				<button class="tb" onclick={() => viewer?.rotate90()}>
+					<span class="tip">Rotate<kbd>R</kbd></span>
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-						<path d="M2 8a6 6 0 0 1 10.3-4.2" />
-						<polyline points="10,1 13,4 10,4" />
+						<polyline points="11,1 14,1 14,5" />
+						<path d="M14 1L5 10" />
+						<polyline points="5,6 5,10 9,10" />
 					</svg>
 				</button>
-				<button class="tb" onclick={() => viewer?.flipZ()} title="Flip Z (Z)">
+				<button class="tb" onclick={() => viewer?.flipZ()}>
+					<span class="tip">Flip Z<kbd>Z</kbd></span>
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
 						<path d="M3 4h10" />
 						<path d="M8 4v8" />
 						<path d="M5 9l3 3 3-3" />
 					</svg>
 				</button>
-				<button class="tb" onclick={() => viewer?.saveScreenshot()} title="Save PNG (Ctrl+S)">
+				<button class="tb" onclick={() => viewer?.saveScreenshot()}>
+					<span class="tip">Save PNG<kbd>Ctrl+S</kbd></span>
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
 						<path d="M2 10v3h12v-3" />
 						<path d="M8 2v8" />
@@ -233,7 +238,8 @@
 					</svg>
 				</button>
 				{#if stack}
-					<button class="tb view-mode" onclick={toggleView} title="Toggle 2D/3D (Space)">
+					<button class="tb view-mode" onclick={toggleView}>
+						<span class="tip">Toggle view<kbd>Space</kbd></span>
 						{viewMode === '2d' ? '3D' : '2D'}
 					</button>
 				{/if}
@@ -391,6 +397,7 @@
 		gap: 2px;
 	}
 	.tb {
+		position: relative;
 		width: 28px;
 		height: 28px;
 		border: 1px solid var(--border);
@@ -410,6 +417,33 @@
 		background: var(--bg-panel);
 		border-color: var(--accent);
 		color: var(--text);
+	}
+	.tb .tip {
+		display: none;
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		white-space: nowrap;
+		font-size: var(--fs-xs);
+		font-family: var(--font-mono);
+		font-weight: 400;
+		color: var(--text-muted);
+		background: var(--bg-surface);
+		border: 1px solid var(--border);
+		padding: 3px 8px;
+		pointer-events: none;
+		z-index: 20;
+	}
+	.tb .tip kbd {
+		margin-left: 6px;
+		color: var(--accent);
+		font-family: var(--font-mono);
+		font-weight: 600;
+	}
+	.tb:hover .tip {
+		display: flex;
+		align-items: center;
+		gap: 4px;
 	}
 	.tb.active-toggle {
 		border-color: var(--accent);
