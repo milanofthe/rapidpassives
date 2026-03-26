@@ -300,7 +300,7 @@ class GdsViewerElement extends HTMLElement {
 			layerZOffsets = new Map();
 			const t = time * 0.001 * speed;
 			const n = this.layerNums.length;
-			const gap = this.xyExtent * 0.15; // large gap per layer
+			const gap = this.xyExtent / n; // equal gap between layers
 			// Total cycle: assemble one layer at a time, hold, disassemble one at a time, hold
 			const layerDur = 0.3; // seconds per layer transition
 			const holdDur = 2.0; // seconds to hold fully spread / fully assembled
