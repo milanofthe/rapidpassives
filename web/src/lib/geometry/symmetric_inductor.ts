@@ -212,19 +212,13 @@ export function buildSymmetricInductor(params: SymmetricInductorParams): Geometr
 	// --- Generate polygons from legacy code for exact visual match ---
 	const layers = generateLegacyPolygons(params);
 
-	// Apply aspect ratio — extend straight side segments, preserve 45° crossings
+	// Apply aspect ratio — scale all Y coordinates
 	if (ar !== 1) {
-		const ext = Dout * (ar - 1);
-		const shiftForCentroid = (cy: number) => cy > 0 ? ext / 2 : cy < 0 ? -ext / 2 : 0;
-		for (const node of nodes) {
-			node.y += shiftForCentroid(node.y);
-		}
+		for (const node of nodes) node.y *= ar;
 		for (const polys of Object.values(layers)) {
 			if (!polys) continue;
 			for (const poly of polys) {
-				const cy = poly.y.reduce((a, b) => a + b, 0) / poly.y.length;
-				const dy = shiftForCentroid(cy);
-				if (dy !== 0) poly.y = poly.y.map(y => y + dy);
+				poly.y = poly.y.map(y => y * ar);
 			}
 		}
 	}

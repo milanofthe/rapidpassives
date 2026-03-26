@@ -209,25 +209,17 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 		}
 	}
 
-	// Apply aspect ratio — extend straight side segments, preserve corner angles
+	// Apply aspect ratio — scale all Y coordinates
 	if (ar !== 1) {
-		const ext = Dout * (ar - 1);
-		const shiftForCentroid = (cy: number) => cy > 0 ? ext / 2 : cy < 0 ? -ext / 2 : 0;
-		for (const node of nodes) {
-			node.y += shiftForCentroid(node.y);
-		}
+		for (const node of nodes) node.y *= ar;
 		for (const seg of segments) {
-			if (seg.polygonOverride && seg.polygonOverride.y.length > 0) {
-				const cy = seg.polygonOverride.y.reduce((a, b) => a + b, 0) / seg.polygonOverride.y.length;
-				const dy = shiftForCentroid(cy);
-				if (dy !== 0) seg.polygonOverride.y = seg.polygonOverride.y.map(y => y + dy);
+			if (seg.polygonOverride) {
+				seg.polygonOverride.y = seg.polygonOverride.y.map(y => y * ar);
 			}
 		}
 		for (const via of network.vias) {
 			for (const poly of via.polygons) {
-				const cy = poly.y.reduce((a, b) => a + b, 0) / poly.y.length;
-				const dy = shiftForCentroid(cy);
-				if (dy !== 0) poly.y = poly.y.map(y => y + dy);
+				poly.y = poly.y.map(y => y * ar);
 			}
 		}
 	}
