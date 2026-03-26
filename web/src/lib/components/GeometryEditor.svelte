@@ -217,7 +217,7 @@
 					<span class="tip">Rotate<kbd>R</kbd></span>
 					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
 						<path d="M12 3A6 6 0 1 0 13 8" />
-						<polyline points="9,1 12,3 9,5" />
+						<polyline points="10,0.5 12.5,3 10,5.5" />
 					</svg>
 				</button>
 				<button class="tb" onclick={() => viewer?.flipZ()}>
