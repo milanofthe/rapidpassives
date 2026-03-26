@@ -31,6 +31,16 @@
 		}
 	});
 
+	/** Convert GitHub blob/tree URLs to raw URLs (handles LFS too) */
+	function resolveGitHubUrl(url: string): string {
+		// github.com/user/repo/blob/branch/path → raw.githubusercontent.com/user/repo/branch/path
+		const blobMatch = url.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/);
+		if (blobMatch) {
+			return `https://raw.githubusercontent.com/${blobMatch[1]}/${blobMatch[2]}/${blobMatch[3]}`;
+		}
+		return url;
+	}
+
 	async function fetchFromUrl(url: string) {
 		loading = true;
 		loadProgress = 0;
@@ -40,13 +50,22 @@
 		error = '';
 
 		try {
-			// Try direct fetch first, fall back to no-cors mode hint
-			const resp = await fetch(url, { mode: 'cors' });
+			const resolved = resolveGitHubUrl(url);
+			const resp = await fetch(resolved, { mode: 'cors' });
 			if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
 			const bytes = new Uint8Array(await resp.arrayBuffer());
+
+			// Check for Git LFS pointer (text file starting with "version https://git-lfs")
+			if (bytes.length < 200) {
+				const text = new TextDecoder().decode(bytes);
+				if (text.startsWith('version https://git-lfs')) {
+					throw new Error('This file is stored in Git LFS. Download it directly or use a non-LFS URL.');
+				}
+			}
+
 			await loadBytes(bytes);
 		} catch (e: any) {
-			error = `Failed to load: ${e.message}. The remote server may not allow cross-origin requests (CORS).`;
+			error = `Failed to load: ${e.message}`;
 			loading = false;
 			console.error('[gds-viewer] Fetch failed:', e);
 		}
