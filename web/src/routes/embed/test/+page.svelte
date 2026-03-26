@@ -8,7 +8,7 @@
 		document.head.appendChild(script);
 	});
 
-	const testUrl = 'https://raw.githubusercontent.com/google/skywater-pdk-libs-sky130_fd_sc_hd/main/cells/inv/sky130_fd_sc_hd__inv_1.gds';
+	const testUrl = '/embed/demo.gds';
 
 	const examples = [
 		{
