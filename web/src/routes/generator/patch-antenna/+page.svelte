@@ -8,6 +8,7 @@
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackView from '$lib/components/StackView.svelte';
+	import PdkSelect from '$lib/components/PdkSelect.svelte';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
 
@@ -75,15 +76,6 @@
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
-			<div class="param-section"><h4>PDK</h4>
-				<div class="f"><span>Process</span><div class="fi">
-					<select bind:value={pdkId}>
-						{#each Object.entries(PDK_NAMES) as [id, name]}
-							<option value={id}>{name}</option>
-						{/each}
-					</select>
-				</div></div>
-			</div>
 			<div class="param-section"><h4>Design</h4>
 				<ParamField label="Frequency" value={designFreq} unit="GHz" step={0.1} min={0.1} onchange={v => { if (v && v > 0) { designFreq = v; autoDesign(); } }} />
 				<ParamField label="εr" value={designEr} step={0.1} min={1} onchange={v => { if (v && v >= 1) { designEr = v; autoDesign(); } }} />
@@ -109,7 +101,13 @@
 	{/snippet}
 	{#snippet stackPanel()}
 		<div class="stack-wrapper">
-			<StackView bind:stack />
+			<StackView bind:stack>
+				{#snippet header()}
+					<div class="param-section"><h4>Process</h4>
+						<PdkSelect bind:value={pdkId} />
+					</div>
+				{/snippet}
+			</StackView>
 		</div>
 	{/snippet}
 </GeometryEditor>

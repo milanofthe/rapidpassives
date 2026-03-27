@@ -1,8 +1,9 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
 	import type { ProcessStack } from '$lib/stack/types';
+	import type { Snippet } from 'svelte';
 
-	let { stack = $bindable<ProcessStack>() }: { stack: ProcessStack } = $props();
+	let { stack = $bindable<ProcessStack>(), header }: { stack: ProcessStack; header?: Snippet } = $props();
 
 	function toggleLayer(id: string) {
 		stack = {
@@ -24,6 +25,10 @@
 			.sort((a, b) => a.z - b.z)
 	);
 </script>
+
+{#if header}
+	{@render header()}
+{/if}
 
 <!-- Cross-section diagram -->
 <div class="cross-section">

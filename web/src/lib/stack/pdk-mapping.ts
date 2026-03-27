@@ -34,40 +34,40 @@ export const GENERATOR_TYPES: Record<string, GeneratorType> = {
 
 // ─── SKY130 ──────────────────────────────────────────────────────────
 
-const SKY130_MET3: PdkLayer = { name: 'met3', gds: 70, datatype: 20, z: 1.78, thickness: 0.845, color: '#00ffff', type: 'metal' };
-const SKY130_VIA3: PdkLayer = { name: 'via3', gds: 70, datatype: 44, z: 2.625, thickness: 0.39, color: '#268c6b', type: 'via' };
-const SKY130_MET4: PdkLayer = { name: 'met4', gds: 71, datatype: 20, z: 3.015, thickness: 0.845, color: '#5e00e6', type: 'metal' };
-const SKY130_VIA4: PdkLayer = { name: 'via4', gds: 71, datatype: 44, z: 3.86, thickness: 0.505, color: '#ffff00', type: 'via' };
-const SKY130_MET5: PdkLayer = { name: 'met5', gds: 72, datatype: 20, z: 4.365, thickness: 1.26, color: '#d9cc00', type: 'metal' };
-const SKY130_MET2: PdkLayer = { name: 'met2', gds: 69, datatype: 20, z: 1.00, thickness: 0.36, color: '#ff00ff', type: 'metal' };
-const SKY130_VIA2: PdkLayer = { name: 'via2', gds: 69, datatype: 44, z: 1.36, thickness: 0.42, color: '#ff8000', type: 'via' };
-const SKY130_MET1: PdkLayer = { name: 'met1', gds: 68, datatype: 20, z: 0.37, thickness: 0.36, color: '#0000ff', type: 'metal' };
-const SKY130_VIA1: PdkLayer = { name: 'via', gds: 68, datatype: 44, z: 0.73, thickness: 0.27, color: '#5e00e6', type: 'via' };
-const SKY130_LI1: PdkLayer = { name: 'li1', gds: 67, datatype: 20, z: 0.00, thickness: 0.10, color: '#ffe6bf', type: 'metal' };
+const SKY130_MET3: PdkLayer = { name: 'met3', gds: 70, datatype: 20, z: 1.78, thickness: 0.845, color: '#5aad78', type: 'metal' };
+const SKY130_VIA3: PdkLayer = { name: 'via3', gds: 70, datatype: 44, z: 2.625, thickness: 0.39, color: '#6e6e78', type: 'via' };
+const SKY130_MET4: PdkLayer = { name: 'met4', gds: 71, datatype: 20, z: 3.015, thickness: 0.845, color: '#d9513c', type: 'metal' };
+const SKY130_VIA4: PdkLayer = { name: 'via4', gds: 71, datatype: 44, z: 3.86, thickness: 0.505, color: '#7a7a84', type: 'via' };
+const SKY130_MET5: PdkLayer = { name: 'met5', gds: 72, datatype: 20, z: 4.365, thickness: 1.26, color: '#e8944a', type: 'metal' };
+const SKY130_MET2: PdkLayer = { name: 'met2', gds: 69, datatype: 20, z: 1.00, thickness: 0.36, color: '#4a9ec2', type: 'metal' };
+const SKY130_VIA2: PdkLayer = { name: 'via2', gds: 69, datatype: 44, z: 1.36, thickness: 0.42, color: '#5a5a62', type: 'via' };
+const SKY130_MET1: PdkLayer = { name: 'met1', gds: 68, datatype: 20, z: 0.37, thickness: 0.36, color: '#6bbf8a', type: 'metal' };
+const SKY130_VIA1: PdkLayer = { name: 'via', gds: 68, datatype: 44, z: 0.73, thickness: 0.27, color: '#5a5a62', type: 'via' };
+const SKY130_LI1: PdkLayer = { name: 'li1', gds: 67, datatype: 20, z: 0.00, thickness: 0.10, color: '#7b5e8a', type: 'metal' };
 
 // ─── SG13G2 ──────────────────────────────────────────────────────────
 
-const SG13_M5: PdkLayer = { name: 'Metal5', gds: 67, datatype: 0, z: 4.05, thickness: 0.49, color: '#dcd146', type: 'metal' };
-const SG13_TV1: PdkLayer = { name: 'TopVia1', gds: 125, datatype: 0, z: 4.54, thickness: 0.85, color: '#ffe6bf', type: 'via' };
-const SG13_TM1: PdkLayer = { name: 'TopMetal1', gds: 126, datatype: 0, z: 5.39, thickness: 2.00, color: '#ffe6bf', type: 'metal' };
-const SG13_TV2: PdkLayer = { name: 'TopVia2', gds: 133, datatype: 0, z: 7.39, thickness: 2.80, color: '#ff8000', type: 'via' };
-const SG13_TM2: PdkLayer = { name: 'TopMetal2', gds: 134, datatype: 0, z: 10.19, thickness: 3.00, color: '#ff8000', type: 'metal' };
-const SG13_M4: PdkLayer = { name: 'Metal4', gds: 50, datatype: 0, z: 3.02, thickness: 0.49, color: '#93e837', type: 'metal' };
-const SG13_V4: PdkLayer = { name: 'Via4', gds: 66, datatype: 0, z: 3.51, thickness: 0.54, color: '#deac5e', type: 'via' };
-const SG13_M3: PdkLayer = { name: 'Metal3', gds: 30, datatype: 0, z: 1.99, thickness: 0.49, color: '#d80000', type: 'metal' };
-const SG13_V3: PdkLayer = { name: 'Via3', gds: 49, datatype: 0, z: 2.48, thickness: 0.54, color: '#9ba940', type: 'via' };
+const SG13_M5: PdkLayer = { name: 'Metal5', gds: 67, datatype: 0, z: 4.05, thickness: 0.49, color: '#5aad78', type: 'metal' };
+const SG13_TV1: PdkLayer = { name: 'TopVia1', gds: 125, datatype: 0, z: 4.54, thickness: 0.85, color: '#6e6e78', type: 'via' };
+const SG13_TM1: PdkLayer = { name: 'TopMetal1', gds: 126, datatype: 0, z: 5.39, thickness: 2.00, color: '#d9513c', type: 'metal' };
+const SG13_TV2: PdkLayer = { name: 'TopVia2', gds: 133, datatype: 0, z: 7.39, thickness: 2.80, color: '#7a7a84', type: 'via' };
+const SG13_TM2: PdkLayer = { name: 'TopMetal2', gds: 134, datatype: 0, z: 10.19, thickness: 3.00, color: '#e8944a', type: 'metal' };
+const SG13_M4: PdkLayer = { name: 'Metal4', gds: 50, datatype: 0, z: 3.02, thickness: 0.49, color: '#4a9ec2', type: 'metal' };
+const SG13_V4: PdkLayer = { name: 'Via4', gds: 66, datatype: 0, z: 3.51, thickness: 0.54, color: '#5a5a62', type: 'via' };
+const SG13_M3: PdkLayer = { name: 'Metal3', gds: 30, datatype: 0, z: 1.99, thickness: 0.49, color: '#7b5e8a', type: 'metal' };
+const SG13_V3: PdkLayer = { name: 'Via3', gds: 49, datatype: 0, z: 2.48, thickness: 0.54, color: '#5a5a62', type: 'via' };
 
 // ─── GF180MCU ────────────────────────────────────────────────────────
 
-const GF180_M4: PdkLayer = { name: 'Metal4', gds: 46, datatype: 0, z: 2.43, thickness: 0.31, color: '#8000ff', type: 'metal' };
-const GF180_V4: PdkLayer = { name: 'Via4', gds: 41, datatype: 0, z: 2.74, thickness: 0.50, color: '#ddff00', type: 'via' };
-const GF180_M5: PdkLayer = { name: 'Metal5', gds: 81, datatype: 0, z: 3.24, thickness: 0.31, color: '#ddff00', type: 'metal' };
-const GF180_V5: PdkLayer = { name: 'Via5', gds: 82, datatype: 0, z: 3.55, thickness: 0.70, color: '#827e5b', type: 'via' };
-const GF180_MT: PdkLayer = { name: 'MetalTop', gds: 53, datatype: 0, z: 4.25, thickness: 0.90, color: '#800057', type: 'metal' };
-const GF180_M3: PdkLayer = { name: 'Metal3', gds: 42, datatype: 0, z: 1.62, thickness: 0.31, color: '#00ffff', type: 'metal' };
-const GF180_V3: PdkLayer = { name: 'Via3', gds: 40, datatype: 0, z: 1.93, thickness: 0.50, color: '#53e2e8', type: 'via' };
-const GF180_M2: PdkLayer = { name: 'Metal2', gds: 36, datatype: 0, z: 0.81, thickness: 0.31, color: '#ff00ff', type: 'metal' };
-const GF180_V2: PdkLayer = { name: 'Via2', gds: 38, datatype: 0, z: 1.12, thickness: 0.50, color: '#e1d8ca', type: 'via' };
+const GF180_M4: PdkLayer = { name: 'Metal4', gds: 46, datatype: 0, z: 2.43, thickness: 0.31, color: '#4a9ec2', type: 'metal' };
+const GF180_V4: PdkLayer = { name: 'Via4', gds: 41, datatype: 0, z: 2.74, thickness: 0.50, color: '#5a5a62', type: 'via' };
+const GF180_M5: PdkLayer = { name: 'Metal5', gds: 81, datatype: 0, z: 3.24, thickness: 0.31, color: '#d9513c', type: 'metal' };
+const GF180_V5: PdkLayer = { name: 'Via5', gds: 82, datatype: 0, z: 3.55, thickness: 0.70, color: '#7a7a84', type: 'via' };
+const GF180_MT: PdkLayer = { name: 'MetalTop', gds: 53, datatype: 0, z: 4.25, thickness: 0.90, color: '#e8944a', type: 'metal' };
+const GF180_M3: PdkLayer = { name: 'Metal3', gds: 42, datatype: 0, z: 1.62, thickness: 0.31, color: '#5aad78', type: 'metal' };
+const GF180_V3: PdkLayer = { name: 'Via3', gds: 40, datatype: 0, z: 1.93, thickness: 0.50, color: '#5a5a62', type: 'via' };
+const GF180_M2: PdkLayer = { name: 'Metal2', gds: 36, datatype: 0, z: 0.81, thickness: 0.31, color: '#7b5e8a', type: 'metal' };
+const GF180_V2: PdkLayer = { name: 'Via2', gds: 38, datatype: 0, z: 1.12, thickness: 0.50, color: '#5a5a62', type: 'via' };
 
 // ─── Mappings per generator type per PDK ─────────────────────────────
 
