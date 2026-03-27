@@ -3,7 +3,6 @@ import type { ConductorNetwork, ConductorNode, ConductorSegment, ViaConnection, 
 import { networkToLayers } from './polygonize';
 import { viaGrid, routingGeometric45 } from './utils';
 import { computeViaResistance } from './via_resistance';
-import { createDefaultStack } from '$lib/stack/types';
 
 export function buildSymmetricInductor(params: SymmetricInductorParams): GeometryResult {
 	const { Dout, N, sides, width, spacing, center_tap, via_extent, via_spacing, via_width, via_in_metal } = params;

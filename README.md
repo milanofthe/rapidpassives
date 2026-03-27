@@ -12,7 +12,7 @@ Browser-based layout generator and viewer for RFIC passive components. Configure
 - **Unified WebGL renderer** with smooth animated transitions between 2D (orthographic) and 3D (perspective) views
 - **GDS-II viewer** — import and visualize GDS files with drag-and-drop or URL parameter (`/viewer?url=...`)
 - **GDS parsing in Web Worker** — off-thread record parsing, cell hierarchy walking, and coordinate scaling for large files
-- **Process stack presets** (SKY130, SG13G2, GF180MCU) with editable metal layers, vias, and substrate
+- **5 PDK presets** — SKY130, SG13G2, GF180MCU, ASAP7, FreePDK45 — unified across generators, viewer, and embed
 - **GDS-II export** directly from the browser
 - **Embeddable viewer** — `<gds-viewer>` web component for showcasing layouts on any website
 - **Fully static** — no server, no backend, deploys to GitHub Pages
@@ -92,7 +92,7 @@ Or load configuration from a URL:
 | Rendering | WebGL2 with earcut triangulation, orthographic/perspective projection |
 | GDS Import | Custom binary parser with Web Worker, handles SREF/AREF hierarchy |
 | GDS Export | Custom binary GDSII encoder |
-| Embed | Standalone web component (`<gds-viewer>`), 26KB gzipped |
+| Embed | Standalone web component (`<gds-viewer>`), ~15KB gzipped |
 | Deploy | GitHub Pages via Actions |
 
 ## Project Structure
