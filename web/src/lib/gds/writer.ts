@@ -62,11 +62,14 @@ function defaultGdsLayers(): Record<LayerName, number> {
 	return map as Record<LayerName, number>;
 }
 
+/** Per-layer GDS info: either a plain number (layer, datatype=0) or { layer, datatype } */
+type GdsLayerSpec = number | { layer: number; datatype: number };
+
 interface GdsExportOptions {
 	cellName?: string;
 	unit?: number;       // database unit in meters (default 1e-6 = 1um)
 	precision?: number;  // database precision in meters (default 1e-9 = 1nm)
-	gdsLayers?: Partial<Record<LayerName, number>>;
+	gdsLayers?: Partial<Record<LayerName, GdsLayerSpec>>;
 	stack?: ProcessStack;
 	labels?: Array<{ text: string; x: number; y: number; layer: number }>;
 }
@@ -101,11 +104,13 @@ export function exportGds(layers: LayerMap, options: GdsExportOptions = {}): Uin
 	// Write polygons per layer
 	for (const [layerName, polys] of Object.entries(layers)) {
 		if (!polys || polys.length === 0) continue;
-		const gdsLayer = (gdsLayers as any)[layerName];
-		if (gdsLayer === undefined) continue;
+		const spec = (gdsLayers as any)[layerName] as GdsLayerSpec | undefined;
+		if (spec === undefined) continue;
+		const gdsLayer = typeof spec === 'number' ? spec : spec.layer;
+		const datatype = typeof spec === 'number' ? 0 : spec.datatype;
 
 		for (const poly of polys) {
-			writeBoundary(buf, poly, gdsLayer, 0, scale);
+			writeBoundary(buf, poly, gdsLayer, datatype, scale);
 		}
 	}
 

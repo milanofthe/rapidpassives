@@ -4,14 +4,26 @@
 	import type { SymmetricTransformerParams, PgsParams, GuardRingParams, LayerMap } from '$lib/geometry/types';
 	import { buildSymmetricTransformer, isSymmetricTransformerValid } from '$lib/geometry/symmetric_transformer';
 	import { pgs4, guardRing } from '$lib/geometry/utils';
-	import { createDefaultStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
+	import { stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
+	import { PDK_MAPPINGS, PDK_NAMES, pdkMapToStack, pdkMapToGdsLayers } from '$lib/stack/pdk-mapping';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackView from '$lib/components/StackView.svelte';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
+
+	let pdkId = $state('sky130');
+	let stack = $state(pdkMapToStack(PDK_MAPPINGS.sky130['3metal'], 'SKY130'));
+
+	$effect(() => {
+		const map = PDK_MAPPINGS[pdkId]?.['3metal'];
+		if (map) stack = pdkMapToStack(map, PDK_NAMES[pdkId]);
+	});
+
 	function doExport() {
-		const data = exportGds(layers, { stack, cellName: 'SymmetricTransformer' });
+		const map = PDK_MAPPINGS[pdkId]?.['3metal'];
+		const gdsLayers = map ? pdkMapToGdsLayers(map) : undefined;
+		const data = exportGds(layers, { gdsLayers, cellName: 'SymmetricTransformer' });
 		downloadGds(data, 'symmetric_transformer.gds');
 	}
 
@@ -23,7 +35,7 @@
 
 	let pgsP = $state<PgsParams>({ enabled: false, D: 270, width: 4, spacing: 2 });
 	let gr = $state<GuardRingParams>({ enabled: false, margin: 10, ringWidth: 5 });
-	let stack = $state(createDefaultStack());
+
 
 	function set<K extends keyof SymmetricTransformerParams>(k: K, v: SymmetricTransformerParams[K]) { p = { ...p, [k]: v }; }
 	function setPgs<K extends keyof PgsParams>(k: K, v: PgsParams[K]) { pgsP = { ...pgsP, [k]: v }; }
@@ -65,6 +77,15 @@
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
+			<div class="param-section"><h4>PDK</h4>
+				<div class="f"><span>Process</span><div class="fi">
+					<select bind:value={pdkId}>
+						{#each Object.entries(PDK_NAMES) as [id, name]}
+							<option value={id}>{name}</option>
+						{/each}
+					</select>
+				</div></div>
+			</div>
 			<div class="param-section"><h4>Geometry</h4>
 				<ParamField label="Dout" value={p.Dout} unit="um" step={1} min={1} onchange={v => set('Dout', v ?? 250)} />
 				<ParamField label="Sides" value={p.sides} step={4} min={4} max={64} onchange={v => set('sides', v ?? 8)} />

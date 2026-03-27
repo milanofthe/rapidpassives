@@ -3,7 +3,8 @@
 	import type { SpiralInductorParams, PgsParams, GuardRingParams, LayerMap } from '$lib/geometry/types';
 	import { buildSpiralInductor, isSpiralValid, addPgs } from '$lib/geometry/spiral';
 	import { guardRing } from '$lib/geometry/utils';
-	import { create2MetalStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
+	import { stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
+	import { PDK_MAPPINGS, PDK_NAMES, pdkMapToStack, pdkMapToGdsLayers } from '$lib/stack/pdk-mapping';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import ParamField from '$lib/components/ParamField.svelte';
@@ -11,8 +12,18 @@
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
 
+	let pdkId = $state('sky130');
+	let stack = $state(pdkMapToStack(PDK_MAPPINGS.sky130['2metal'], 'SKY130'));
+
+	$effect(() => {
+		const map = PDK_MAPPINGS[pdkId]?.['2metal'];
+		if (map) stack = pdkMapToStack(map, PDK_NAMES[pdkId]);
+	});
+
 	function doExport() {
-		const data = exportGds(layers, { stack, cellName: 'SpiralInductor' });
+		const map = PDK_MAPPINGS[pdkId]?.['2metal'];
+		const gdsLayers = map ? pdkMapToGdsLayers(map) : undefined;
+		const data = exportGds(layers, { gdsLayers, cellName: 'SpiralInductor' });
 		downloadGds(data, 'spiral_inductor.gds');
 	}
 
@@ -23,7 +34,6 @@
 
 	let pgs = $state<PgsParams>({ enabled: false, D: 150, width: 2, spacing: 1 });
 	let gr = $state<GuardRingParams>({ enabled: false, margin: 10, ringWidth: 5 });
-	let stack = $state(create2MetalStack());
 
 	function set<K extends keyof SpiralInductorParams>(k: K, v: SpiralInductorParams[K]) { p = { ...p, [k]: v }; }
 
@@ -63,6 +73,15 @@
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
+			<div class="param-section"><h4>PDK</h4>
+				<div class="f"><span>Process</span><div class="fi">
+					<select bind:value={pdkId}>
+						{#each Object.entries(PDK_NAMES) as [id, name]}
+							<option value={id}>{name}</option>
+						{/each}
+					</select>
+				</div></div>
+			</div>
 			<div class="param-section"><h4>Geometry</h4>
 				<ParamField label="Dout" value={p.Dout} unit="um" step={1} min={1} onchange={v => set('Dout', v ?? 130)} />
 				<ParamField label="N" value={p.N} unit="turns" step={1} min={1} max={20} onchange={v => set('N', v ?? 3)} />

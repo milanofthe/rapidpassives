@@ -4,15 +4,26 @@
 	import type { LayerMap } from '$lib/geometry/types';
 	import type { RatraceCouplerParams } from '$lib/geometry/ratrace_coupler';
 	import { buildRatraceCoupler, isRatraceCouplerValid } from '$lib/geometry/ratrace_coupler';
-	import { create2MetalStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
+	import { stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
+	import { PDK_MAPPINGS, PDK_NAMES, pdkMapToStack, pdkMapToGdsLayers } from '$lib/stack/pdk-mapping';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackView from '$lib/components/StackView.svelte';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
 
+	let pdkId = $state('sky130');
+	let stack = $state(pdkMapToStack(PDK_MAPPINGS.sky130['2metal'], 'SKY130'));
+
+	$effect(() => {
+		const map = PDK_MAPPINGS[pdkId]?.['2metal'];
+		if (map) stack = pdkMapToStack(map, PDK_NAMES[pdkId]);
+	});
+
 	function doExport() {
-		const data = exportGds(layers, { stack, cellName: 'RatraceCoupler' });
+		const map = PDK_MAPPINGS[pdkId]?.['2metal'];
+		const gdsLayers = map ? pdkMapToGdsLayers(map) : undefined;
+		const data = exportGds(layers, { gdsLayers, cellName: 'RatraceCoupler' });
 		downloadGds(data, 'ratrace_coupler.gds');
 	}
 
@@ -20,7 +31,7 @@
 		radius: 120, ringWidth: 8, portWidth: 10, feedLength: 40, groundMargin: 30,
 	});
 
-	let stack = $state(create2MetalStack());
+
 
 	function set<K extends keyof RatraceCouplerParams>(k: K, v: RatraceCouplerParams[K]) { p = { ...p, [k]: v }; }
 
@@ -52,6 +63,15 @@
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
+			<div class="param-section"><h4>PDK</h4>
+				<div class="f"><span>Process</span><div class="fi">
+					<select bind:value={pdkId}>
+						{#each Object.entries(PDK_NAMES) as [id, name]}
+							<option value={id}>{name}</option>
+						{/each}
+					</select>
+				</div></div>
+			</div>
 			<div class="param-section"><h4>Ring</h4>
 				<ParamField label="Radius" value={p.radius} unit="um" step={5} min={1} onchange={v => set('radius', v ?? 120)} />
 				<ParamField label="Width" value={p.ringWidth} unit="um" step={0.5} min={0.1} onchange={v => set('ringWidth', v ?? 8)} />

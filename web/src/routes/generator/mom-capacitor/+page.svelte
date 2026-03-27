@@ -4,14 +4,26 @@
 	import type { MomCapacitorParams, GuardRingParams, LayerMap } from '$lib/geometry/types';
 	import { buildMomCapacitor, isMomCapacitorValid } from '$lib/geometry/mom_capacitor';
 	import { guardRing } from '$lib/geometry/utils';
-	import { createDefaultStack, stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
+	import { stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
+	import { PDK_MAPPINGS, PDK_NAMES, pdkMapToStack, pdkMapToGdsLayers } from '$lib/stack/pdk-mapping';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackView from '$lib/components/StackView.svelte';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
+
+	let pdkId = $state('sky130');
+	let stack = $state(pdkMapToStack(PDK_MAPPINGS.sky130['3metal'], 'SKY130'));
+
+	$effect(() => {
+		const map = PDK_MAPPINGS[pdkId]?.['3metal'];
+		if (map) stack = pdkMapToStack(map, PDK_NAMES[pdkId]);
+	});
+
 	function doExport() {
-		const data = exportGds(layers, { stack, cellName: 'MomCapacitor' });
+		const map = PDK_MAPPINGS[pdkId]?.['3metal'];
+		const gdsLayers = map ? pdkMapToGdsLayers(map) : undefined;
+		const data = exportGds(layers, { gdsLayers, cellName: 'MomCapacitor' });
 		downloadGds(data, 'mom_capacitor.gds');
 	}
 
@@ -22,7 +34,7 @@
 	});
 
 	let gr = $state<GuardRingParams>({ enabled: false, margin: 5, ringWidth: 3 });
-	let stack = $state(createDefaultStack());
+
 
 	function set<K extends keyof MomCapacitorParams>(k: K, v: MomCapacitorParams[K]) { p = { ...p, [k]: v }; }
 	function setGR<K extends keyof GuardRingParams>(k: K, v: GuardRingParams[K]) { gr = { ...gr, [k]: v }; }
@@ -69,6 +81,15 @@
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
 		<ParamSidebar onexport={doExport}>
+			<div class="param-section"><h4>PDK</h4>
+				<div class="f"><span>Process</span><div class="fi">
+					<select bind:value={pdkId}>
+						{#each Object.entries(PDK_NAMES) as [id, name]}
+							<option value={id}>{name}</option>
+						{/each}
+					</select>
+				</div></div>
+			</div>
 			<div class="param-section"><h4>Fingers</h4>
 				<ParamField label="Count" value={p.nFingers} step={2} min={2} onchange={v => set('nFingers', v ?? 21)} />
 				<ParamField label="Length" value={p.fingerLength} unit="um" step={1} min={1} onchange={v => set('fingerLength', v ?? 40)} />
