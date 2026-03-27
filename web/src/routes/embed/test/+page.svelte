@@ -58,6 +58,11 @@
 			desc: 'Custom initial camera angle',
 		},
 		{
+			title: 'PDK Preset',
+			attrs: 'interactive preset="sky130"',
+			desc: 'Uses SKY130 layer colors and Z positions',
+		},
+		{
 			title: 'Custom Colors',
 			attrs: `interactive config='${JSON.stringify({ colors: ['#c4a67a', '#8b6e4e', '#a3c1ad', '#5b8a72', '#d4a574', '#7c9885', '#b8956a', '#6b8f71'] })}'`,
 			desc: 'Earthy color palette via config attribute',

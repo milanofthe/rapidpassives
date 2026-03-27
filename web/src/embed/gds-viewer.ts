@@ -27,7 +27,8 @@ import { readGds, buildInstancedScene, sceneToInstancedData } from '../lib/gds/r
 import type { ProcessStack } from '../lib/stack/types';
 import { PDKS } from '../lib/stack/pdk';
 
-const DEFAULT_COLORS = ['#6bbf8a', '#d9513c', '#e8944a', '#f0b86a', '#7b5e8a', '#5a8fd9', '#d95a8f', '#8fd95a', '#5ad9c7', '#d9c75a'];
+// Same palette as pdk.ts — bottom to top: purple, green, blue, green, blue, red, orange
+const DEFAULT_COLORS = ['#7b5e8a', '#6bbf8a', '#4a9ec2', '#5aad78', '#4a9ec2', '#5aad78', '#d9513c', '#e8944a'];
 
 function createEmbedStack(): ProcessStack {
 	return {
