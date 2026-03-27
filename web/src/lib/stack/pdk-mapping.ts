@@ -199,6 +199,12 @@ export const PDK_NAMES: Record<string, string> = {
 	gf180mcu: 'GF180MCU',
 };
 
+export const PDK_DESCRIPTIONS: Record<string, string> = {
+	sky130: 'SkyWater 130nm CMOS — 1 LI + 5 metals',
+	sg13g2: 'IHP 130nm BiCMOS — 5 thin + 2 thick metals',
+	gf180mcu: 'GlobalFoundries 180nm CMOS — 5M + thick top metal',
+};
+
 /** Convert a PDK mapping to a ProcessStack for rendering */
 export function pdkMapToStack(pdkMap: GeneratorPdkMap, pdkName: string): import('$lib/stack/types').ProcessStack {
 	// Collect unique PDK layers, sorted by z

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
-	import { PDK_NAMES } from '$lib/stack/pdk-mapping';
+	import { PDK_NAMES, PDK_DESCRIPTIONS } from '$lib/stack/pdk-mapping';
 
 	let { value = $bindable<string>() }: { value: string } = $props();
 	let open = $state(false);
@@ -15,7 +15,8 @@
 		<div class="pdk-menu">
 			{#each Object.entries(PDK_NAMES) as [id, name]}
 				<button class="pdk-option" class:active={value === id} onclick={() => { value = id; open = false; }}>
-					{name}
+					<span>{name}</span>
+					<span class="pdk-desc">{PDK_DESCRIPTIONS[id]}</span>
 				</button>
 			{/each}
 		</div>
@@ -70,6 +71,9 @@
 		text-transform: none;
 		letter-spacing: 0;
 		font-weight: 400;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
 		transition: background var(--transition);
 	}
 	.pdk-option:hover {
@@ -78,5 +82,9 @@
 	.pdk-option.active {
 		color: var(--accent);
 		font-weight: 600;
+	}
+	.pdk-desc {
+		font-size: 9px;
+		color: var(--text-dim);
 	}
 </style>
