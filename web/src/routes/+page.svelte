@@ -1,84 +1,29 @@
 <script lang="ts">
-	import type { LayerMap } from '$lib/geometry/types';
-	import { buildSpiralInductor } from '$lib/geometry/spiral';
-	import { buildSymmetricInductor } from '$lib/geometry/symmetric_inductor';
-	import { buildSymmetricTransformer } from '$lib/geometry/symmetric_transformer';
-	import { buildStackedTransformer } from '$lib/geometry/stacked_transformer';
-	import { buildMomCapacitor } from '$lib/geometry/mom_capacitor';
-	import { buildPatchAntenna } from '$lib/geometry/patch_antenna';
-	import { buildRatraceCoupler } from '$lib/geometry/ratrace_coupler';
-	import { fitToView, renderLayers } from '$lib/render/canvas2d';
 	import { onMount } from 'svelte';
 
-	const cards = [
-		{
-			title: 'Spiral Inductor',
-			href: '/generator/spiral',
-			desc: 'Single-ended spiral with underpass routing',
-			layers: buildSpiralInductor({ Dout: 80, N: 2, sides: 8, width: 8, spacing: 4, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
-		},
-		{
-			title: 'Symmetric Inductor',
-			href: '/generator/symmetric-inductor',
-			desc: 'Differential symmetric inductor with optional center tap',
-			layers: buildSymmetricInductor({ Dout: 120, N: 2, sides: 8, width: 10, spacing: 3, center_tap: false, via_extent: 6, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
-		},
-		{
-			title: 'Interleaved Transformer',
-			href: '/generator/symmetric-transformer',
-			desc: 'Laterally interleaved transformer with configurable winding ratio',
-			layers: buildSymmetricTransformer({ Dout: 120, N1: 1, N2: 2, sides: 8, width: 8, spacing: 3, center_tap_primary: false, center_tap_secondary: false, via_extent: 5, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
-		},
-		{
-			title: 'Stacked Transformer',
-			href: '/generator/stacked-transformer',
-			desc: 'Vertically stacked differential transformer on separate metal layers',
-			layers: buildStackedTransformer({ Dout: 120, N1: 2, N2: 2, sides: 8, width: 8, spacing: 3, center_tap_primary: false, center_tap_secondary: false, via_extent: 5, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
-		},
-		{
-			title: 'MOM Capacitor',
-			href: '/generator/mom-capacitor',
-			desc: 'Interdigitated metal-oxide-metal finger capacitor',
-			layers: buildMomCapacitor({ nFingers: 15, fingerLength: 30, fingerWidth: 1, fingerSpacing: 1, busWidth: 3, nLayers: 3, via_spacing: 0.8, via_width: 1, via_in_metal: 0.45 }).layers,
-		},
-		{
-			title: 'Patch Antenna',
-			href: '/generator/patch-antenna',
-			desc: 'Microstrip patch antenna with inset or edge feed',
-			layers: buildPatchAntenna({ W: 200, L: 160, feedType: 'inset', feedWidth: 10, feedLength: 80, insetDepth: 40, insetGap: 2, groundMargin: 60 }).layers,
-		},
-		{
-			title: 'Rat-Race Coupler',
-			href: '/generator/ratrace-coupler',
-			desc: 'Ring hybrid coupler with 4 ports',
-			layers: buildRatraceCoupler({ radius: 80, ringWidth: 6, portWidth: 8, feedLength: 25, groundMargin: 20 }).layers,
-		},
-	];
-
-	let canvases = $state<HTMLCanvasElement[]>([]);
-
-	function renderCard(canvas: HTMLCanvasElement, layers: LayerMap) {
-		if (!canvas) return;
-		const rect = canvas.parentElement!.getBoundingClientRect();
-		const size = Math.round(Math.min(rect.width, rect.height));
-		if (size <= 0) return;
-		const scale = (window.devicePixelRatio || 1) * 2;
-		canvas.width = Math.round(size * scale);
-		canvas.height = Math.round(size * scale);
-		canvas.style.width = size + 'px';
-		canvas.style.height = size + 'px';
-		const ctx = canvas.getContext('2d')!;
-		ctx.scale(scale, scale);
-		const view = fitToView(size, size, layers);
-		renderLayers(ctx, layers, view, null, undefined, size, size);
-	}
-
+	// Load the embed script for <gds-viewer> custom elements
 	onMount(() => {
-		cards.forEach((card, i) => {
-			if (canvases[i]) renderCard(canvases[i], card.layers);
-		});
+		if (customElements.get('gds-viewer')) return;
+		const script = document.createElement('script');
+		script.src = '/embed/gds-viewer.js';
+		document.head.appendChild(script);
 	});
+
+	const cards = [
+		{ title: 'Spiral Inductor', href: '/generator/spiral', desc: 'Single-ended spiral with underpass routing', gds: '/cards/spiral_inductor.gds' },
+		{ title: 'Symmetric Inductor', href: '/generator/symmetric-inductor', desc: 'Differential symmetric inductor with optional center tap', gds: '/cards/symmetric_inductor.gds' },
+		{ title: 'Interleaved Transformer', href: '/generator/symmetric-transformer', desc: 'Laterally interleaved transformer with configurable winding ratio', gds: '/cards/symmetric_transformer.gds' },
+		{ title: 'Stacked Transformer', href: '/generator/stacked-transformer', desc: 'Vertically stacked differential transformer on separate metal layers', gds: '/cards/stacked_transformer.gds' },
+		{ title: 'MOM Capacitor', href: '/generator/mom-capacitor', desc: 'Interdigitated metal-oxide-metal finger capacitor', gds: '/cards/mom_capacitor.gds' },
+		{ title: 'Patch Antenna', href: '/generator/patch-antenna', desc: 'Microstrip patch antenna with inset or edge feed', gds: '/cards/patch_antenna.gds' },
+		{ title: 'Rat-Race Coupler', href: '/generator/ratrace-coupler', desc: 'Ring hybrid coupler with 4 ports', gds: '/cards/ratrace_coupler.gds' },
+	];
 </script>
+
+<svelte:head>
+	<title>RapidPassives — RFIC Passive Layout Generator</title>
+	<meta name="description" content="Browser-based RFIC passive layout generator. Configure geometry, preview in real time, and export production-ready GDS-II." />
+</svelte:head>
 
 <div class="page">
 	<div class="landing">
@@ -87,10 +32,10 @@
 			<p>Browser-based RFIC passive layout generator. Configure geometry, preview in real time, and export production-ready GDS-II.</p>
 		</div>
 		<div class="cards">
-			{#each cards as card, i}
+			{#each cards as card}
 				<a class="card" href={card.href}>
 					<div class="card-preview">
-						<canvas bind:this={canvases[i]}></canvas>
+						{@html `<gds-viewer src="${card.gds}" rotate speed="0.5" width="100%" height="200px"></gds-viewer>`}
 					</div>
 					<div class="card-info">
 						<h3>{card.title}</h3>
@@ -181,16 +126,7 @@
 	}
 	.card-preview {
 		width: 100%;
-		aspect-ratio: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		overflow: hidden;
-	}
-	.card-preview canvas {
-		display: block;
-		width: 100%;
-		height: 100%;
 	}
 	.card-info {
 		padding: 12px 14px;
@@ -210,6 +146,10 @@
 		font-family: var(--font-mono);
 	}
 	.viewer-preview {
+		height: 200px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		color: var(--text-dim);
 		transition: color var(--transition);
 	}

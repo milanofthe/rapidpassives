@@ -9,7 +9,7 @@ const config = {
 		prerender: {
 			handleHttpError: ({ path }) => {
 				// Static files in /embed/ are served at runtime, not during prerender
-				if (path.startsWith('/embed/')) return;
+				if (path.startsWith('/embed/') || path.startsWith('/cards/')) return;
 				throw new Error(`404: ${path}`);
 			}
 		}
