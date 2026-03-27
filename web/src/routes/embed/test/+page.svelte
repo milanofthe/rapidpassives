@@ -13,54 +13,49 @@
 	const examples = [
 		{
 			title: 'Default',
-			attrs: '',
+			attrs: 'preset="sky130"',
 			desc: 'Static 3D view, no interaction',
 		},
 		{
 			title: 'Interactive',
-			attrs: 'interactive',
+			attrs: 'interactive preset="sky130"',
 			desc: 'Orbit, pan, zoom with mouse. Double-click to fit.',
 		},
 		{
 			title: 'Rotate',
-			attrs: 'rotate',
+			attrs: 'rotate preset="sky130"',
 			desc: 'Continuous camera orbit',
 		},
 		{
 			title: 'Explode',
-			attrs: 'explode',
+			attrs: 'explode preset="sky130"',
 			desc: 'Sequential layer explode/assemble, no rotation',
 		},
 		{
 			title: 'Rotate + Explode',
-			attrs: 'rotate explode',
+			attrs: 'rotate explode preset="sky130"',
 			desc: 'Layer explode animation with orbit',
 		},
 		{
 			title: 'Interactive + Rotate',
-			attrs: 'interactive rotate',
+			attrs: 'interactive rotate preset="sky130"',
 			desc: 'Auto-orbit pauses while dragging',
 		},
 		{
 			title: 'Transparent',
-			attrs: 'interactive transparent',
+			attrs: 'interactive transparent preset="sky130"',
 			desc: 'No background, blends with page',
 			transparent: true,
 		},
 		{
 			title: 'Slow Animation',
-			attrs: 'rotate explode speed="0.3"',
+			attrs: 'rotate explode speed="0.3" preset="sky130"',
 			desc: 'Gentle animation speed',
 		},
 		{
 			title: 'Top-Down View',
-			attrs: 'interactive theta="0" phi="85"',
+			attrs: 'interactive theta="0" phi="85" preset="sky130"',
 			desc: 'Custom initial camera angle',
-		},
-		{
-			title: 'PDK Preset',
-			attrs: 'interactive preset="sky130"',
-			desc: 'Uses SKY130 layer colors and Z positions',
 		},
 		{
 			title: 'Custom Colors',
