@@ -25,6 +25,7 @@
 import { initGL, buildInstancedMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera, type InstancedSceneData, type GdsLayerInfo } from '../lib/render/canvas3d';
 import { readGds, buildInstancedScene, sceneToInstancedData } from '../lib/gds/reader';
 import type { ProcessStack } from '../lib/stack/types';
+import { PDKS } from '../lib/stack/pdk';
 
 const DEFAULT_COLORS = ['#6bbf8a', '#d9513c', '#e8944a', '#f0b86a', '#7b5e8a', '#5a8fd9', '#d95a8f', '#8fd95a', '#5ad9c7', '#d9c75a'];
 
@@ -39,6 +40,7 @@ function createEmbedStack(): ProcessStack {
 function assignLayerInfo(
 	scene: InstancedSceneData,
 	config?: any,
+	presetId?: string,
 ): Map<number, GdsLayerInfo> {
 	const info = new Map<number, GdsLayerInfo>();
 	const layerNums = new Set<number>();
@@ -46,6 +48,10 @@ function assignLayerInfo(
 		for (const key of Object.keys(meshes)) layerNums.add(parseInt(key));
 	}
 	const sorted = [...layerNums].sort((a, b) => a - b);
+
+	// If a PDK preset is specified, use its layer data as defaults
+	const pdkLayers = presetId ? PDKS[presetId]?.layers : undefined;
+	const pdkByGds = pdkLayers ? new Map(pdkLayers.map(l => [l.gds, l])) : undefined;
 
 	// Parse config formats
 	const layerConfig = config?.layers as Record<string, { color?: string; z?: number; thickness?: number }> | undefined;
@@ -55,13 +61,15 @@ function assignLayerInfo(
 	const thickness = 0.5;
 	sorted.forEach((num, i) => {
 		const cfg = layerConfig?.[String(num)];
-		const color = cfg?.color ?? colorList?.[i] ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length];
+		const pdkL = pdkByGds?.get(num);
+		const color = cfg?.color ?? pdkL?.color ?? colorList?.[i] ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length];
+		const th = cfg?.thickness ?? pdkL?.thickness ?? thickness;
 		info.set(num, {
-			z: cfg?.z ?? z,
-			thickness: cfg?.thickness ?? thickness,
+			z: cfg?.z ?? pdkL?.z ?? z,
+			thickness: th,
 			color,
 		});
-		z += cfg?.thickness ?? thickness;
+		z += th;
 	});
 	return info;
 }
@@ -96,7 +104,7 @@ class GdsViewerElement extends HTMLElement {
 	private needsRender = false;
 
 	static get observedAttributes() {
-		return ['src', 'width', 'height', 'rotate', 'explode', 'interactive', 'transparent', 'speed', 'theta', 'phi', 'config'];
+		return ['src', 'width', 'height', 'rotate', 'explode', 'interactive', 'transparent', 'speed', 'theta', 'phi', 'config', 'preset'];
 	}
 
 	connectedCallback() {
@@ -252,7 +260,7 @@ class GdsViewerElement extends HTMLElement {
 				} catch { /* ignore */ }
 			}
 
-			this.gdsLayerInfo = assignLayerInfo(this.scene, config);
+			this.gdsLayerInfo = assignLayerInfo(this.scene, config, this.getAttribute('preset') ?? undefined);
 			this.layerNums = [...this.gdsLayerInfo.keys()].sort((a, b) => a - b);
 
 			const stack = createEmbedStack();

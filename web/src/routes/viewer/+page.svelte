@@ -6,8 +6,7 @@
 	import type { RenderOptions } from '$lib/render/canvas2d';
 	import { readGdsInWorker } from '$lib/gds/reader';
 	import { type InstancedSceneData } from '$lib/render/canvas3d';
-	import { PRESET_LIST, PRESETS } from '$lib/stack/presets/index';
-	import { applyPreset } from '$lib/stack/presets/apply';
+	import { PDKS, PDK_LIST } from '$lib/stack/pdk';
 	import { parseLyp, parseCsvLayerMap } from '$lib/stack/presets/lyp-parser';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import { onMount } from 'svelte';
@@ -255,7 +254,7 @@
 
 		// Show loading
 		loading = true;
-		loadPhase = id ? `Applying ${PRESETS[id]?.name ?? id}...` : 'Resetting layers...';
+		loadPhase = id ? `Applying ${PDKS[id]?.name ?? id}...` : 'Resetting layers...';
 
 		// Defer to let UI show loading state
 		requestAnimationFrame(() => {
@@ -263,28 +262,24 @@
 				// Reset to generic stack
 				resetToGenericStack();
 			} else {
-				const preset = PRESETS[id];
-				if (!preset) { loading = false; return; }
+				const pdk = PDKS[id];
+				if (!pdk) { loading = false; return; }
 
-				const gdsLayersInFile = new Set<number>();
-				for (const meshes of Object.values(instancedScene!.cellMeshes)) {
-					for (const key of Object.keys(meshes)) gdsLayersInFile.add(Number(key));
-				}
+				// Match PDK layers to GDS layers in the file
+				const pdkByGds = new Map(pdk.layers.map(l => [l.gds, l]));
 
-				const applied = applyPreset(preset, gdsLayersInFile);
-
-				// Apply preset colors/thickness/names to existing gdsLayers
+				// Apply PDK colors/thickness/names to existing gdsLayers
 				gdsLayers = gdsLayers.map(info => {
-					const presetInfo = applied.layerInfo.get(info.gdsNum);
-					return presetInfo ? {
+					const pdkLayer = pdkByGds.get(info.gdsNum);
+					return pdkLayer ? {
 						...info,
-						color: presetInfo.color,
-						thickness: presetInfo.thickness,
+						color: pdkLayer.color,
+						thickness: pdkLayer.thickness,
 					} : info;
 				});
-				// Update labels from preset
+				// Update labels from PDK
 				layerMapNames = new Map(
-					[...applied.layerInfo.entries()].map(([gds, info]) => [gds, info.name] as [number, string])
+					pdk.layers.filter(l => gdsLayers.some(g => g.gdsNum === l.gds)).map(l => [l.gds, l.name] as [number, string])
 				);
 			}
 
@@ -386,13 +381,13 @@
 			<h4 class="section-label">Process</h4>
 				<div class="preset-dropdown">
 					<button class="preset-btn" onclick={() => presetOpen = !presetOpen}>
-						{selectedPreset ? PRESETS[selectedPreset]?.name : 'No preset'}
+						{selectedPreset ? PDKS[selectedPreset]?.name : 'No preset'}
 						<svg width="8" height="5" viewBox="0 0 8 5" fill="currentColor"><path d="M0 0L4 5L8 0Z"/></svg>
 					</button>
 					{#if presetOpen}
 						<div class="preset-menu">
 							<button class="preset-option" class:active={!selectedPreset} onclick={() => { applyPresetById(''); presetOpen = false; }}>No preset</button>
-							{#each PRESET_LIST as p}
+							{#each PDK_LIST as p}
 								<button class="preset-option" class:active={selectedPreset === p.id} onclick={() => { applyPresetById(p.id); presetOpen = false; }}>
 									<span>{p.name}</span>
 									<span class="preset-desc">{p.description}</span>

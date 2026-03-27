@@ -4,7 +4,7 @@
 	import type { PatchAntennaParams, LayerMap } from '$lib/geometry/types';
 	import { buildPatchAntenna, isPatchAntennaValid, designPatchAntenna } from '$lib/geometry/patch_antenna';
 	import { stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
-	import { PDK_MAPPINGS, PDK_NAMES, pdkMapToStack, pdkMapToGdsLayers } from '$lib/stack/pdk-mapping';
+	import { PDKS, pdkMapToStack, pdkMapToGdsLayers } from '$lib/stack/pdk';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackView from '$lib/components/StackView.svelte';
@@ -13,15 +13,15 @@
 	import { mergeLayers } from '$lib/geometry/merge';
 
 	let pdkId = $state('sky130');
-	let stack = $state(pdkMapToStack(PDK_MAPPINGS.sky130['2metal'], 'SKY130'));
+	let stack = $state(pdkMapToStack(PDKS.sky130.generators['2metal'], 'SKY130'));
 
 	$effect(() => {
-		const map = PDK_MAPPINGS[pdkId]?.['2metal'];
-		if (map) stack = pdkMapToStack(map, PDK_NAMES[pdkId]);
+		const map = PDKS[pdkId]?.generators['2metal'];
+		if (map) stack = pdkMapToStack(map, PDKS[pdkId]?.name ?? pdkId);
 	});
 
 	function doExport() {
-		const map = PDK_MAPPINGS[pdkId]?.['2metal'];
+		const map = PDKS[pdkId]?.generators['2metal'];
 		const gdsLayers = map ? pdkMapToGdsLayers(map) : undefined;
 		const data = exportGds(layers, { gdsLayers, cellName: 'PatchAntenna' });
 		downloadGds(data, 'patch_antenna.gds');

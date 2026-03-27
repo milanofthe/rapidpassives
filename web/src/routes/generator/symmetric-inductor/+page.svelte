@@ -5,7 +5,7 @@
 	import { buildSymmetricInductor, isSymmetricInductorValid } from '$lib/geometry/symmetric_inductor';
 	import { pgs4, guardRing } from '$lib/geometry/utils';
 	import { stackToColorMap, stackToVisibleSet } from '$lib/stack/types';
-	import { PDK_MAPPINGS, PDK_NAMES, pdkMapToStack, pdkMapToGdsLayers } from '$lib/stack/pdk-mapping';
+	import { PDKS, pdkMapToStack, pdkMapToGdsLayers } from '$lib/stack/pdk';
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackView from '$lib/components/StackView.svelte';
@@ -14,15 +14,15 @@
 	import { mergeLayers } from '$lib/geometry/merge';
 
 	let pdkId = $state('sky130');
-	let stack = $state(pdkMapToStack(PDK_MAPPINGS.sky130['3metal'], 'SKY130'));
+	let stack = $state(pdkMapToStack(PDKS.sky130.generators['3metal'], 'SKY130'));
 
 	$effect(() => {
-		const map = PDK_MAPPINGS[pdkId]?.['3metal'];
-		if (map) stack = pdkMapToStack(map, PDK_NAMES[pdkId]);
+		const map = PDKS[pdkId]?.generators['3metal'];
+		if (map) stack = pdkMapToStack(map, PDKS[pdkId]?.name ?? pdkId);
 	});
 
 	function doExport() {
-		const map = PDK_MAPPINGS[pdkId]?.['3metal'];
+		const map = PDKS[pdkId]?.generators['3metal'];
 		const gdsLayers = map ? pdkMapToGdsLayers(map) : undefined;
 		const data = exportGds(layers, { gdsLayers, cellName: 'SymmetricInductor' });
 		downloadGds(data, 'symmetric_inductor.gds');

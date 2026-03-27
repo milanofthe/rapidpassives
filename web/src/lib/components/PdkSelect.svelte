@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '$lib/components/fields.css';
-	import { PDK_NAMES, PDK_DESCRIPTIONS } from '$lib/stack/pdk-mapping';
+	import { PDKS, PDK_LIST } from '$lib/stack/pdk';
 
 	let { value = $bindable<string>() }: { value: string } = $props();
 	let open = $state(false);
@@ -8,15 +8,15 @@
 
 <div class="pdk-dropdown">
 	<button class="pdk-btn" onclick={() => open = !open}>
-		{PDK_NAMES[value] ?? value}
+		{PDKS[value]?.name ?? value}
 		<svg width="8" height="5" viewBox="0 0 8 5" fill="currentColor"><path d="M0 0L4 5L8 0Z"/></svg>
 	</button>
 	{#if open}
 		<div class="pdk-menu">
-			{#each Object.entries(PDK_NAMES) as [id, name]}
-				<button class="pdk-option" class:active={value === id} onclick={() => { value = id; open = false; }}>
-					<span>{name}</span>
-					<span class="pdk-desc">{PDK_DESCRIPTIONS[id]}</span>
+			{#each PDK_LIST as p}
+				<button class="pdk-option" class:active={value === p.id} onclick={() => { value = p.id; open = false; }}>
+					<span>{p.name}</span>
+					<span class="pdk-desc">{p.description}</span>
 				</button>
 			{/each}
 		</div>
