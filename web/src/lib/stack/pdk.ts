@@ -187,6 +187,109 @@ const gf180mcu_4m = (() => {
 	} as GeneratorPdkMap;
 })();
 
+// ─── ASAP7 (7nm FinFET predictive) ───────────────────────────────────
+
+const asap7_layers: PdkLayer[] = [
+	{ name: 'V0', gds: 18, datatype: 0, z: 0.032, thickness: 0.018, color: C.viaDark, type: 'via' },
+	{ name: 'M1', gds: 19, datatype: 0, z: 0.050, thickness: 0.036, color: C.metal6, type: 'metal' },
+	{ name: 'V1', gds: 21, datatype: 0, z: 0.086, thickness: 0.018, color: C.viaDark, type: 'via' },
+	{ name: 'M2', gds: 20, datatype: 0, z: 0.104, thickness: 0.036, color: C.metal5, type: 'metal' },
+	{ name: 'V2', gds: 25, datatype: 0, z: 0.140, thickness: 0.018, color: C.viaDark, type: 'via' },
+	{ name: 'M3', gds: 30, datatype: 0, z: 0.158, thickness: 0.036, color: C.metal4, type: 'metal' },
+	{ name: 'V3', gds: 35, datatype: 0, z: 0.194, thickness: 0.024, color: C.viaMid, type: 'via' },
+	{ name: 'M4', gds: 40, datatype: 0, z: 0.218, thickness: 0.048, color: C.metal3, type: 'metal' },
+	{ name: 'V4', gds: 45, datatype: 0, z: 0.266, thickness: 0.024, color: C.viaMid, type: 'via' },
+	{ name: 'M5', gds: 50, datatype: 0, z: 0.290, thickness: 0.048, color: C.metal4, type: 'metal' },
+	{ name: 'V5', gds: 55, datatype: 0, z: 0.338, thickness: 0.032, color: C.viaMid, type: 'via' },
+	{ name: 'M6', gds: 60, datatype: 0, z: 0.370, thickness: 0.064, color: C.metal3, type: 'metal' },
+	{ name: 'V6', gds: 65, datatype: 0, z: 0.434, thickness: 0.032, color: C.viaMid, type: 'via' },
+	{ name: 'M7', gds: 70, datatype: 0, z: 0.466, thickness: 0.064, color: C.metal4, type: 'metal' },
+	{ name: 'V7', gds: 75, datatype: 0, z: 0.530, thickness: 0.040, color: C.viaLight, type: 'via' },
+	{ name: 'M8', gds: 80, datatype: 0, z: 0.570, thickness: 0.080, color: C.metal2, type: 'metal' },
+	{ name: 'V8', gds: 85, datatype: 0, z: 0.650, thickness: 0.040, color: C.viaLight, type: 'via' },
+	{ name: 'M9', gds: 90, datatype: 0, z: 0.690, thickness: 0.080, color: C.topMetal, type: 'metal' },
+];
+
+const asap7_2m = (() => {
+	const l = (n: string) => asap7_layers.find(x => x.name === n)!;
+	return {
+		crossings: l('M8'), windings_m2: l('M8'), windings: l('M9'),
+		vias: l('V8'), vias1: l('V8'), pgs: l('M1'),
+	} as GeneratorPdkMap;
+})();
+
+const asap7_3m = (() => {
+	const l = (n: string) => asap7_layers.find(x => x.name === n)!;
+	return {
+		centertap: l('M7'), crossings_m1: l('M7'), guard_ring: l('M7'),
+		crossings: l('M8'), windings_m2: l('M8'), windings: l('M9'),
+		vias: l('V8'), vias1: l('V8'), vias2: l('V7'), pgs: l('M1'),
+	} as GeneratorPdkMap;
+})();
+
+const asap7_4m = (() => {
+	const l = (n: string) => asap7_layers.find(x => x.name === n)!;
+	return {
+		centertap: l('M6'), crossings_m1: l('M6'), guard_ring: l('M6'),
+		crossings: l('M7'), windings_m2: l('M7'), windings: l('M8'),
+		windings_m4: l('M9'),
+		vias: l('V7'), vias1: l('V7'), vias2: l('V6'), vias3: l('V8'), pgs: l('M1'),
+	} as GeneratorPdkMap;
+})();
+
+// ─── FreePDK45 (45nm predictive) ────────────────────────────────────
+
+const freepdk45_layers: PdkLayer[] = [
+	{ name: 'poly', gds: 9, datatype: 0, z: -0.05, thickness: 0.05, color: C.poly, type: 'poly' },
+	{ name: 'contact', gds: 10, datatype: 0, z: 0.25, thickness: 0.12, color: C.viaDark, type: 'via' },
+	{ name: 'metal1', gds: 11, datatype: 0, z: 0.37, thickness: 0.13, color: C.metal6, type: 'metal' },
+	{ name: 'via1', gds: 12, datatype: 0, z: 0.50, thickness: 0.12, color: C.viaDark, type: 'via' },
+	{ name: 'metal2', gds: 13, datatype: 0, z: 0.62, thickness: 0.14, color: C.metal5, type: 'metal' },
+	{ name: 'via2', gds: 14, datatype: 0, z: 0.76, thickness: 0.12, color: C.viaDark, type: 'via' },
+	{ name: 'metal3', gds: 15, datatype: 0, z: 0.88, thickness: 0.14, color: C.metal4, type: 'metal' },
+	{ name: 'via3', gds: 16, datatype: 0, z: 1.02, thickness: 0.12, color: C.viaMid, type: 'via' },
+	{ name: 'metal4', gds: 17, datatype: 0, z: 1.14, thickness: 0.28, color: C.metal3, type: 'metal' },
+	{ name: 'via4', gds: 18, datatype: 0, z: 1.42, thickness: 0.29, color: C.viaMid, type: 'via' },
+	{ name: 'metal5', gds: 19, datatype: 0, z: 1.71, thickness: 0.28, color: C.metal4, type: 'metal' },
+	{ name: 'via5', gds: 20, datatype: 0, z: 1.99, thickness: 0.29, color: C.viaMid, type: 'via' },
+	{ name: 'metal6', gds: 21, datatype: 0, z: 2.28, thickness: 0.28, color: C.metal3, type: 'metal' },
+	{ name: 'via6', gds: 22, datatype: 0, z: 2.56, thickness: 0.29, color: C.viaMid, type: 'via' },
+	{ name: 'metal7', gds: 23, datatype: 0, z: 2.85, thickness: 0.80, color: C.metal4, type: 'metal' },
+	{ name: 'via7', gds: 24, datatype: 0, z: 3.65, thickness: 0.82, color: C.viaLight, type: 'via' },
+	{ name: 'metal8', gds: 25, datatype: 0, z: 4.47, thickness: 0.80, color: C.metal3, type: 'metal' },
+	{ name: 'via8', gds: 26, datatype: 0, z: 5.27, thickness: 0.82, color: C.viaLight, type: 'via' },
+	{ name: 'metal9', gds: 27, datatype: 0, z: 6.09, thickness: 2.00, color: C.metal2, type: 'metal' },
+	{ name: 'via9', gds: 28, datatype: 0, z: 8.09, thickness: 2.00, color: C.viaLight, type: 'via' },
+	{ name: 'metal10', gds: 29, datatype: 0, z: 10.09, thickness: 2.00, color: C.topMetal, type: 'metal' },
+];
+
+const freepdk45_2m = (() => {
+	const l = (n: string) => freepdk45_layers.find(x => x.name === n)!;
+	return {
+		crossings: l('metal9'), windings_m2: l('metal9'), windings: l('metal10'),
+		vias: l('via9'), vias1: l('via9'), pgs: l('metal1'),
+	} as GeneratorPdkMap;
+})();
+
+const freepdk45_3m = (() => {
+	const l = (n: string) => freepdk45_layers.find(x => x.name === n)!;
+	return {
+		centertap: l('metal8'), crossings_m1: l('metal8'), guard_ring: l('metal8'),
+		crossings: l('metal9'), windings_m2: l('metal9'), windings: l('metal10'),
+		vias: l('via9'), vias1: l('via9'), vias2: l('via8'), pgs: l('metal1'),
+	} as GeneratorPdkMap;
+})();
+
+const freepdk45_4m = (() => {
+	const l = (n: string) => freepdk45_layers.find(x => x.name === n)!;
+	return {
+		centertap: l('metal7'), crossings_m1: l('metal7'), guard_ring: l('metal7'),
+		crossings: l('metal8'), windings_m2: l('metal8'), windings: l('metal9'),
+		windings_m4: l('metal10'),
+		vias: l('via8'), vias1: l('via8'), vias2: l('via7'), vias3: l('via9'), pgs: l('metal1'),
+	} as GeneratorPdkMap;
+})();
+
 // ─── PDK Registry ────────────────────────────────────────────────────
 
 export const PDKS: Record<string, Pdk> = {
@@ -207,6 +310,18 @@ export const PDKS: Record<string, Pdk> = {
 		description: 'GlobalFoundries 180nm — 5M + thick top metal',
 		layers: gf180mcu_layers,
 		generators: { '2metal': gf180mcu_2m, '3metal': gf180mcu_3m, '4metal': gf180mcu_4m },
+	},
+	asap7: {
+		id: 'asap7', name: 'ASAP7',
+		description: 'ASU 7nm FinFET predictive — 9 metals',
+		layers: asap7_layers,
+		generators: { '2metal': asap7_2m, '3metal': asap7_3m, '4metal': asap7_4m },
+	},
+	freepdk45: {
+		id: 'freepdk45', name: 'FreePDK45',
+		description: 'NCSU 45nm predictive — 10 metals',
+		layers: freepdk45_layers,
+		generators: { '2metal': freepdk45_2m, '3metal': freepdk45_3m, '4metal': freepdk45_4m },
 	},
 };
 
