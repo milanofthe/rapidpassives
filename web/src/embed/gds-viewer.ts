@@ -52,7 +52,17 @@ function assignLayerInfo(
 
 	// If a PDK preset is specified, use its layer data as defaults
 	const pdkLayers = presetId ? PDKS[presetId]?.layers : undefined;
-	const pdkByGds = pdkLayers ? new Map(pdkLayers.map(l => [l.gds, l])) : undefined;
+	// Build GDS→PDK lookup, preferring metals over vias when GDS numbers collide (SKY130)
+	let pdkByGds: Map<number, typeof pdkLayers extends (infer T)[] ? T : never> | undefined;
+	if (pdkLayers) {
+		pdkByGds = new Map();
+		for (const l of pdkLayers) {
+			const existing = pdkByGds.get(l.gds);
+			if (!existing || (existing.type === 'via' && l.type === 'metal')) {
+				pdkByGds.set(l.gds, l);
+			}
+		}
+	}
 
 	// Parse config formats
 	const layerConfig = config?.layers as Record<string, { color?: string; z?: number; thickness?: number }> | undefined;

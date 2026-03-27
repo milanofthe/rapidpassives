@@ -35,7 +35,7 @@
 			{#each cards as card}
 				<a class="card" href={card.href}>
 					<div class="card-preview">
-						{@html `<gds-viewer src="${card.gds}" rotate speed="0.5" width="100%" height="200px"></gds-viewer>`}
+						{@html `<gds-viewer src="${card.gds}" rotate speed="0.5" preset="sky130" width="100%" height="200px"></gds-viewer>`}
 					</div>
 					<div class="card-info">
 						<h3>{card.title}</h3>
