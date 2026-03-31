@@ -20,13 +20,15 @@ self.onmessage = (e: MessageEvent) => {
 		const scene = buildInstancedScene(data);
 		const t2 = performance.now();
 
-		self.postMessage({ type: 'progress', phase: 'triangulating' });
+		self.postMessage({ type: 'progress', phase: 'triangulating', polygonCount: 0, cellsDone: 0, cellsTotal: scene.cells.size });
 
 		const cellMeshes: Record<string, Record<number, Float32Array>> = {};
 		const cellEdges: Record<string, Record<number, Float32Array>> = {};
 		const cellInstances: Record<string, Float32Array> = {};
 		const transferables: ArrayBuffer[] = [];
 		let totalTriVerts = 0;
+		let cellsDone = 0;
+		let lastProgress = performance.now();
 
 		for (const [cellName, cellData] of scene.cells) {
 			const instances = scene.instances.get(cellName);
@@ -76,6 +78,13 @@ self.onmessage = (e: MessageEvent) => {
 				}
 				cellInstances[cellName] = packed;
 			transferables.push(packed.buffer);
+			}
+
+			cellsDone++;
+			const now = performance.now();
+			if (now - lastProgress > 100) {
+				lastProgress = now;
+				self.postMessage({ type: 'progress', phase: 'triangulating', polygonCount: totalTriVerts / 2, cellsDone, cellsTotal: scene.cells.size });
 			}
 		}
 
