@@ -91,12 +91,13 @@
 	export function pan(dx: number, dy: number) {
 		const step = camera.distance * 0.05;
 		if (orthoBlend > 0.5) {
-			// 2D: shift world X/Y directly
+			// 2D: shift along camera's local right/up (respects rotation)
+			const ct = Math.cos(camera.theta), st = Math.sin(camera.theta);
 			camera = {
 				...camera,
 				target: [
-					camera.target[0] + dx * step,
-					camera.target[1] + dy * step,
+					camera.target[0] + (dx * ct - dy * st) * step,
+					camera.target[1] + (-dx * st - dy * ct) * step,
 					camera.target[2],
 				],
 			};
@@ -293,12 +294,13 @@
 		if (orthoBlend > 0.5 || isRightDrag) {
 			const panScale = camera.distance * 0.0007;
 			if (orthoBlend > 0.5) {
-				// 2D pan: screen right = +X, screen up = +Y
+				// 2D pan: move along camera's local right/up (respects rotation)
+				const ct = Math.cos(camera.theta), st = Math.sin(camera.theta);
 				camera = {
 					...camera,
 					target: [
-						camera.target[0] + dx * panScale,
-						camera.target[1] - dy * panScale,
+						camera.target[0] + (dx * ct - dy * st) * panScale,
+						camera.target[1] - (dx * st + dy * ct) * panScale,
 						camera.target[2],
 					],
 				};

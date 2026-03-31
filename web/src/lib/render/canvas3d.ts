@@ -33,22 +33,26 @@ export function createCamera(): Camera {
 
 interface Mesh {
 	vao: WebGLVertexArrayObject;
+	buffers: WebGLBuffer[];
 	count: number;
 	color: [number, number, number];
 }
 
 interface LineMesh {
 	vao: WebGLVertexArrayObject;
+	buffers: WebGLBuffer[];
 	count: number;
 	color: [number, number, number];
 }
 
 interface InstancedMesh {
 	vao: WebGLVertexArrayObject;
+	buffers: WebGLBuffer[];
 	vertCount: number;
 	instanceCount: number;
 	color: [number, number, number];
 	sideVao?: WebGLVertexArrayObject;
+	sideBuffers?: WebGLBuffer[];
 	sideVertCount?: number;
 	/** GDS layer number for visibility filtering */
 	gdsLayer?: number;
@@ -87,6 +91,17 @@ interface GLState {
 	instancedMeshes: InstancedMesh[];
 	axisMeshes: LineMesh[];
 	gridMesh: LineMesh | null;
+}
+
+function deleteMesh(gl: WebGL2RenderingContext, m: { vao: WebGLVertexArrayObject; buffers: WebGLBuffer[] }) {
+	for (const b of m.buffers) gl.deleteBuffer(b);
+	gl.deleteVertexArray(m.vao);
+}
+
+function deleteInstancedMesh(gl: WebGL2RenderingContext, m: InstancedMesh) {
+	deleteMesh(gl, m);
+	if (m.sideVao) gl.deleteVertexArray(m.sideVao);
+	if (m.sideBuffers) for (const b of m.sideBuffers) gl.deleteBuffer(b);
 }
 
 // ─── Shader sources ──────────────────────────────────────────────────
@@ -289,7 +304,7 @@ function extrudePolygon(
 	}
 }
 
-function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: number[]): WebGLVertexArrayObject {
+function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: number[]): { vao: WebGLVertexArrayObject; buffers: WebGLBuffer[] } {
 	const vao = gl.createVertexArray()!;
 	gl.bindVertexArray(vao);
 
@@ -306,10 +321,10 @@ function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: nu
 	gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
 
 	gl.bindVertexArray(null);
-	return vao;
+	return { vao, buffers: [posBuf, normBuf] };
 }
 
-function createLineMesh(gl: WebGL2RenderingContext, positions: number[]): WebGLVertexArrayObject {
+function createLineMesh(gl: WebGL2RenderingContext, positions: number[]): { vao: WebGLVertexArrayObject; buffers: WebGLBuffer[] } {
 	const vao = gl.createVertexArray()!;
 	gl.bindVertexArray(vao);
 
@@ -320,7 +335,7 @@ function createLineMesh(gl: WebGL2RenderingContext, positions: number[]): WebGLV
 	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 
 	gl.bindVertexArray(null);
-	return vao;
+	return { vao, buffers: [buf] };
 }
 
 // ─── Matrix math (minimal) ──────────────────────────────────────────
@@ -487,9 +502,7 @@ async function buildMeshesAsync(
 	const { gl } = state;
 
 	// Clean up old meshes
-	for (const m of state.meshes) {
-		gl.deleteVertexArray(m.vao);
-	}
+	for (const m of state.meshes) deleteMesh(gl, m);
 	state.meshes = [];
 
 	// Map geometry LayerName → stack layer z/thickness
@@ -559,8 +572,8 @@ async function buildMeshesAsync(
 			if (now - lastYield > 30 && pi < polys.length - 1) {
 				if (gen !== buildGeneration) return;
 				if (allPos.length > 0) {
-					const vao = createMesh(gl, allPos, allNorm);
-					state.meshes.push({ vao, count: allPos.length / 3, color });
+					const m = createMesh(gl, allPos, allNorm);
+					state.meshes.push({ ...m, count: allPos.length / 3, color });
 					allPos = [];
 					allNorm = [];
 				}
@@ -572,8 +585,8 @@ async function buildMeshesAsync(
 
 		if (allPos.length > 0) {
 			if (gen !== buildGeneration) return;
-			const vao = createMesh(gl, allPos, allNorm);
-			state.meshes.push({ vao, count: allPos.length / 3, color });
+			const m = createMesh(gl, allPos, allNorm);
+			state.meshes.push({ ...m, count: allPos.length / 3, color });
 		}
 	}
 }
@@ -582,8 +595,8 @@ function buildGrid(state: GLState, xyExtent: number, z: number): void {
 	const { gl } = state;
 
 	// Clean up old
-	for (const m of state.axisMeshes) gl.deleteVertexArray(m.vao);
-	if (state.gridMesh) gl.deleteVertexArray(state.gridMesh.vao);
+	for (const m of state.axisMeshes) deleteMesh(gl, m);
+	if (state.gridMesh) deleteMesh(gl, state.gridMesh);
 	state.axisMeshes = [];
 	state.gridMesh = null;
 
@@ -597,8 +610,8 @@ function buildGrid(state: GLState, xyExtent: number, z: number): void {
 		gridLines.push(-gridHalf, v, z, gridHalf, v, z);
 	}
 	if (gridLines.length > 0) {
-		const vao = createLineMesh(gl, gridLines);
-		state.gridMesh = { vao, count: gridLines.length / 3, color: [0.25, 0.25, 0.25] };
+		const m = createLineMesh(gl, gridLines);
+		state.gridMesh = { ...m, count: gridLines.length / 3, color: [0.25, 0.25, 0.25] };
 	}
 }
 
@@ -648,9 +661,9 @@ export function buildInstancedMeshes(
 	const { gl } = state;
 
 	// Clean up old instanced meshes
-	for (const m of state.instancedMeshes) gl.deleteVertexArray(m.vao);
+	for (const m of state.instancedMeshes) deleteInstancedMesh(gl, m);
 	state.instancedMeshes = [];
-	for (const m of state.meshes) gl.deleteVertexArray(m.vao);
+	for (const m of state.meshes) deleteMesh(gl, m);
 	state.meshes = [];
 
 	// Use provided GDS layer info directly
@@ -794,6 +807,7 @@ export function buildInstancedMeshes(
 			// Build side wall VAO from edge data
 			const edgeBuf = sceneData.cellEdges?.[cellName]?.[gdsLayer];
 			let sideVao: WebGLVertexArrayObject | undefined;
+			let sideBufGL: WebGLBuffer | undefined;
 			let sideVertCount = 0;
 
 			if (edgeBuf && edgeBuf.length >= 4) {
@@ -827,7 +841,7 @@ export function buildInstancedMeshes(
 					sideVao = gl.createVertexArray()!;
 					gl.bindVertexArray(sideVao);
 
-					const sideBufGL = gl.createBuffer()!;
+					sideBufGL = gl.createBuffer()!;
 					gl.bindBuffer(gl.ARRAY_BUFFER, sideBufGL);
 					gl.bufferData(gl.ARRAY_BUFFER, trimmed, gl.STATIC_DRAW);
 					// aPos (location 0): vec2 at offset 0, stride 20
@@ -856,10 +870,12 @@ export function buildInstancedMeshes(
 
 			state.instancedMeshes.push({
 				vao,
+				buffers: [vertBufGL, instBufGL],
 				vertCount: vertBuf.length / 2,
 				instanceCount,
 				color,
 				sideVao,
+				sideBuffers: sideBufGL ? [sideBufGL] : undefined,
 				sideVertCount,
 				gdsLayer,
 				bbox,
@@ -897,8 +913,8 @@ export function render3D(
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	const aspect = width / height || 1;
-	const near = Math.max(0.01, camera.distance * 0.01);
-	const far = camera.distance * 10;
+	const near = Math.max(1e-6, camera.distance * 0.001);
+	const far = camera.distance * 50 + 1.0;
 
 	let proj: Mat4;
 	if (orthoBlend >= 0.999) {
@@ -1067,11 +1083,12 @@ export function fitCamera(layers: LayerMap, stack: ProcessStack, instancedScene?
 /** Clean up GL resources */
 export function disposeGL(state: GLState): void {
 	const { gl } = state;
-	for (const m of state.meshes) {
-		gl.deleteVertexArray(m.vao);
-	}
-	for (const m of state.axisMeshes) gl.deleteVertexArray(m.vao);
-	if (state.gridMesh) gl.deleteVertexArray(state.gridMesh.vao);
+	for (const m of state.meshes) deleteMesh(gl, m);
+	for (const m of state.instancedMeshes) deleteInstancedMesh(gl, m);
+	for (const m of state.axisMeshes) deleteMesh(gl, m);
+	if (state.gridMesh) deleteMesh(gl, state.gridMesh);
 	gl.deleteProgram(state.program);
 	gl.deleteProgram(state.lineProgram);
+	gl.deleteProgram(state.instProgram);
+	gl.deleteProgram(state.instSideProgram);
 }
