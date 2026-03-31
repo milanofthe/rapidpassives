@@ -1036,42 +1036,47 @@ export function render3D(
 		gl.uniform1f(state.uInstAmbient, 0.8 + 0.2 * orthoBlend);
 		gl.uniform1f(state.uInstZFlip, zFlip);
 
-		// Filter meshes by layer visibility, frustum culling, and sub-pixel culling
+		// Visibility test — avoid .filter() allocation every frame
 		const isOrtho = orthoBlend > 0.5;
-		const visibleMeshes = state.instancedMeshes.filter(mesh => {
-			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) return false;
-			if (mesh.bbox && !isBboxVisible(mesh.bbox, vp, width, height, 2, isOrtho)) return false;
-			return true;
-		});
+		const draw3D = orthoBlend < 0.9;
+		let hasSideWalls = false;
 
-		// Draw top faces
+		// Draw top faces (and bottom faces in 3D, sharing VAO bind + uniforms)
 		gl.uniform1f(state.uInstTopFace, 1.0);
-		for (const mesh of visibleMeshes) {
-			gl.uniform1f(state.uInstLayerZOffset, layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0);
+		for (let mi = 0; mi < state.instancedMeshes.length; mi++) {
+			const mesh = state.instancedMeshes[mi];
+			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
+			if (mesh.bbox && !isBboxVisible(mesh.bbox, vp, width, height, 2, isOrtho)) continue;
+
+			const zOff = layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0;
+			gl.uniform1f(state.uInstLayerZOffset, zOff);
 			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
+
+			// Top face
+			gl.uniform1f(state.uInstTopFace, 1.0);
 			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
+
+			// Bottom face (3D only) — reuse bound VAO + color + zOffset
+			if (draw3D) {
+				gl.uniform1f(state.uInstTopFace, 0.0);
+				gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
+				if (mesh.sideVao) hasSideWalls = true;
+			}
 		}
 
-		// Skip bottom faces and side walls in 2D (ortho) mode — they're invisible from top-down
-		if (orthoBlend < 0.9) {
-			// Draw bottom faces
-			gl.uniform1f(state.uInstTopFace, 0.0);
-			for (const mesh of visibleMeshes) {
-				gl.uniform1f(state.uInstLayerZOffset, layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0);
-				gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
-				gl.bindVertexArray(mesh.vao);
-				gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
-			}
-
-			// Draw side walls
+		// Draw side walls (3D only) — separate program
+		if (draw3D && hasSideWalls) {
 			gl.useProgram(state.instSideProgram);
 			gl.uniformMatrix4fv(state.uInstSideMVP, false, vp);
 			gl.uniform3f(state.uInstSideLightDir, lightDir[0], lightDir[1], lightDir[2]);
 			gl.uniform1f(state.uInstSideAmbient, 0.8 + 0.2 * orthoBlend);
 			gl.uniform1f(state.uInstSideZFlip, zFlip);
-			for (const mesh of visibleMeshes) {
+			for (let mi = 0; mi < state.instancedMeshes.length; mi++) {
+				const mesh = state.instancedMeshes[mi];
 				if (!mesh.sideVao || !mesh.sideVertCount) continue;
+				if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
+				if (mesh.bbox && !isBboxVisible(mesh.bbox, vp, width, height, 2, isOrtho)) continue;
 				gl.uniform1f(state.uInstSideLayerZOffset, layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0);
 				gl.uniform3f(state.uInstSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 				gl.bindVertexArray(mesh.sideVao);
