@@ -184,6 +184,21 @@
 				thickness: 0.5,
 			}));
 
+			// Apply preset if one is already selected
+			if (selectedPreset) {
+				const pdk = PDKS[selectedPreset];
+				if (pdk) {
+					const pdkByGds = new Map(pdk.layers.map(l => [l.gds, l]));
+					gdsLayers = gdsLayers.map(info => {
+						const pdkLayer = pdkByGds.get(info.gdsNum);
+						return pdkLayer ? { ...info, color: pdkLayer.color, thickness: pdkLayer.thickness } : info;
+					});
+					layerMapNames = new Map(
+						pdk.layers.filter(l => gdsLayers.some(g => g.gdsNum === l.gds)).map(l => [l.gds, l.name] as [number, string])
+					);
+				}
+			}
+
 			totalPolygons = result.polygonCount;
 			loading = false;
 		} catch (e: any) {

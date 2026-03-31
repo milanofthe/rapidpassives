@@ -91,6 +91,8 @@ interface GLState {
 	instancedMeshes: InstancedMesh[];
 	axisMeshes: LineMesh[];
 	gridMesh: LineMesh | null;
+	/** Half-diagonal of the scene bounding box (used for far plane calculation) */
+	sceneRadius: number;
 }
 
 function deleteMesh(gl: WebGL2RenderingContext, m: { vao: WebGLVertexArrayObject; buffers: WebGLBuffer[] }) {
@@ -469,7 +471,7 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace, uInstZFlip, uInstLayerZOffset,
 		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient, uInstSideZFlip, uInstSideLayerZOffset,
 		lineProgram, uLineMVP, uLineColor,
-		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null,
+		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null, sceneRadius: 1,
 	};
 }
 
@@ -537,6 +539,8 @@ async function buildMeshesAsync(
 		maxZ = Math.max(maxZ, sl.z + sl.thickness);
 	}
 	const cz = isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
+	const zExtent = isFinite(minZ) ? maxZ - minZ : 0;
+	state.sceneRadius = Math.sqrt(xyExtent * xyExtent + zExtent * zExtent) / 2;
 
 	// Build grid first so something renders immediately
 	const gridZ = isFinite(minZ) ? minZ - cz : 0;
@@ -717,6 +721,8 @@ export function buildInstancedMeshes(
 		}
 	}
 	const cz = isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
+	const zExtent = isFinite(minZ) ? maxZ - minZ : 0;
+	state.sceneRadius = Math.sqrt(xyExtent * xyExtent + zExtent * zExtent) / 2;
 
 	// Build grid
 	const gridZ = isFinite(minZ) ? minZ - cz : 0;
@@ -960,7 +966,7 @@ export function render3D(
 
 	const aspect = width / height || 1;
 	const near = Math.max(1e-6, camera.distance * 0.001);
-	const far = camera.distance * 50 + 1.0;
+	const far = camera.distance * 50 + state.sceneRadius * 2;
 
 	let proj: Mat4;
 	if (orthoBlend >= 0.999) {
