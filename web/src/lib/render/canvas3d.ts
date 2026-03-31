@@ -887,9 +887,17 @@ export function buildInstancedMeshes(
 }
 
 /**
- * Test if a world-space 2D bbox is visible on screen and large enough to draw.
- * Projects the 4 XY corners (at z=0) through the view-projection matrix.
- * Returns false if entirely off-screen or smaller than minPixels in both axes.
+ * Test if a world-space 2D bbox should be drawn.
+ *
+ * In ortho mode (2D top-down), the Z coordinate has no effect on the XY
+ * projection, so projecting the 4 bbox corners at z=0 is exact.  We can
+ * safely do both frustum culling and sub-pixel culling.
+ *
+ * In perspective mode (3D), a 2D bbox projected at a single Z value is
+ * unreliable for frustum tests — extruded geometry at other Z heights
+ * projects to different screen positions.  We only do sub-pixel culling
+ * there: if the *entire* bbox projects smaller than minPixels, the
+ * geometry is invisible regardless of Z extent.
  */
 function isBboxVisible(
 	bbox: [number, number, number, number],
@@ -897,6 +905,7 @@ function isBboxVisible(
 	screenW: number,
 	screenH: number,
 	minPixels: number,
+	isOrtho: boolean,
 ): boolean {
 	const [bx0, by0, bx1, by1] = bbox;
 	let ndcMinX = Infinity, ndcMaxX = -Infinity;
@@ -914,8 +923,8 @@ function isBboxVisible(
 		if (cy < ndcMinY) ndcMinY = cy;
 		if (cy > ndcMaxY) ndcMaxY = cy;
 	}
-	// Frustum cull: entirely outside NDC [-1, 1]
-	if (ndcMaxX < -1 || ndcMinX > 1 || ndcMaxY < -1 || ndcMinY > 1) return false;
+	// Frustum cull (ortho only — exact in 2D top-down)
+	if (isOrtho && (ndcMaxX < -1 || ndcMinX > 1 || ndcMaxY < -1 || ndcMinY > 1)) return false;
 	// Sub-pixel cull: projected size in pixels too small to see
 	const pw = (ndcMaxX - ndcMinX) * 0.5 * screenW;
 	const ph = (ndcMaxY - ndcMinY) * 0.5 * screenH;
@@ -1022,9 +1031,10 @@ export function render3D(
 		gl.uniform1f(state.uInstZFlip, zFlip);
 
 		// Filter meshes by layer visibility, frustum culling, and sub-pixel culling
+		const isOrtho = orthoBlend > 0.5;
 		const visibleMeshes = state.instancedMeshes.filter(mesh => {
 			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) return false;
-			if (mesh.bbox && !isBboxVisible(mesh.bbox, vp, width, height, 2)) return false;
+			if (mesh.bbox && !isBboxVisible(mesh.bbox, vp, width, height, 2, isOrtho)) return false;
 			return true;
 		});
 
