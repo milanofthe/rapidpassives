@@ -87,6 +87,10 @@ interface GLState {
 	lineProgram: WebGLProgram;
 	uLineMVP: WebGLUniformLocation;
 	uLineColor: WebGLUniformLocation;
+	uLogDepthCoef: WebGLUniformLocation;
+	uInstLogDepthCoef: WebGLUniformLocation;
+	uInstSideLogDepthCoef: WebGLUniformLocation;
+	uLineLogDepthCoef: WebGLUniformLocation;
 	meshes: Mesh[];
 	instancedMeshes: InstancedMesh[];
 	axisMeshes: LineMesh[];
@@ -116,6 +120,7 @@ uniform mat4 uMVP;
 uniform mat3 uNormalMat;
 uniform float uZFlip;
 out vec3 vNormal;
+out float vLogZ;
 void main() {
 	vec3 n = aNormal;
 	n.z *= uZFlip;
@@ -123,19 +128,23 @@ void main() {
 	vec3 pos = aPos;
 	pos.z *= uZFlip;
 	gl_Position = uMVP * vec4(pos, 1.0);
+	vLogZ = 1.0 + gl_Position.w;
 }`;
 
 const FS = `#version 300 es
 precision highp float;
 in vec3 vNormal;
+in float vLogZ;
 uniform vec3 uColor;
 uniform vec3 uLightDir;
 uniform float uAmbient;
+uniform float uLogDepthCoef;
 out vec4 fragColor;
 void main() {
 	float diff = max(dot(normalize(vNormal), uLightDir), 0.0);
 	vec3 lit = uColor * (uAmbient + (1.0 - uAmbient) * diff);
 	fragColor = vec4(lit, 1.0);
+	gl_FragDepth = log2(max(vLogZ, 1e-6)) * uLogDepthCoef;
 }`;
 
 // Instanced shader: 2D vertex positions + per-instance 2D affine transform + Z extrusion
@@ -149,11 +158,13 @@ uniform float uTopFace;                   // 1.0 for top face pass, 0.0 for bott
 uniform float uZFlip;
 uniform float uLayerZOffset;
 out vec3 vNormal;
+out float vLogZ;
 void main() {
 	float wx = aInstRow0.x * aPos.x + aInstRow0.y * aPos.y + aInstRow0.z;
 	float wy = aInstRow1.x * aPos.x + aInstRow1.y * aPos.y + aInstRow1.z;
 	float z = mix(aInstRow1.w, aInstRow0.w, uTopFace) * uZFlip + uLayerZOffset;
 	gl_Position = uMVP * vec4(wx, wy, z, 1.0);
+	vLogZ = 1.0 + gl_Position.w;
 	vNormal = vec3(0.0, 0.0, (uTopFace > 0.5 ? 1.0 : -1.0) * uZFlip);
 }`;
 
@@ -169,11 +180,13 @@ uniform mat4 uMVP;
 uniform float uZFlip;
 uniform float uLayerZOffset;
 out vec3 vNormal;
+out float vLogZ;
 void main() {
 	float wx = aInstRow0.x * aPos.x + aInstRow0.y * aPos.y + aInstRow0.z;
 	float wy = aInstRow1.x * aPos.x + aInstRow1.y * aPos.y + aInstRow1.z;
 	float z = mix(aInstRow1.w, aInstRow0.w, aZFlag) * uZFlip + uLayerZOffset;
 	gl_Position = uMVP * vec4(wx, wy, z, 1.0);
+	vLogZ = 1.0 + gl_Position.w;
 	float tnx = aInstRow0.x * aNormalXY.x + aInstRow0.y * aNormalXY.y;
 	float tny = aInstRow1.x * aNormalXY.x + aInstRow1.y * aNormalXY.y;
 	vNormal = normalize(vec3(tnx, tny, 0.0));
@@ -182,30 +195,38 @@ void main() {
 const INST_FS = `#version 300 es
 precision highp float;
 in vec3 vNormal;
+in float vLogZ;
 uniform vec3 uColor;
 uniform vec3 uLightDir;
 uniform float uAmbient;
+uniform float uLogDepthCoef;
 out vec4 fragColor;
 void main() {
 	float diff = max(dot(normalize(vNormal), uLightDir), 0.0);
 	vec3 lit = uColor * (uAmbient + (1.0 - uAmbient) * diff);
 	fragColor = vec4(lit, 1.0);
+	gl_FragDepth = log2(max(vLogZ, 1e-6)) * uLogDepthCoef;
 }`;
 
 const LINE_VS = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;
 uniform mat4 uMVP;
+out float vLogZ;
 void main() {
 	gl_Position = uMVP * vec4(aPos, 1.0);
+	vLogZ = 1.0 + gl_Position.w;
 }`;
 
 const LINE_FS = `#version 300 es
 precision highp float;
+in float vLogZ;
 uniform vec3 uColor;
+uniform float uLogDepthCoef;
 out vec4 fragColor;
 void main() {
 	fragColor = vec4(uColor, 1.0);
+	gl_FragDepth = log2(max(vLogZ, 1e-6)) * uLogDepthCoef;
 }`;
 
 // ─── GL helpers ──────────────────────────────────────────────────────
@@ -437,11 +458,13 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uLightDir = gl.getUniformLocation(program, 'uLightDir')!;
 	const uAmbient = gl.getUniformLocation(program, 'uAmbient')!;
 	const uZFlip = gl.getUniformLocation(program, 'uZFlip')!;
+	const uLogDepthCoef = gl.getUniformLocation(program, 'uLogDepthCoef')!;
 
 	// Line shader program
 	const lineProgram = linkProgramFromSource(gl, LINE_VS, LINE_FS);
 	const uLineMVP = gl.getUniformLocation(lineProgram, 'uMVP')!;
 	const uLineColor = gl.getUniformLocation(lineProgram, 'uColor')!;
+	const uLineLogDepthCoef = gl.getUniformLocation(lineProgram, 'uLogDepthCoef')!;
 
 	const bg = hexToRgb(canvasTheme.bg);
 	gl.clearColor(bg[0], bg[1], bg[2], 1);
@@ -456,6 +479,7 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uInstTopFace = gl.getUniformLocation(instProgram, 'uTopFace')!;
 	const uInstZFlip = gl.getUniformLocation(instProgram, 'uZFlip')!;
 	const uInstLayerZOffset = gl.getUniformLocation(instProgram, 'uLayerZOffset')!;
+	const uInstLogDepthCoef = gl.getUniformLocation(instProgram, 'uLogDepthCoef')!;
 
 	// Instanced side wall shader
 	const instSideProgram = linkProgramFromSource(gl, INST_SIDE_VS, INST_FS);
@@ -465,12 +489,13 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uInstSideAmbient = gl.getUniformLocation(instSideProgram, 'uAmbient')!;
 	const uInstSideZFlip = gl.getUniformLocation(instSideProgram, 'uZFlip')!;
 	const uInstSideLayerZOffset = gl.getUniformLocation(instSideProgram, 'uLayerZOffset')!;
+	const uInstSideLogDepthCoef = gl.getUniformLocation(instSideProgram, 'uLogDepthCoef')!;
 
 	return {
-		gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient, uZFlip,
-		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace, uInstZFlip, uInstLayerZOffset,
-		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient, uInstSideZFlip, uInstSideLayerZOffset,
-		lineProgram, uLineMVP, uLineColor,
+		gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient, uZFlip, uLogDepthCoef,
+		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace, uInstZFlip, uInstLayerZOffset, uInstLogDepthCoef,
+		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient, uInstSideZFlip, uInstSideLayerZOffset, uInstSideLogDepthCoef,
+		lineProgram, uLineMVP, uLineColor, uLineLogDepthCoef,
 		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null, sceneZExtent: 1,
 	};
 }
@@ -965,8 +990,9 @@ export function render3D(
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	const aspect = width / height || 1;
-	const near = Math.max(1e-6, camera.distance * 0.01);
-	const far = camera.distance * 10 + state.sceneZExtent * 3;
+	const near = Math.max(0.001, camera.distance * 0.01);
+	const far = camera.distance * 1e6;
+	const logDepthCoef = 1.0 / Math.log2(far + 1.0);
 
 	let proj: Mat4;
 	if (orthoBlend >= 0.999) {
@@ -1002,6 +1028,7 @@ export function render3D(
 	if (!transparent) {
 		gl.useProgram(state.lineProgram);
 		gl.uniformMatrix4fv(state.uLineMVP, false, vp);
+		gl.uniform1f(state.uLineLogDepthCoef, logDepthCoef);
 
 		if (state.gridMesh) {
 			gl.uniform3f(state.uLineColor, state.gridMesh.color[0], state.gridMesh.color[1], state.gridMesh.color[2]);
@@ -1021,6 +1048,7 @@ export function render3D(
 		// Flat shading in ortho (2D) mode, lit shading in perspective (3D)
 		gl.uniform1f(uAmbient, 0.8 + 0.2 * orthoBlend);
 		gl.uniform1f(state.uZFlip, zFlip);
+		gl.uniform1f(state.uLogDepthCoef, logDepthCoef);
 		for (const mesh of state.meshes) {
 			gl.uniform3f(uColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
@@ -1035,6 +1063,7 @@ export function render3D(
 		gl.uniform3f(state.uInstLightDir, lightDir[0], lightDir[1], lightDir[2]);
 		gl.uniform1f(state.uInstAmbient, 0.8 + 0.2 * orthoBlend);
 		gl.uniform1f(state.uInstZFlip, zFlip);
+		gl.uniform1f(state.uInstLogDepthCoef, logDepthCoef);
 
 		// Visibility test — avoid .filter() allocation every frame
 		const isOrtho = orthoBlend > 0.5;
@@ -1072,6 +1101,7 @@ export function render3D(
 			gl.uniform3f(state.uInstSideLightDir, lightDir[0], lightDir[1], lightDir[2]);
 			gl.uniform1f(state.uInstSideAmbient, 0.8 + 0.2 * orthoBlend);
 			gl.uniform1f(state.uInstSideZFlip, zFlip);
+			gl.uniform1f(state.uInstSideLogDepthCoef, logDepthCoef);
 			for (let mi = 0; mi < state.instancedMeshes.length; mi++) {
 				const mesh = state.instancedMeshes[mi];
 				if (!mesh.sideVao || !mesh.sideVertCount) continue;
