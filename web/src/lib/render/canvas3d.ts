@@ -993,7 +993,7 @@ export function render3D(
 
 	// Ortho uses standard depth → needs tight near/far for precision
 	// Perspective uses log depth → can have huge range
-	const orthoNear = 0.001;
+	const orthoNear = -(state.sceneZExtent * 4 + 1);
 	const orthoFar = camera.distance * 2 + state.sceneZExtent * 4 + 1;
 	const perspNear = Math.max(0.001, camera.distance * 0.01);
 	const perspFar = camera.distance * 1e6;
