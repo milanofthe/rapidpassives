@@ -144,7 +144,7 @@ void main() {
 	float diff = max(dot(normalize(vNormal), uLightDir), 0.0);
 	vec3 lit = uColor * (uAmbient + (1.0 - uAmbient) * diff);
 	fragColor = vec4(lit, 1.0);
-	gl_FragDepth = log2(max(vLogZ, 1e-6)) * uLogDepthCoef;
+	gl_FragDepth = uLogDepthCoef > 0.0 ? log2(max(vLogZ, 1e-6)) * uLogDepthCoef : gl_FragCoord.z;
 }`;
 
 // Instanced shader: 2D vertex positions + per-instance 2D affine transform + Z extrusion
@@ -205,7 +205,7 @@ void main() {
 	float diff = max(dot(normalize(vNormal), uLightDir), 0.0);
 	vec3 lit = uColor * (uAmbient + (1.0 - uAmbient) * diff);
 	fragColor = vec4(lit, 1.0);
-	gl_FragDepth = log2(max(vLogZ, 1e-6)) * uLogDepthCoef;
+	gl_FragDepth = uLogDepthCoef > 0.0 ? log2(max(vLogZ, 1e-6)) * uLogDepthCoef : gl_FragCoord.z;
 }`;
 
 const LINE_VS = `#version 300 es
@@ -226,7 +226,7 @@ uniform float uLogDepthCoef;
 out vec4 fragColor;
 void main() {
 	fragColor = vec4(uColor, 1.0);
-	gl_FragDepth = log2(max(vLogZ, 1e-6)) * uLogDepthCoef;
+	gl_FragDepth = uLogDepthCoef > 0.0 ? log2(max(vLogZ, 1e-6)) * uLogDepthCoef : gl_FragCoord.z;
 }`;
 
 // ─── GL helpers ──────────────────────────────────────────────────────
@@ -992,7 +992,8 @@ export function render3D(
 	const aspect = width / height || 1;
 	const near = Math.max(0.001, camera.distance * 0.01);
 	const far = camera.distance * 1e6;
-	const logDepthCoef = 1.0 / Math.log2(far + 1.0);
+	// Log depth only in perspective mode — ortho has constant w, so fall back to standard depth
+	const logDepthCoef = orthoBlend > 0.999 ? 0.0 : 1.0 / Math.log2(far + 1.0);
 
 	let proj: Mat4;
 	if (orthoBlend >= 0.999) {
