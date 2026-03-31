@@ -91,8 +91,8 @@ interface GLState {
 	instancedMeshes: InstancedMesh[];
 	axisMeshes: LineMesh[];
 	gridMesh: LineMesh | null;
-	/** Half-diagonal of the scene bounding box (used for far plane calculation) */
-	sceneRadius: number;
+	/** Z extent of the layer stack (used for far plane calculation) */
+	sceneZExtent: number;
 }
 
 function deleteMesh(gl: WebGL2RenderingContext, m: { vao: WebGLVertexArrayObject; buffers: WebGLBuffer[] }) {
@@ -471,7 +471,7 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace, uInstZFlip, uInstLayerZOffset,
 		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient, uInstSideZFlip, uInstSideLayerZOffset,
 		lineProgram, uLineMVP, uLineColor,
-		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null, sceneRadius: 1,
+		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null, sceneZExtent: 1,
 	};
 }
 
@@ -540,7 +540,7 @@ async function buildMeshesAsync(
 	}
 	const cz = isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
 	const zExtent = isFinite(minZ) ? maxZ - minZ : 0;
-	state.sceneRadius = Math.sqrt(xyExtent * xyExtent + zExtent * zExtent) / 2;
+	state.sceneZExtent = zExtent;
 
 	// Build grid first so something renders immediately
 	const gridZ = isFinite(minZ) ? minZ - cz : 0;
@@ -722,7 +722,7 @@ export function buildInstancedMeshes(
 	}
 	const cz = isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
 	const zExtent = isFinite(minZ) ? maxZ - minZ : 0;
-	state.sceneRadius = Math.sqrt(xyExtent * xyExtent + zExtent * zExtent) / 2;
+	state.sceneZExtent = zExtent;
 
 	// Build grid
 	const gridZ = isFinite(minZ) ? minZ - cz : 0;
@@ -965,8 +965,8 @@ export function render3D(
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	const aspect = width / height || 1;
-	const near = Math.max(1e-6, camera.distance * 0.001);
-	const far = camera.distance * 50 + state.sceneRadius * 2;
+	const near = Math.max(1e-6, camera.distance * 0.01);
+	const far = camera.distance * 10 + state.sceneZExtent * 3;
 
 	let proj: Mat4;
 	if (orthoBlend >= 0.999) {
