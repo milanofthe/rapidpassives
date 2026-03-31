@@ -496,6 +496,8 @@ export function sceneToInstancedData(scene: InstancedScene): {
 export interface GdsProgress {
 	phase: string;
 	polygonCount: number;
+	cellsDone?: number;
+	cellsTotal?: number;
 }
 
 /** Result from worker — always instanced */
@@ -526,7 +528,7 @@ export function readGdsInWorker(
 		worker.onmessage = (e) => {
 			const msg = e.data;
 			if (msg.type === 'progress') {
-				onProgress({ phase: msg.phase, polygonCount: msg.polygonCount ?? 0 });
+				onProgress({ phase: msg.phase, polygonCount: msg.polygonCount ?? 0, cellsDone: msg.cellsDone, cellsTotal: msg.cellsTotal });
 			} else if (msg.type === 'done') {
 				worker.terminate();
 				onProgress({ phase: 'done', polygonCount: msg.polygonCount });

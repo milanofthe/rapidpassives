@@ -8,10 +8,10 @@
 	import GeometryEditor from '$lib/components/GeometryEditor.svelte';
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import ParamField from '$lib/components/ParamField.svelte';
-	import StackView from '$lib/components/StackView.svelte';
-	import PdkSelect from '$lib/components/PdkSelect.svelte';
+	import StackPanel from '$lib/components/StackPanel.svelte';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
 	import { mergeLayers } from '$lib/geometry/merge';
+	import { extractPortMarkers } from '$lib/geometry/ports';
 
 	let pdkId = $state('sky130');
 	let stack = $state(pdkMapToStack(PDKS.sky130.generators['2metal'], 'SKY130'));
@@ -54,14 +54,7 @@
 		return merged;
 	});
 	let valid = $derived(isSpiralValid({ ...p }));
-	let portMarkers = $derived.by(() => {
-		if (!result) return [];
-		const nodeMap = new Map(result.network.nodes.map(n => [n.id, n]));
-		return result.network.ports.map(port => {
-			const node = nodeMap.get(port.node);
-			return node ? { name: port.name, x: node.x, y: node.y } : null;
-		}).filter((p): p is { name: string; x: number; y: number } => p !== null);
-	});
+	let portMarkers = $derived(extractPortMarkers(result));
 	let renderOpts = $derived({ colorOverrides: stackToColorMap(stack), visibleLayers: stackToVisibleSet(stack), ports: portMarkers });
 </script>
 
@@ -108,23 +101,7 @@
 		</ParamSidebar>
 	{/snippet}
 	{#snippet stackPanel()}
-		<div class="stack-wrapper">
-			<StackView bind:stack>
-				{#snippet header()}
-					<div class="param-section"><h4>Process</h4>
-						<PdkSelect bind:value={pdkId} />
-					</div>
-				{/snippet}
-			</StackView>
-		</div>
+		<StackPanel bind:stack bind:pdkId />
 	{/snippet}
 </GeometryEditor>
 
-<style>
-	.stack-wrapper {
-		padding: var(--space-lg);
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-lg);
-	}
-</style>

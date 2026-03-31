@@ -159,14 +159,19 @@
 
 			const result = await readGdsInWorker(bytes, (p) => {
 				loadPolyCount = p.polygonCount;
-				const phaseNames: Record<string, string> = {
-					parsing: 'Parsing records...',
-					'building hierarchy': 'Analyzing hierarchy...',
-					triangulating: 'Triangulating...',
-					done: 'Done',
-				};
-				loadPhase = phaseNames[p.phase] ?? p.phase;
-				loadProgress = p.phase === 'done' ? 1 : p.phase === 'triangulating' ? 0.6 : 0.2;
+				if (p.phase === 'triangulating' && p.cellsTotal) {
+					const done = p.cellsDone ?? 0;
+					loadPhase = `Triangulating... ${done} / ${p.cellsTotal} cells`;
+					loadProgress = 0.2 + 0.7 * (done / p.cellsTotal);
+				} else {
+					const phaseNames: Record<string, string> = {
+						parsing: 'Parsing records...',
+						'building hierarchy': 'Analyzing hierarchy...',
+						done: 'Done',
+					};
+					loadPhase = phaseNames[p.phase] ?? p.phase;
+					loadProgress = p.phase === 'done' ? 1 : 0.2;
+				}
 			});
 
 			instancedScene = { cellMeshes: result.cellMeshes, cellEdges: result.cellEdges, cellInstances: result.cellInstances };
@@ -183,6 +188,21 @@
 				polyCount: 0,
 				thickness: 0.5,
 			}));
+
+			// Apply preset if one is already selected
+			if (selectedPreset) {
+				const pdk = PDKS[selectedPreset];
+				if (pdk) {
+					const pdkByGds = new Map(pdk.layers.map(l => [l.gds, l]));
+					gdsLayers = gdsLayers.map(info => {
+						const pdkLayer = pdkByGds.get(info.gdsNum);
+						return pdkLayer ? { ...info, color: pdkLayer.color, thickness: pdkLayer.thickness } : info;
+					});
+					layerMapNames = new Map(
+						pdk.layers.filter(l => gdsLayers.some(g => g.gdsNum === l.gds)).map(l => [l.gds, l.name] as [number, string])
+					);
+				}
+			}
 
 			totalPolygons = result.polygonCount;
 			loading = false;

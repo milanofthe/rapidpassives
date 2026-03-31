@@ -33,22 +33,26 @@ export function createCamera(): Camera {
 
 interface Mesh {
 	vao: WebGLVertexArrayObject;
+	buffers: WebGLBuffer[];
 	count: number;
 	color: [number, number, number];
 }
 
 interface LineMesh {
 	vao: WebGLVertexArrayObject;
+	buffers: WebGLBuffer[];
 	count: number;
 	color: [number, number, number];
 }
 
 interface InstancedMesh {
 	vao: WebGLVertexArrayObject;
+	buffers: WebGLBuffer[];
 	vertCount: number;
 	instanceCount: number;
 	color: [number, number, number];
 	sideVao?: WebGLVertexArrayObject;
+	sideBuffers?: WebGLBuffer[];
 	sideVertCount?: number;
 	/** GDS layer number for visibility filtering */
 	gdsLayer?: number;
@@ -83,10 +87,27 @@ interface GLState {
 	lineProgram: WebGLProgram;
 	uLineMVP: WebGLUniformLocation;
 	uLineColor: WebGLUniformLocation;
+	uLogDepthCoef: WebGLUniformLocation;
+	uInstLogDepthCoef: WebGLUniformLocation;
+	uInstSideLogDepthCoef: WebGLUniformLocation;
+	uLineLogDepthCoef: WebGLUniformLocation;
 	meshes: Mesh[];
 	instancedMeshes: InstancedMesh[];
 	axisMeshes: LineMesh[];
 	gridMesh: LineMesh | null;
+	/** Z extent of the layer stack (used for far plane calculation) */
+	sceneZExtent: number;
+}
+
+function deleteMesh(gl: WebGL2RenderingContext, m: { vao: WebGLVertexArrayObject; buffers: WebGLBuffer[] }) {
+	for (const b of m.buffers) gl.deleteBuffer(b);
+	gl.deleteVertexArray(m.vao);
+}
+
+function deleteInstancedMesh(gl: WebGL2RenderingContext, m: InstancedMesh) {
+	deleteMesh(gl, m);
+	if (m.sideVao) gl.deleteVertexArray(m.sideVao);
+	if (m.sideBuffers) for (const b of m.sideBuffers) gl.deleteBuffer(b);
 }
 
 // ─── Shader sources ──────────────────────────────────────────────────
@@ -99,6 +120,7 @@ uniform mat4 uMVP;
 uniform mat3 uNormalMat;
 uniform float uZFlip;
 out vec3 vNormal;
+out float vLogZ;
 void main() {
 	vec3 n = aNormal;
 	n.z *= uZFlip;
@@ -106,19 +128,23 @@ void main() {
 	vec3 pos = aPos;
 	pos.z *= uZFlip;
 	gl_Position = uMVP * vec4(pos, 1.0);
+	vLogZ = 1.0 + gl_Position.w;
 }`;
 
 const FS = `#version 300 es
 precision highp float;
 in vec3 vNormal;
+in float vLogZ;
 uniform vec3 uColor;
 uniform vec3 uLightDir;
 uniform float uAmbient;
+uniform float uLogDepthCoef;
 out vec4 fragColor;
 void main() {
 	float diff = max(dot(normalize(vNormal), uLightDir), 0.0);
 	vec3 lit = uColor * (uAmbient + (1.0 - uAmbient) * diff);
 	fragColor = vec4(lit, 1.0);
+	gl_FragDepth = uLogDepthCoef > 0.0 ? log2(max(vLogZ, 1e-6)) * uLogDepthCoef : gl_FragCoord.z;
 }`;
 
 // Instanced shader: 2D vertex positions + per-instance 2D affine transform + Z extrusion
@@ -132,11 +158,13 @@ uniform float uTopFace;                   // 1.0 for top face pass, 0.0 for bott
 uniform float uZFlip;
 uniform float uLayerZOffset;
 out vec3 vNormal;
+out float vLogZ;
 void main() {
 	float wx = aInstRow0.x * aPos.x + aInstRow0.y * aPos.y + aInstRow0.z;
 	float wy = aInstRow1.x * aPos.x + aInstRow1.y * aPos.y + aInstRow1.z;
 	float z = mix(aInstRow1.w, aInstRow0.w, uTopFace) * uZFlip + uLayerZOffset;
 	gl_Position = uMVP * vec4(wx, wy, z, 1.0);
+	vLogZ = 1.0 + gl_Position.w;
 	vNormal = vec3(0.0, 0.0, (uTopFace > 0.5 ? 1.0 : -1.0) * uZFlip);
 }`;
 
@@ -152,11 +180,13 @@ uniform mat4 uMVP;
 uniform float uZFlip;
 uniform float uLayerZOffset;
 out vec3 vNormal;
+out float vLogZ;
 void main() {
 	float wx = aInstRow0.x * aPos.x + aInstRow0.y * aPos.y + aInstRow0.z;
 	float wy = aInstRow1.x * aPos.x + aInstRow1.y * aPos.y + aInstRow1.z;
 	float z = mix(aInstRow1.w, aInstRow0.w, aZFlag) * uZFlip + uLayerZOffset;
 	gl_Position = uMVP * vec4(wx, wy, z, 1.0);
+	vLogZ = 1.0 + gl_Position.w;
 	float tnx = aInstRow0.x * aNormalXY.x + aInstRow0.y * aNormalXY.y;
 	float tny = aInstRow1.x * aNormalXY.x + aInstRow1.y * aNormalXY.y;
 	vNormal = normalize(vec3(tnx, tny, 0.0));
@@ -165,30 +195,38 @@ void main() {
 const INST_FS = `#version 300 es
 precision highp float;
 in vec3 vNormal;
+in float vLogZ;
 uniform vec3 uColor;
 uniform vec3 uLightDir;
 uniform float uAmbient;
+uniform float uLogDepthCoef;
 out vec4 fragColor;
 void main() {
 	float diff = max(dot(normalize(vNormal), uLightDir), 0.0);
 	vec3 lit = uColor * (uAmbient + (1.0 - uAmbient) * diff);
 	fragColor = vec4(lit, 1.0);
+	gl_FragDepth = uLogDepthCoef > 0.0 ? log2(max(vLogZ, 1e-6)) * uLogDepthCoef : gl_FragCoord.z;
 }`;
 
 const LINE_VS = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;
 uniform mat4 uMVP;
+out float vLogZ;
 void main() {
 	gl_Position = uMVP * vec4(aPos, 1.0);
+	vLogZ = 1.0 + gl_Position.w;
 }`;
 
 const LINE_FS = `#version 300 es
 precision highp float;
+in float vLogZ;
 uniform vec3 uColor;
+uniform float uLogDepthCoef;
 out vec4 fragColor;
 void main() {
 	fragColor = vec4(uColor, 1.0);
+	gl_FragDepth = uLogDepthCoef > 0.0 ? log2(max(vLogZ, 1e-6)) * uLogDepthCoef : gl_FragCoord.z;
 }`;
 
 // ─── GL helpers ──────────────────────────────────────────────────────
@@ -289,7 +327,7 @@ function extrudePolygon(
 	}
 }
 
-function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: number[]): WebGLVertexArrayObject {
+function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: number[]): { vao: WebGLVertexArrayObject; buffers: WebGLBuffer[] } {
 	const vao = gl.createVertexArray()!;
 	gl.bindVertexArray(vao);
 
@@ -306,10 +344,10 @@ function createMesh(gl: WebGL2RenderingContext, positions: number[], normals: nu
 	gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
 
 	gl.bindVertexArray(null);
-	return vao;
+	return { vao, buffers: [posBuf, normBuf] };
 }
 
-function createLineMesh(gl: WebGL2RenderingContext, positions: number[]): WebGLVertexArrayObject {
+function createLineMesh(gl: WebGL2RenderingContext, positions: number[]): { vao: WebGLVertexArrayObject; buffers: WebGLBuffer[] } {
 	const vao = gl.createVertexArray()!;
 	gl.bindVertexArray(vao);
 
@@ -320,7 +358,7 @@ function createLineMesh(gl: WebGL2RenderingContext, positions: number[]): WebGLV
 	gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 
 	gl.bindVertexArray(null);
-	return vao;
+	return { vao, buffers: [buf] };
 }
 
 // ─── Matrix math (minimal) ──────────────────────────────────────────
@@ -420,11 +458,13 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uLightDir = gl.getUniformLocation(program, 'uLightDir')!;
 	const uAmbient = gl.getUniformLocation(program, 'uAmbient')!;
 	const uZFlip = gl.getUniformLocation(program, 'uZFlip')!;
+	const uLogDepthCoef = gl.getUniformLocation(program, 'uLogDepthCoef')!;
 
 	// Line shader program
 	const lineProgram = linkProgramFromSource(gl, LINE_VS, LINE_FS);
 	const uLineMVP = gl.getUniformLocation(lineProgram, 'uMVP')!;
 	const uLineColor = gl.getUniformLocation(lineProgram, 'uColor')!;
+	const uLineLogDepthCoef = gl.getUniformLocation(lineProgram, 'uLogDepthCoef')!;
 
 	const bg = hexToRgb(canvasTheme.bg);
 	gl.clearColor(bg[0], bg[1], bg[2], 1);
@@ -439,6 +479,7 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uInstTopFace = gl.getUniformLocation(instProgram, 'uTopFace')!;
 	const uInstZFlip = gl.getUniformLocation(instProgram, 'uZFlip')!;
 	const uInstLayerZOffset = gl.getUniformLocation(instProgram, 'uLayerZOffset')!;
+	const uInstLogDepthCoef = gl.getUniformLocation(instProgram, 'uLogDepthCoef')!;
 
 	// Instanced side wall shader
 	const instSideProgram = linkProgramFromSource(gl, INST_SIDE_VS, INST_FS);
@@ -448,13 +489,14 @@ export function initGL(canvas: HTMLCanvasElement): GLState | null {
 	const uInstSideAmbient = gl.getUniformLocation(instSideProgram, 'uAmbient')!;
 	const uInstSideZFlip = gl.getUniformLocation(instSideProgram, 'uZFlip')!;
 	const uInstSideLayerZOffset = gl.getUniformLocation(instSideProgram, 'uLayerZOffset')!;
+	const uInstSideLogDepthCoef = gl.getUniformLocation(instSideProgram, 'uLogDepthCoef')!;
 
 	return {
-		gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient, uZFlip,
-		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace, uInstZFlip, uInstLayerZOffset,
-		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient, uInstSideZFlip, uInstSideLayerZOffset,
-		lineProgram, uLineMVP, uLineColor,
-		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null,
+		gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient, uZFlip, uLogDepthCoef,
+		instProgram, uInstMVP, uInstColor, uInstLightDir, uInstAmbient, uInstTopFace, uInstZFlip, uInstLayerZOffset, uInstLogDepthCoef,
+		instSideProgram, uInstSideMVP, uInstSideColor, uInstSideLightDir, uInstSideAmbient, uInstSideZFlip, uInstSideLayerZOffset, uInstSideLogDepthCoef,
+		lineProgram, uLineMVP, uLineColor, uLineLogDepthCoef,
+		meshes: [], instancedMeshes: [], axisMeshes: [], gridMesh: null, sceneZExtent: 1,
 	};
 }
 
@@ -487,9 +529,7 @@ async function buildMeshesAsync(
 	const { gl } = state;
 
 	// Clean up old meshes
-	for (const m of state.meshes) {
-		gl.deleteVertexArray(m.vao);
-	}
+	for (const m of state.meshes) deleteMesh(gl, m);
 	state.meshes = [];
 
 	// Map geometry LayerName → stack layer z/thickness
@@ -524,6 +564,8 @@ async function buildMeshesAsync(
 		maxZ = Math.max(maxZ, sl.z + sl.thickness);
 	}
 	const cz = isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
+	const zExtent = isFinite(minZ) ? maxZ - minZ : 0;
+	state.sceneZExtent = zExtent;
 
 	// Build grid first so something renders immediately
 	const gridZ = isFinite(minZ) ? minZ - cz : 0;
@@ -559,8 +601,8 @@ async function buildMeshesAsync(
 			if (now - lastYield > 30 && pi < polys.length - 1) {
 				if (gen !== buildGeneration) return;
 				if (allPos.length > 0) {
-					const vao = createMesh(gl, allPos, allNorm);
-					state.meshes.push({ vao, count: allPos.length / 3, color });
+					const m = createMesh(gl, allPos, allNorm);
+					state.meshes.push({ ...m, count: allPos.length / 3, color });
 					allPos = [];
 					allNorm = [];
 				}
@@ -572,8 +614,8 @@ async function buildMeshesAsync(
 
 		if (allPos.length > 0) {
 			if (gen !== buildGeneration) return;
-			const vao = createMesh(gl, allPos, allNorm);
-			state.meshes.push({ vao, count: allPos.length / 3, color });
+			const m = createMesh(gl, allPos, allNorm);
+			state.meshes.push({ ...m, count: allPos.length / 3, color });
 		}
 	}
 }
@@ -582,8 +624,8 @@ function buildGrid(state: GLState, xyExtent: number, z: number): void {
 	const { gl } = state;
 
 	// Clean up old
-	for (const m of state.axisMeshes) gl.deleteVertexArray(m.vao);
-	if (state.gridMesh) gl.deleteVertexArray(state.gridMesh.vao);
+	for (const m of state.axisMeshes) deleteMesh(gl, m);
+	if (state.gridMesh) deleteMesh(gl, state.gridMesh);
 	state.axisMeshes = [];
 	state.gridMesh = null;
 
@@ -597,8 +639,8 @@ function buildGrid(state: GLState, xyExtent: number, z: number): void {
 		gridLines.push(-gridHalf, v, z, gridHalf, v, z);
 	}
 	if (gridLines.length > 0) {
-		const vao = createLineMesh(gl, gridLines);
-		state.gridMesh = { vao, count: gridLines.length / 3, color: [0.25, 0.25, 0.25] };
+		const m = createLineMesh(gl, gridLines);
+		state.gridMesh = { ...m, count: gridLines.length / 3, color: [0.25, 0.25, 0.25] };
 	}
 }
 
@@ -648,9 +690,9 @@ export function buildInstancedMeshes(
 	const { gl } = state;
 
 	// Clean up old instanced meshes
-	for (const m of state.instancedMeshes) gl.deleteVertexArray(m.vao);
+	for (const m of state.instancedMeshes) deleteInstancedMesh(gl, m);
 	state.instancedMeshes = [];
-	for (const m of state.meshes) gl.deleteVertexArray(m.vao);
+	for (const m of state.meshes) deleteMesh(gl, m);
 	state.meshes = [];
 
 	// Use provided GDS layer info directly
@@ -704,6 +746,8 @@ export function buildInstancedMeshes(
 		}
 	}
 	const cz = isFinite(minZ) ? (minZ + maxZ) / 2 : 0;
+	const zExtent = isFinite(minZ) ? maxZ - minZ : 0;
+	state.sceneZExtent = zExtent;
 
 	// Build grid
 	const gridZ = isFinite(minZ) ? minZ - cz : 0;
@@ -794,6 +838,7 @@ export function buildInstancedMeshes(
 			// Build side wall VAO from edge data
 			const edgeBuf = sceneData.cellEdges?.[cellName]?.[gdsLayer];
 			let sideVao: WebGLVertexArrayObject | undefined;
+			let sideBufGL: WebGLBuffer | undefined;
 			let sideVertCount = 0;
 
 			if (edgeBuf && edgeBuf.length >= 4) {
@@ -827,7 +872,7 @@ export function buildInstancedMeshes(
 					sideVao = gl.createVertexArray()!;
 					gl.bindVertexArray(sideVao);
 
-					const sideBufGL = gl.createBuffer()!;
+					sideBufGL = gl.createBuffer()!;
 					gl.bindBuffer(gl.ARRAY_BUFFER, sideBufGL);
 					gl.bufferData(gl.ARRAY_BUFFER, trimmed, gl.STATIC_DRAW);
 					// aPos (location 0): vec2 at offset 0, stride 20
@@ -856,10 +901,12 @@ export function buildInstancedMeshes(
 
 			state.instancedMeshes.push({
 				vao,
+				buffers: [vertBufGL, instBufGL],
 				vertCount: vertBuf.length / 2,
 				instanceCount,
 				color,
 				sideVao,
+				sideBuffers: sideBufGL ? [sideBufGL] : undefined,
 				sideVertCount,
 				gdsLayer,
 				bbox,
@@ -868,6 +915,52 @@ export function buildInstancedMeshes(
 	}
 
 	onDone?.();
+}
+
+/**
+ * Test if a world-space 2D bbox should be drawn.
+ *
+ * In ortho mode (2D top-down), the Z coordinate has no effect on the XY
+ * projection, so projecting the 4 bbox corners at z=0 is exact.  We can
+ * safely do both frustum culling and sub-pixel culling.
+ *
+ * In perspective mode (3D), a 2D bbox projected at a single Z value is
+ * unreliable for frustum tests — extruded geometry at other Z heights
+ * projects to different screen positions.  We only do sub-pixel culling
+ * there: if the *entire* bbox projects smaller than minPixels, the
+ * geometry is invisible regardless of Z extent.
+ */
+function isBboxVisible(
+	bbox: [number, number, number, number],
+	vp: Mat4,
+	screenW: number,
+	screenH: number,
+	minPixels: number,
+	isOrtho: boolean,
+): boolean {
+	const [bx0, by0, bx1, by1] = bbox;
+	let ndcMinX = Infinity, ndcMaxX = -Infinity;
+	let ndcMinY = Infinity, ndcMaxY = -Infinity;
+	for (let ci = 0; ci < 4; ci++) {
+		const wx = ci & 1 ? bx1 : bx0;
+		const wy = ci & 2 ? by1 : by0;
+		// clip = vp * [wx, wy, 0, 1]  (column-major)
+		const cw = vp[3] * wx + vp[7] * wy + vp[15];
+		if (cw <= 0) return true; // behind camera — be conservative, don't cull
+		const cx = (vp[0] * wx + vp[4] * wy + vp[12]) / cw;
+		const cy = (vp[1] * wx + vp[5] * wy + vp[13]) / cw;
+		if (cx < ndcMinX) ndcMinX = cx;
+		if (cx > ndcMaxX) ndcMaxX = cx;
+		if (cy < ndcMinY) ndcMinY = cy;
+		if (cy > ndcMaxY) ndcMaxY = cy;
+	}
+	// Frustum cull (ortho only — exact in 2D top-down)
+	if (isOrtho && (ndcMaxX < -1 || ndcMinX > 1 || ndcMaxY < -1 || ndcMinY > 1)) return false;
+	// Sub-pixel cull: projected size in pixels too small to see
+	const pw = (ndcMaxX - ndcMinX) * 0.5 * screenW;
+	const ph = (ndcMaxY - ndcMinY) * 0.5 * screenH;
+	if (pw < minPixels && ph < minPixels) return false;
+	return true;
 }
 
 /** Render one frame */
@@ -897,24 +990,30 @@ export function render3D(
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	const aspect = width / height || 1;
-	const near = Math.max(0.01, camera.distance * 0.01);
-	const far = camera.distance * 10;
+
+	// Ortho uses standard depth → needs tight near/far for precision
+	// Perspective uses log depth → can have huge range
+	const orthoNear = -(state.sceneZExtent * 4 + 1);
+	const orthoFar = camera.distance * 2 + state.sceneZExtent * 4 + 1;
+	const perspNear = Math.max(0.001, camera.distance * 0.01);
+	const perspFar = camera.distance * 1e6;
+	const logDepthCoef = orthoBlend > 0.999 ? 0.0 : 1.0 / Math.log2(perspFar + 1.0);
 
 	let proj: Mat4;
 	if (orthoBlend >= 0.999) {
 		// Pure orthographic
-		const halfH = camera.distance * Math.tan(Math.PI / 12); // match perspective FOV extent
-		const halfW = halfH * aspect;
-		proj = mat4Ortho(-halfW, halfW, -halfH, halfH, near, far);
-	} else if (orthoBlend <= 0.001) {
-		// Pure perspective
-		proj = mat4Perspective(Math.PI / 6, aspect, near, far);
-	} else {
-		// Blend: interpolate between perspective and ortho
-		const perspProj = mat4Perspective(Math.PI / 6, aspect, near, far);
 		const halfH = camera.distance * Math.tan(Math.PI / 12);
 		const halfW = halfH * aspect;
-		const orthoProj = mat4Ortho(-halfW, halfW, -halfH, halfH, near, far);
+		proj = mat4Ortho(-halfW, halfW, -halfH, halfH, orthoNear, orthoFar);
+	} else if (orthoBlend <= 0.001) {
+		// Pure perspective
+		proj = mat4Perspective(Math.PI / 6, aspect, perspNear, perspFar);
+	} else {
+		// Blend: interpolate between perspective and ortho
+		const perspProj = mat4Perspective(Math.PI / 6, aspect, perspNear, perspFar);
+		const halfH = camera.distance * Math.tan(Math.PI / 12);
+		const halfW = halfH * aspect;
+		const orthoProj = mat4Ortho(-halfW, halfW, -halfH, halfH, orthoNear, orthoFar);
 		proj = new Float32Array(16) as Mat4;
 		for (let i = 0; i < 16; i++) proj[i] = perspProj[i] * (1 - orthoBlend) + orthoProj[i] * orthoBlend;
 	}
@@ -934,6 +1033,7 @@ export function render3D(
 	if (!transparent) {
 		gl.useProgram(state.lineProgram);
 		gl.uniformMatrix4fv(state.uLineMVP, false, vp);
+		gl.uniform1f(state.uLineLogDepthCoef, logDepthCoef);
 
 		if (state.gridMesh) {
 			gl.uniform3f(state.uLineColor, state.gridMesh.color[0], state.gridMesh.color[1], state.gridMesh.color[2]);
@@ -953,6 +1053,7 @@ export function render3D(
 		// Flat shading in ortho (2D) mode, lit shading in perspective (3D)
 		gl.uniform1f(uAmbient, 0.8 + 0.2 * orthoBlend);
 		gl.uniform1f(state.uZFlip, zFlip);
+		gl.uniform1f(state.uLogDepthCoef, logDepthCoef);
 		for (const mesh of state.meshes) {
 			gl.uniform3f(uColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
@@ -967,41 +1068,50 @@ export function render3D(
 		gl.uniform3f(state.uInstLightDir, lightDir[0], lightDir[1], lightDir[2]);
 		gl.uniform1f(state.uInstAmbient, 0.8 + 0.2 * orthoBlend);
 		gl.uniform1f(state.uInstZFlip, zFlip);
+		gl.uniform1f(state.uInstLogDepthCoef, logDepthCoef);
 
-		// Filter meshes by visibility
-		const visibleMeshes = state.instancedMeshes.filter(mesh => {
-			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) return false;
-			return true;
-		});
+		// Visibility test — avoid .filter() allocation every frame
+		const isOrtho = orthoBlend > 0.5;
+		const draw3D = orthoBlend < 0.9;
+		let hasSideWalls = false;
 
-		// Draw top faces
+		// Draw top faces (and bottom faces in 3D, sharing VAO bind + uniforms)
 		gl.uniform1f(state.uInstTopFace, 1.0);
-		for (const mesh of visibleMeshes) {
-			gl.uniform1f(state.uInstLayerZOffset, layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0);
+		for (let mi = 0; mi < state.instancedMeshes.length; mi++) {
+			const mesh = state.instancedMeshes[mi];
+			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
+			if (mesh.bbox && !isBboxVisible(mesh.bbox, vp, width, height, 2, isOrtho)) continue;
+
+			const zOff = layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0;
+			gl.uniform1f(state.uInstLayerZOffset, zOff);
 			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
+
+			// Top face
+			gl.uniform1f(state.uInstTopFace, 1.0);
 			gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
+
+			// Bottom face (3D only) — reuse bound VAO + color + zOffset
+			if (draw3D) {
+				gl.uniform1f(state.uInstTopFace, 0.0);
+				gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
+				if (mesh.sideVao) hasSideWalls = true;
+			}
 		}
 
-		// Skip bottom faces and side walls in 2D (ortho) mode — they're invisible from top-down
-		if (orthoBlend < 0.9) {
-			// Draw bottom faces
-			gl.uniform1f(state.uInstTopFace, 0.0);
-			for (const mesh of visibleMeshes) {
-				gl.uniform1f(state.uInstLayerZOffset, layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0);
-				gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
-				gl.bindVertexArray(mesh.vao);
-				gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.vertCount, mesh.instanceCount);
-			}
-
-			// Draw side walls
+		// Draw side walls (3D only) — separate program
+		if (draw3D && hasSideWalls) {
 			gl.useProgram(state.instSideProgram);
 			gl.uniformMatrix4fv(state.uInstSideMVP, false, vp);
 			gl.uniform3f(state.uInstSideLightDir, lightDir[0], lightDir[1], lightDir[2]);
 			gl.uniform1f(state.uInstSideAmbient, 0.8 + 0.2 * orthoBlend);
 			gl.uniform1f(state.uInstSideZFlip, zFlip);
-			for (const mesh of visibleMeshes) {
+			gl.uniform1f(state.uInstSideLogDepthCoef, logDepthCoef);
+			for (let mi = 0; mi < state.instancedMeshes.length; mi++) {
+				const mesh = state.instancedMeshes[mi];
 				if (!mesh.sideVao || !mesh.sideVertCount) continue;
+				if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
+				if (mesh.bbox && !isBboxVisible(mesh.bbox, vp, width, height, 2, isOrtho)) continue;
 				gl.uniform1f(state.uInstSideLayerZOffset, layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0);
 				gl.uniform3f(state.uInstSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 				gl.bindVertexArray(mesh.sideVao);
@@ -1067,11 +1177,12 @@ export function fitCamera(layers: LayerMap, stack: ProcessStack, instancedScene?
 /** Clean up GL resources */
 export function disposeGL(state: GLState): void {
 	const { gl } = state;
-	for (const m of state.meshes) {
-		gl.deleteVertexArray(m.vao);
-	}
-	for (const m of state.axisMeshes) gl.deleteVertexArray(m.vao);
-	if (state.gridMesh) gl.deleteVertexArray(state.gridMesh.vao);
+	for (const m of state.meshes) deleteMesh(gl, m);
+	for (const m of state.instancedMeshes) deleteInstancedMesh(gl, m);
+	for (const m of state.axisMeshes) deleteMesh(gl, m);
+	if (state.gridMesh) deleteMesh(gl, state.gridMesh);
 	gl.deleteProgram(state.program);
 	gl.deleteProgram(state.lineProgram);
+	gl.deleteProgram(state.instProgram);
+	gl.deleteProgram(state.instSideProgram);
 }
