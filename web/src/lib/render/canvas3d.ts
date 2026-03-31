@@ -886,6 +886,43 @@ export function buildInstancedMeshes(
 	onDone?.();
 }
 
+/**
+ * Test if a world-space 2D bbox is visible on screen and large enough to draw.
+ * Projects the 4 XY corners (at z=0) through the view-projection matrix.
+ * Returns false if entirely off-screen or smaller than minPixels in both axes.
+ */
+function isBboxVisible(
+	bbox: [number, number, number, number],
+	vp: Mat4,
+	screenW: number,
+	screenH: number,
+	minPixels: number,
+): boolean {
+	const [bx0, by0, bx1, by1] = bbox;
+	let ndcMinX = Infinity, ndcMaxX = -Infinity;
+	let ndcMinY = Infinity, ndcMaxY = -Infinity;
+	for (let ci = 0; ci < 4; ci++) {
+		const wx = ci & 1 ? bx1 : bx0;
+		const wy = ci & 2 ? by1 : by0;
+		// clip = vp * [wx, wy, 0, 1]  (column-major)
+		const cw = vp[3] * wx + vp[7] * wy + vp[15];
+		if (cw <= 0) return true; // behind camera — be conservative, don't cull
+		const cx = (vp[0] * wx + vp[4] * wy + vp[12]) / cw;
+		const cy = (vp[1] * wx + vp[5] * wy + vp[13]) / cw;
+		if (cx < ndcMinX) ndcMinX = cx;
+		if (cx > ndcMaxX) ndcMaxX = cx;
+		if (cy < ndcMinY) ndcMinY = cy;
+		if (cy > ndcMaxY) ndcMaxY = cy;
+	}
+	// Frustum cull: entirely outside NDC [-1, 1]
+	if (ndcMaxX < -1 || ndcMinX > 1 || ndcMaxY < -1 || ndcMinY > 1) return false;
+	// Sub-pixel cull: projected size in pixels too small to see
+	const pw = (ndcMaxX - ndcMinX) * 0.5 * screenW;
+	const ph = (ndcMaxY - ndcMinY) * 0.5 * screenH;
+	if (pw < minPixels && ph < minPixels) return false;
+	return true;
+}
+
 /** Render one frame */
 export function render3D(
 	state: GLState,
@@ -984,9 +1021,10 @@ export function render3D(
 		gl.uniform1f(state.uInstAmbient, 0.8 + 0.2 * orthoBlend);
 		gl.uniform1f(state.uInstZFlip, zFlip);
 
-		// Filter meshes by visibility
+		// Filter meshes by layer visibility, frustum culling, and sub-pixel culling
 		const visibleMeshes = state.instancedMeshes.filter(mesh => {
 			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) return false;
+			if (mesh.bbox && !isBboxVisible(mesh.bbox, vp, width, height, 2)) return false;
 			return true;
 		});
 
