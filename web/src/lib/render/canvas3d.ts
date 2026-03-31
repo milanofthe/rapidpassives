@@ -990,26 +990,31 @@ export function render3D(
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 	const aspect = width / height || 1;
-	const near = Math.max(0.001, camera.distance * 0.01);
-	const far = camera.distance * 1e6;
-	// Log depth only in perspective mode — ortho has constant w, so fall back to standard depth
-	const logDepthCoef = orthoBlend > 0.999 ? 0.0 : 1.0 / Math.log2(far + 1.0);
+
+	// Ortho uses standard depth → needs tight near/far for precision
+	// Perspective uses log depth → can have huge range
+	const zPad = state.sceneZExtent * 2 + 1;
+	const orthoNear = Math.max(0.001, camera.distance - zPad);
+	const orthoFar = camera.distance + zPad;
+	const perspNear = Math.max(0.001, camera.distance * 0.01);
+	const perspFar = camera.distance * 1e6;
+	const logDepthCoef = orthoBlend > 0.999 ? 0.0 : 1.0 / Math.log2(perspFar + 1.0);
 
 	let proj: Mat4;
 	if (orthoBlend >= 0.999) {
 		// Pure orthographic
-		const halfH = camera.distance * Math.tan(Math.PI / 12); // match perspective FOV extent
-		const halfW = halfH * aspect;
-		proj = mat4Ortho(-halfW, halfW, -halfH, halfH, near, far);
-	} else if (orthoBlend <= 0.001) {
-		// Pure perspective
-		proj = mat4Perspective(Math.PI / 6, aspect, near, far);
-	} else {
-		// Blend: interpolate between perspective and ortho
-		const perspProj = mat4Perspective(Math.PI / 6, aspect, near, far);
 		const halfH = camera.distance * Math.tan(Math.PI / 12);
 		const halfW = halfH * aspect;
-		const orthoProj = mat4Ortho(-halfW, halfW, -halfH, halfH, near, far);
+		proj = mat4Ortho(-halfW, halfW, -halfH, halfH, orthoNear, orthoFar);
+	} else if (orthoBlend <= 0.001) {
+		// Pure perspective
+		proj = mat4Perspective(Math.PI / 6, aspect, perspNear, perspFar);
+	} else {
+		// Blend: interpolate between perspective and ortho
+		const perspProj = mat4Perspective(Math.PI / 6, aspect, perspNear, perspFar);
+		const halfH = camera.distance * Math.tan(Math.PI / 12);
+		const halfW = halfH * aspect;
+		const orthoProj = mat4Ortho(-halfW, halfW, -halfH, halfH, orthoNear, orthoFar);
 		proj = new Float32Array(16) as Mat4;
 		for (let i = 0; i < 16; i++) proj[i] = perspProj[i] * (1 - orthoBlend) + orthoProj[i] * orthoBlend;
 	}
