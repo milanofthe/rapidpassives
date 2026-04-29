@@ -8,7 +8,7 @@
 	import ResultsPanel from './ResultsPanel.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, instancedScene, gdsLayerInfo, visibleGdsLayers, onFileDrop, dropLoading = false, dropPhase = '', dropPolyCount = 0 }: {
+	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, instancedScene, gdsLayerInfo, visibleGdsLayers, onFileDrop, dropLoading = false, dropPhase = '', dropPolyCount = 0, dropEmpty = false, dropAccept = '.gds,.gdsii,.gds2' }: {
 		layers: LayerMap;
 		sidebar: Snippet;
 		stackPanel?: Snippet;
@@ -24,7 +24,18 @@
 		dropLoading?: boolean;
 		dropPhase?: string;
 		dropPolyCount?: number;
+		dropEmpty?: boolean;
+		dropAccept?: string;
 	} = $props();
+
+	let fileInput = $state<HTMLInputElement | null>(null);
+
+	function onFileInputChange(e: Event) {
+		const target = e.target as HTMLInputElement;
+		const file = target.files?.[0];
+		if (file && onFileDrop) onFileDrop(file);
+		target.value = '';
+	}
 
 	let viewerDragOver = $state(false);
 	let dragCounter = 0;
@@ -176,22 +187,34 @@
 			ondragover={onViewerDragOver}
 			ondragleave={onViewerDragLeave}
 		>
-			{#if (viewerDragOver || dropLoading) && onFileDrop}
-				<div class="viewer-drop-overlay">
+			{#if (viewerDragOver || dropLoading || dropEmpty) && onFileDrop}
+				<div class="viewer-drop-overlay" class:empty={dropEmpty && !viewerDragOver && !dropLoading}>
 					{#if dropLoading}
 						<p class="drop-phase">{dropPhase}</p>
 						<p class="drop-text">{dropPolyCount > 0 ? `${dropPolyCount.toLocaleString()} polygons` : ''}</p>
 					{:else}
-						<div class="drop-prompt">
-							<svg width="32" height="32" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+						<div class="drop-prompt" class:active={viewerDragOver}>
+							<svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
 								<rect x="8" y="6" width="32" height="36" rx="2" />
 								<path d="M18 24L24 30L30 24" />
 								<path d="M24 16V30" />
 							</svg>
-							<p>Drop GDS file</p>
+							<p class="drop-title">Drop a GDS-II file here</p>
+							<p class="drop-or">or</p>
+							<button type="button" class="drop-browse-btn" onclick={() => fileInput?.click()}>
+								Browse files
+							</button>
+							<p class="drop-hint">.gds / .gdsii / .gds2</p>
 						</div>
 					{/if}
 				</div>
+				<input
+					bind:this={fileInput}
+					type="file"
+					accept={dropAccept}
+					style="display: none;"
+					onchange={onFileInputChange}
+				/>
 			{/if}
 			{#if stack}
 				<LayoutViewer3D bind:this={viewer} {layers} {stack}
@@ -360,20 +383,49 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 12px;
-		color: var(--text-dim);
+		gap: 14px;
+		color: var(--text-muted);
 		border: 2px dashed var(--border);
-		padding: 30px 50px;
+		padding: 40px 60px;
 		transition: border-color var(--transition), color var(--transition);
 	}
-	.viewer-drop-overlay:not(:has(.drop-phase)) .drop-prompt {
+	.drop-prompt.active {
 		border-color: var(--accent);
 		color: var(--accent);
 	}
-	.drop-prompt p {
-		font-size: var(--fs-sm);
+	.drop-title {
+		font-size: var(--fs-md);
 		font-family: var(--font-mono);
 		font-weight: 600;
+		color: var(--text-muted);
+	}
+	.drop-or {
+		font-size: var(--fs-xs);
+		font-family: var(--font-mono);
+		color: var(--text-dim);
+		text-transform: uppercase;
+		letter-spacing: 1px;
+	}
+	.drop-browse-btn {
+		background: var(--accent);
+		color: var(--bg);
+		border: none;
+		padding: 8px 18px;
+		font-family: var(--font-body);
+		font-size: var(--fs-sm);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		cursor: pointer;
+		transition: background var(--transition);
+	}
+	.drop-browse-btn:hover {
+		background: var(--accent-hover);
+	}
+	.drop-hint {
+		font-size: var(--fs-xs);
+		font-family: var(--font-mono);
+		color: var(--text-dim);
 	}
 	.drop-phase {
 		font-size: var(--fs-sm);

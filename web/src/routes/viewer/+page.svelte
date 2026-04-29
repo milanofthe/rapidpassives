@@ -380,7 +380,8 @@
 </svelte:head>
 
 <GeometryEditor {layers} {renderOpts} {stack} {instancedScene} {gdsLayerInfo} {visibleGdsLayers}
-	onFileDrop={handleFile} dropLoading={loading} dropPhase={loadPhase} dropPolyCount={loadPolyCount}>
+	onFileDrop={handleFile} dropLoading={loading} dropPhase={loadPhase} dropPolyCount={loadPolyCount}
+	dropEmpty={!loaded && !loading}>
 	{#snippet sidebar()}
 		<div class="panel">
 			{#if loaded}
@@ -450,8 +451,12 @@
 							</span>
 							<button class="layer-toggle" onclick={() => toggleLayer(i)}>
 								<span class="layer-swatch" style="background: {info.color};"></span>
-								<span class="layer-num">L{info.gdsNum}</span>
-								<span class="layer-count">{info.polyCount.toLocaleString()}</span>
+								{#if layerMapNames.get(info.gdsNum)}
+									<span class="layer-name">{layerMapNames.get(info.gdsNum)}</span>
+									<span class="layer-num-sub">L{info.gdsNum}</span>
+								{:else}
+									<span class="layer-name">L{info.gdsNum}</span>
+								{/if}
 								<span class="layer-vis">{info.visible ? 'ON' : 'OFF'}</span>
 							</button>
 							<div class="layer-thickness">
@@ -575,16 +580,16 @@
 		color: var(--accent);
 	}
 	.preset-desc {
-		font-size: 9px;
+		font-size: var(--fs-xs);
 		color: var(--text-dim);
 	}
 	.layermap-drop {
 		padding: 8px;
 		border: 1px dashed var(--border);
 		text-align: center;
-		font-size: 9px;
+		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
-		color: var(--text-dim);
+		color: var(--text-muted);
 		cursor: default;
 		transition: border-color 0.15s, color 0.15s;
 	}
@@ -593,9 +598,9 @@
 		color: var(--text-muted);
 	}
 	.hint {
-		font-size: 9px;
+		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
-		color: var(--text-dim);
+		color: var(--text-muted);
 		line-height: 1.4;
 	}
 	.layer-list {
@@ -662,16 +667,21 @@
 		height: 12px;
 		flex-shrink: 0;
 	}
-	.layer-num {
+	.layer-name {
 		font-weight: 600;
-		min-width: 32px;
-	}
-	.layer-count {
 		flex: 1;
-		color: var(--text-dim);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.layer-num-sub {
+		font-size: var(--fs-xs);
+		font-weight: 400;
+		color: var(--text-muted);
+		flex-shrink: 0;
 	}
 	.layer-vis {
-		font-size: 9px;
+		font-size: var(--fs-xs);
 		font-weight: 700;
 		letter-spacing: 0.5px;
 		min-width: 20px;
@@ -685,9 +695,9 @@
 		flex-shrink: 0;
 	}
 	.layer-thickness input {
-		width: 42px;
+		width: 50px;
 		padding: 2px 4px;
-		font-size: 9px;
+		font-size: var(--fs-xs);
 		font-family: var(--font-mono);
 		background: var(--input-bg);
 		border: 1px solid var(--input-border);
@@ -699,8 +709,8 @@
 		outline: none;
 	}
 	.layer-thickness em {
-		font-size: 9px;
+		font-size: var(--fs-xs);
 		font-style: normal;
-		color: var(--text-dim);
+		color: var(--text-muted);
 	}
 </style>
