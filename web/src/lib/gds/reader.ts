@@ -2,6 +2,20 @@ import { RecordType, type GDSRecord } from 'gdsii';
 import type { Polygon } from '$lib/geometry/types';
 import { triangulatePolygons } from './triangulate';
 
+/**
+ * Composite layer key: (layer << 16) | datatype.
+ * GDSII layer and datatype are both uint16, so this fits in a 32-bit number.
+ * Used as the single key throughout the renderer pipeline so that layers
+ * sharing a layer number but differing in datatype (e.g. SKY130 met1=68:20
+ * vs via=68:44) stay distinct.
+ */
+export type LayerKey = number;
+export function makeLayerKey(layer: number, datatype: number): LayerKey {
+	return ((layer & 0xffff) << 16) | (datatype & 0xffff);
+}
+export function keyLayer(key: LayerKey): number { return (key >>> 16) & 0xffff; }
+export function keyDatatype(key: LayerKey): number { return key & 0xffff; }
+
 /** Decode a GDSII 8-byte real (excess-64 exponent, base-16) */
 function parseReal8(dv: DataView, offset: number): number {
 	if (dv.getUint32(offset) === 0) return 0;
@@ -138,7 +152,7 @@ function parseString(dv: DataView, offset: number, len: number): string {
 	return textDecoder.decode(new Uint8Array(dv.buffer, dv.byteOffset + offset, len));
 }
 
-/** Raw parsed GDS data: polygons grouped by GDS layer number */
+/** Raw parsed GDS data: polygons grouped by composite (layer:datatype) key */
 export interface GdsData {
 	cells: GdsCell[];
 	units: { userUnit: number; metersPerUnit: number };
@@ -146,7 +160,8 @@ export interface GdsData {
 
 export interface GdsCell {
 	name: string;
-	polygons: Map<number, Polygon[]>;
+	/** Keyed by composite LayerKey (see makeLayerKey) */
+	polygons: Map<LayerKey, Polygon[]>;
 	srefs: GdsSRef[];
 	arefs: GdsARef[];
 }
@@ -180,6 +195,7 @@ export function readGds(bytes: Uint8Array): GdsData {
 	// Element parsing state
 	let elementType: 'boundary' | 'path' | 'sref' | 'aref' | 'box' | null = null;
 	let layer = 0;
+	let datatype = 0;
 	let xy: [number, number][] = [];
 	let width = 0;
 	let pathtype = 0;
@@ -193,6 +209,7 @@ export function readGds(bytes: Uint8Array): GdsData {
 	function resetElement() {
 		elementType = null;
 		layer = 0;
+		datatype = 0;
 		xy = [];
 		width = 0;
 		pathtype = 0;
@@ -252,6 +269,10 @@ export function readGds(bytes: Uint8Array): GdsData {
 				layer = rec.data as number;
 				break;
 
+			case RecordType.DATATYPE:
+				datatype = rec.data as number;
+				break;
+
 			case RecordType.XY:
 				xy = rec.data as [number, number][];
 				break;
@@ -292,10 +313,10 @@ export function readGds(bytes: Uint8Array): GdsData {
 
 				if (elementType === 'boundary' || elementType === 'box') {
 					const poly = xyToPolygon(xy);
-					if (poly) addPolygon(currentCell.polygons, layer, poly);
+					if (poly) addPolygon(currentCell.polygons, makeLayerKey(layer, datatype), poly);
 				} else if (elementType === 'path') {
 					const polys = pathToPolygons(xy, width, pathtype);
-					for (const p of polys) addPolygon(currentCell.polygons, layer, p);
+					for (const p of polys) addPolygon(currentCell.polygons, makeLayerKey(layer, datatype), p);
 				} else if (elementType === 'sref') {
 					currentCell.srefs.push({
 						sname,
@@ -328,7 +349,7 @@ export type Affine2D = [number, number, number, number, number, number];
 /** Scene with instanced cell data — avoids flattening millions of polygons */
 export interface InstancedScene {
 	/** Cells that have their own polygons, keyed by cell name */
-	cells: Map<string, { polygons: Map<number, Polygon[]> }>;
+	cells: Map<string, { polygons: Map<LayerKey, Polygon[]> }>;
 	/** For each cell name, list of global transforms at which to draw it */
 	instances: Map<string, Affine2D[]>;
 	/** Units for scaling */
@@ -369,7 +390,7 @@ export function buildInstancedScene(data: GdsData): InstancedScene {
 	const topCells = data.cells.filter(c => !referenced.has(c.name));
 	const topCell = topCells.length > 0 ? topCells[topCells.length - 1] : data.cells[data.cells.length - 1];
 
-	const cells = new Map<string, { polygons: Map<number, Polygon[]> }>();
+	const cells = new Map<string, { polygons: Map<LayerKey, Polygon[]> }>();
 	const instances = new Map<string, Affine2D[]>();
 
 	// Register all cells that have polygons
@@ -453,11 +474,11 @@ export function sceneToInstancedData(scene: InstancedScene): {
 
 		const meshes: Record<number, Float32Array> = {};
 		const edges: Record<number, Float32Array> = {};
-		for (const [layerNum, polys] of cellData.polygons) {
+		for (const [layerKey, polys] of cellData.polygons) {
 			polygonCount += polys.length * instances.length;
 
 			const buf = triangulatePolygons(polys, scene.userUnit);
-			if (buf.length > 0) meshes[layerNum] = buf;
+			if (buf.length > 0) meshes[layerKey] = buf;
 
 			const edgeVerts: number[] = [];
 			for (const poly of polys) {
@@ -471,7 +492,7 @@ export function sceneToInstancedData(scene: InstancedScene): {
 					);
 				}
 			}
-			if (edgeVerts.length > 0) edges[layerNum] = new Float32Array(edgeVerts);
+			if (edgeVerts.length > 0) edges[layerKey] = new Float32Array(edgeVerts);
 		}
 
 		if (Object.keys(meshes).length > 0) {
@@ -601,9 +622,9 @@ function pathToPolygons(xy: [number, number][], width: number, pathtype: number)
 	return polys;
 }
 
-function addPolygon(map: Map<number, Polygon[]>, layer: number, poly: Polygon) {
-	let arr = map.get(layer);
-	if (!arr) { arr = []; map.set(layer, arr); }
+function addPolygon(map: Map<LayerKey, Polygon[]>, key: LayerKey, poly: Polygon) {
+	let arr = map.get(key);
+	if (!arr) { arr = []; map.set(key, arr); }
 	arr.push(poly);
 }
 

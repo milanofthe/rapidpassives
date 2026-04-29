@@ -36,10 +36,10 @@ self.onmessage = (e: MessageEvent) => {
 
 			const meshes: Record<number, Float32Array> = {};
 			const edges: Record<number, Float32Array> = {};
-			for (const [layerNum, polys] of cellData.polygons) {
+			for (const [layerKey, polys] of cellData.polygons) {
 				const buf = triangulatePolygons(polys, scene.userUnit);
 				if (buf.length > 0) {
-					meshes[layerNum] = buf;
+					meshes[layerKey] = buf;
 					transferables.push(buf.buffer);
 					totalTriVerts += buf.length / 2;
 				}
@@ -58,7 +58,7 @@ self.onmessage = (e: MessageEvent) => {
 				}
 				if (edgeVerts.length > 0) {
 					const ebuf = new Float32Array(edgeVerts);
-					edges[layerNum] = ebuf;
+					edges[layerKey] = ebuf;
 					transferables.push(ebuf.buffer);
 				}
 			}

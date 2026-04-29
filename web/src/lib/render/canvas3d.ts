@@ -54,8 +54,8 @@ interface InstancedMesh {
 	sideVao?: WebGLVertexArrayObject;
 	sideBuffers?: WebGLBuffer[];
 	sideVertCount?: number;
-	/** GDS layer number for visibility filtering */
-	gdsLayer?: number;
+	/** Composite GDS layer key (layer<<16|datatype) for visibility filtering */
+	layerKey?: number;
 	/** World-space bounding box of all instances [minX, minY, maxX, maxY] */
 	bbox?: [number, number, number, number];
 }
@@ -658,9 +658,10 @@ function niceStep(extent: number): number {
 // ─── Instanced mesh building ─────────────────────────────────────────
 
 export interface InstancedSceneData {
-	/** cellName → { gdsLayer → Float32Array of triangulated 2D verts [x,y,x,y,...] } */
+	/** cellName → { layerKey → Float32Array of triangulated 2D verts [x,y,x,y,...] }
+	 *  layerKey = (layer<<16)|datatype */
 	cellMeshes: Record<string, Record<number, Float32Array>>;
-	/** cellName → { gdsLayer → Float32Array of edge pairs [x1,y1,x2,y2,...] } */
+	/** cellName → { layerKey → Float32Array of edge pairs [x1,y1,x2,y2,...] } */
 	cellEdges: Record<string, Record<number, Float32Array>>;
 	/** cellName → Float32Array of affine transforms [a,b,c,d,tx,ty, ...] */
 	cellInstances: Record<string, Float32Array>;
@@ -684,7 +685,7 @@ export function buildInstancedMeshes(
 	stack: ProcessStack,
 	colorOverrides?: Record<string, string>,
 	onDone?: () => void,
-	/** Direct mapping: GDS layer number → z/thickness/color */
+	/** Direct mapping: composite layerKey → z/thickness/color */
 	gdsLayerInfo?: Map<number, GdsLayerInfo>,
 ): void {
 	const { gl } = state;
@@ -773,9 +774,9 @@ export function buildInstancedMeshes(
 		const cellHalfW = isFinite(cellMaxX) ? (cellMaxX - cellMinX) / 2 + 1 : 1;
 		const cellHalfH = isFinite(cellMaxY) ? (cellMaxY - cellMinY) / 2 + 1 : 1;
 
-		for (const [gdsLayerStr, vertBuf] of Object.entries(meshes)) {
-			const gdsLayer = Number(gdsLayerStr);
-			const zInfo = layerZMap.get(gdsLayer);
+		for (const [layerKeyStr, vertBuf] of Object.entries(meshes)) {
+			const layerKey = Number(layerKeyStr);
+			const zInfo = layerZMap.get(layerKey);
 			if (!zInfo) continue;
 			if (vertBuf.length === 0) continue;
 
@@ -836,7 +837,7 @@ export function buildInstancedMeshes(
 			gl.bindVertexArray(null);
 
 			// Build side wall VAO from edge data
-			const edgeBuf = sceneData.cellEdges?.[cellName]?.[gdsLayer];
+			const edgeBuf = sceneData.cellEdges?.[cellName]?.[layerKey];
 			let sideVao: WebGLVertexArrayObject | undefined;
 			let sideBufGL: WebGLBuffer | undefined;
 			let sideVertCount = 0;
@@ -908,7 +909,7 @@ export function buildInstancedMeshes(
 				sideVao,
 				sideBuffers: sideBufGL ? [sideBufGL] : undefined,
 				sideVertCount,
-				gdsLayer,
+				layerKey,
 				bbox,
 			});
 		}
@@ -973,11 +974,11 @@ export function render3D(
 	orthoBlend: number = 0,
 	/** If true, skip background clear and grid (for transparent PNG export) */
 	transparent: boolean = false,
-	/** Set of visible GDS layer numbers — if provided, skip instanced meshes not in this set */
+	/** Set of visible composite layer keys — if provided, skip instanced meshes not in this set */
 	visibleGdsLayers?: Set<number> | null,
 	/** Z-axis scale: 1.0 normal, -1.0 flipped */
 	zFlip: number = 1.0,
-	/** Per-GDS-layer Z offset for explode animation */
+	/** Per composite-layer-key Z offset for explode animation */
 	layerZOffsets?: Map<number, number> | null,
 ): void {
 	const { gl, program, uMVP, uNormalMat, uColor, uLightDir, uAmbient } = state;
@@ -1079,10 +1080,10 @@ export function render3D(
 		gl.uniform1f(state.uInstTopFace, 1.0);
 		for (let mi = 0; mi < state.instancedMeshes.length; mi++) {
 			const mesh = state.instancedMeshes[mi];
-			if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
+			if (visibleGdsLayers && mesh.layerKey != null && !visibleGdsLayers.has(mesh.layerKey)) continue;
 			if (mesh.bbox && !isBboxVisible(mesh.bbox, vp, width, height, 2, isOrtho)) continue;
 
-			const zOff = layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0;
+			const zOff = layerZOffsets?.get(mesh.layerKey ?? -1) ?? 0;
 			gl.uniform1f(state.uInstLayerZOffset, zOff);
 			gl.uniform3f(state.uInstColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 			gl.bindVertexArray(mesh.vao);
@@ -1110,9 +1111,9 @@ export function render3D(
 			for (let mi = 0; mi < state.instancedMeshes.length; mi++) {
 				const mesh = state.instancedMeshes[mi];
 				if (!mesh.sideVao || !mesh.sideVertCount) continue;
-				if (visibleGdsLayers && mesh.gdsLayer != null && !visibleGdsLayers.has(mesh.gdsLayer)) continue;
+				if (visibleGdsLayers && mesh.layerKey != null && !visibleGdsLayers.has(mesh.layerKey)) continue;
 				if (mesh.bbox && !isBboxVisible(mesh.bbox, vp, width, height, 2, isOrtho)) continue;
-				gl.uniform1f(state.uInstSideLayerZOffset, layerZOffsets?.get(mesh.gdsLayer ?? -1) ?? 0);
+				gl.uniform1f(state.uInstSideLayerZOffset, layerZOffsets?.get(mesh.layerKey ?? -1) ?? 0);
 				gl.uniform3f(state.uInstSideColor, mesh.color[0], mesh.color[1], mesh.color[2]);
 				gl.bindVertexArray(mesh.sideVao);
 				gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.sideVertCount, mesh.instanceCount);
