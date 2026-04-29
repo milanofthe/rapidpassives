@@ -15,8 +15,8 @@ export const palette = {
 	bgInset:      '#18181d',
 
 	text:         '#e2ddd5',
-	textMuted:    '#7d7a85',
-	textDim:      '#55535a',
+	textMuted:    '#9a96a0',
+	textDim:      '#8a8790',
 
 	accent:       '#d9513c',
 	accentHover:  '#e5634f',
@@ -77,7 +77,7 @@ export const plotColors = {
 	/** Axis lines */
 	axis: '#35353d',
 	/** Text color */
-	text: '#7d7a85',
+	text: '#9a96a0',
 } as const;
 
 // --- Fonts ---
@@ -91,10 +91,10 @@ export const fonts = {
 // 4 sizes only: xs (detail), sm (body), md (emphasis), lg (headings)
 
 export const typeScale = {
-	xs: '10px',
-	sm: '12px',
-	md: '14px',
-	lg: '20px',
+	xs: '11px',
+	sm: '13px',
+	md: '15px',
+	lg: '21px',
 } as const;
 
 // --- Helpers ---

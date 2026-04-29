@@ -11,8 +11,8 @@
 	--bg-panel: #2a2a31;
 	--bg-inset: #18181d;
 	--text: #e2ddd5;
-	--text-muted: #7d7a85;
-	--text-dim: #55535a;
+	--text-muted: #9a96a0;
+	--text-dim: #8a8790;
 	--accent: #d9513c;
 	--accent-hover: #e5634f;
 	--accent-secondary: #e8944a;
@@ -26,10 +26,10 @@
 	--canvas-bg: #131316;
 	--font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 	--font-mono: 'JetBrains Mono', monospace;
-	--fs-xs: 10px;
-	--fs-sm: 12px;
-	--fs-md: 14px;
-	--fs-lg: 20px;
+	--fs-xs: 11px;
+	--fs-sm: 13px;
+	--fs-md: 15px;
+	--fs-lg: 21px;
 	--space-xs: 2px;
 	--space-sm: 4px;
 	--space-md: 8px;
