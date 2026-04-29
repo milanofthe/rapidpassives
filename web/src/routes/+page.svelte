@@ -108,10 +108,10 @@
 		gap: 16px;
 		flex-wrap: wrap;
 		justify-content: center;
-		max-width: 900px;
+		max-width: 1080px;
 	}
 	.card {
-		width: 200px;
+		width: 240px;
 		background: var(--bg-surface);
 		border: 1px solid var(--border-subtle);
 		text-decoration: none;
