@@ -4,7 +4,7 @@
 	// LayerName no longer needed — GDS viewer uses direct GDS layer numbers
 	import type { ProcessStack, StackLayer } from '$lib/stack/types';
 	import type { RenderOptions } from '$lib/render/canvas2d';
-	import { readGdsInWorker } from '$lib/gds/reader';
+	import { readGdsInWorker, makeLayerKey, keyLayer, keyDatatype } from '$lib/gds/reader';
 	import { type InstancedSceneData } from '$lib/render/canvas3d';
 	import { PDKS, PDK_LIST } from '$lib/stack/pdk';
 	import { parseLyp, parseCsvLayerMap } from '$lib/stack/presets/lyp-parser';
@@ -79,10 +79,12 @@
 
 
 	interface GdsLayerInfo {
-		gdsNum: number;
+		/** Composite key (layer<<16)|datatype — canonical id throughout the renderer */
+		key: number;
+		gds: number;
+		datatype: number;
 		color: string;
 		visible: boolean;
-		polyCount: number;
 		thickness: number;
 	}
 
@@ -104,20 +106,20 @@
 	const layers: LayerMap = {};
 	const renderOpts: RenderOptions = {};
 
-	// Direct GDS layer info for the renderer — no LayerName indirection
+	// Direct GDS layer info for the renderer — keyed by composite layerKey
 	let gdsLayerInfo = $derived.by(() => {
 		const map = new Map<number, import('$lib/render/canvas3d').GdsLayerInfo>();
 		// z follows sidebar order: first in list = lowest z (bottom of stack)
 		let z = 0.5;
 		for (const info of gdsLayers) {
-			map.set(info.gdsNum, { z, thickness: info.thickness, color: info.color });
+			map.set(info.key, { z, thickness: info.thickness, color: info.color });
 			z += info.thickness;
 		}
 		return map;
 	});
 
-	// Set of visible GDS layer numbers for render-time filtering (no mesh rebuild)
-	let visibleGdsLayers = $derived(new Set(gdsLayers.filter(l => l.visible).map(l => l.gdsNum)));
+	// Set of visible composite layer keys for render-time filtering
+	let visibleGdsLayers = $derived(new Set(gdsLayers.filter(l => l.visible).map(l => l.key)));
 
 	let stack = $state<ProcessStack>({
 		name: 'GDS Import',
@@ -176,30 +178,36 @@
 
 			instancedScene = { cellMeshes: result.cellMeshes, cellEdges: result.cellEdges, cellInstances: result.cellInstances };
 
-			// Build layer info directly from GDS layer numbers — no LayerName indirection
-			const gdsLayerNums = new Set<number>();
+			// Collect unique composite layer keys present in the file
+			const layerKeys = new Set<number>();
 			for (const meshes of Object.values(result.cellMeshes)) {
-				for (const key of Object.keys(meshes)) gdsLayerNums.add(Number(key));
+				for (const k of Object.keys(meshes)) layerKeys.add(Number(k));
 			}
-			gdsLayers = [...gdsLayerNums].sort((a, b) => a - b).map((gdsNum, i) => ({
-				gdsNum,
-				color: PALETTE[i % PALETTE.length],
-				visible: true,
-				polyCount: 0,
-				thickness: 0.5,
-			}));
+			// Sort by (layer, datatype) so the sidebar ordering is stable and intuitive
+			gdsLayers = [...layerKeys]
+				.sort((a, b) => keyLayer(a) - keyLayer(b) || keyDatatype(a) - keyDatatype(b))
+				.map((key, i) => ({
+					key,
+					gds: keyLayer(key),
+					datatype: keyDatatype(key),
+					color: PALETTE[i % PALETTE.length],
+					visible: true,
+					thickness: 0.5,
+				}));
 
 			// Apply preset if one is already selected
 			if (selectedPreset) {
 				const pdk = PDKS[selectedPreset];
 				if (pdk) {
-					const pdkByGds = new Map(pdk.layers.map(l => [l.gds, l]));
+					const pdkByKey = new Map(pdk.layers.map(l => [makeLayerKey(l.gds, l.datatype), l]));
 					gdsLayers = gdsLayers.map(info => {
-						const pdkLayer = pdkByGds.get(info.gdsNum);
+						const pdkLayer = pdkByKey.get(info.key);
 						return pdkLayer ? { ...info, color: pdkLayer.color, thickness: pdkLayer.thickness } : info;
 					});
 					layerMapNames = new Map(
-						pdk.layers.filter(l => gdsLayers.some(g => g.gdsNum === l.gds)).map(l => [l.gds, l.name] as [number, string])
+						pdk.layers
+							.filter(l => gdsLayers.some(g => g.key === makeLayerKey(l.gds, l.datatype)))
+							.map(l => [makeLayerKey(l.gds, l.datatype), l.name] as [number, string])
 					);
 				}
 			}
@@ -285,12 +293,12 @@
 				const pdk = PDKS[id];
 				if (!pdk) { loading = false; return; }
 
-				// Match PDK layers to GDS layers in the file
-				const pdkByGds = new Map(pdk.layers.map(l => [l.gds, l]));
+				// Match PDK layers to GDS layers in the file via composite (layer:datatype) key
+				const pdkByKey = new Map(pdk.layers.map(l => [makeLayerKey(l.gds, l.datatype), l]));
 
 				// Apply PDK colors/thickness/names to existing gdsLayers
 				gdsLayers = gdsLayers.map(info => {
-					const pdkLayer = pdkByGds.get(info.gdsNum);
+					const pdkLayer = pdkByKey.get(info.key);
 					return pdkLayer ? {
 						...info,
 						color: pdkLayer.color,
@@ -299,7 +307,9 @@
 				});
 				// Update labels from PDK
 				layerMapNames = new Map(
-					pdk.layers.filter(l => gdsLayers.some(g => g.gdsNum === l.gds)).map(l => [l.gds, l.name] as [number, string])
+					pdk.layers
+						.filter(l => gdsLayers.some(g => g.key === makeLayerKey(l.gds, l.datatype)))
+						.map(l => [makeLayerKey(l.gds, l.datatype), l.name] as [number, string])
 				);
 			}
 
@@ -311,17 +321,20 @@
 		if (!instancedScene) return;
 		layerMapNames = new Map();
 
-		const gdsLayerNums = new Set<number>();
+		const layerKeys = new Set<number>();
 		for (const meshes of Object.values(instancedScene.cellMeshes)) {
-			for (const key of Object.keys(meshes)) gdsLayerNums.add(Number(key));
+			for (const k of Object.keys(meshes)) layerKeys.add(Number(k));
 		}
-		gdsLayers = [...gdsLayerNums].sort((a, b) => a - b).map((gdsNum, i) => ({
-			gdsNum,
-			color: PALETTE[i % PALETTE.length],
-			visible: true,
-			polyCount: 0,
-			thickness: 0.5,
-		}));
+		gdsLayers = [...layerKeys]
+			.sort((a, b) => keyLayer(a) - keyLayer(b) || keyDatatype(a) - keyDatatype(b))
+			.map((key, i) => ({
+				key,
+				gds: keyLayer(key),
+				datatype: keyDatatype(key),
+				color: PALETTE[i % PALETTE.length],
+				visible: true,
+				thickness: 0.5,
+			}));
 	}
 
 	function onLayerMapDrop(e: DragEvent) {
@@ -351,18 +364,22 @@
 			}
 			if (!parsed || parsed.length === 0) return;
 
-			// Apply names and colors from the layermap to existing gdsLayers
-			const nameMap = new Map(parsed.map((l: any) => [l.gds, l]));
+			// Apply names and colors from the layermap, matching by composite (layer:datatype) key
+			const nameMap = new Map<number, { color?: string; name: string }>(
+				parsed.map((l: any) => [makeLayerKey(l.gds, l.datatype ?? 0), l]),
+			);
 			gdsLayers = gdsLayers.map(info => {
-				const match = nameMap.get(info.gdsNum);
+				const match = nameMap.get(info.key);
 				if (!match) return info;
 				return { ...info, color: match.color || info.color };
 			});
 
 			// Store parsed names for label display
+			const newNames = new Map(layerMapNames);
 			for (const l of parsed) {
-				layerMapNames.set(l.gds, l.name);
+				newNames.set(makeLayerKey(l.gds, l.datatype ?? 0), l.name);
 			}
+			layerMapNames = newNames;
 		};
 		reader.readAsText(file);
 	}
@@ -451,11 +468,11 @@
 							</span>
 							<button class="layer-toggle" onclick={() => toggleLayer(i)}>
 								<span class="layer-swatch" style="background: {info.color};"></span>
-								{#if layerMapNames.get(info.gdsNum)}
-									<span class="layer-name">{layerMapNames.get(info.gdsNum)}</span>
-									<span class="layer-num-sub">L{info.gdsNum}</span>
+								{#if layerMapNames.get(info.key)}
+									<span class="layer-name">{layerMapNames.get(info.key)}</span>
+									<span class="layer-num-sub">{info.gds}{info.datatype ? `/${info.datatype}` : ''}</span>
 								{:else}
-									<span class="layer-name">L{info.gdsNum}</span>
+									<span class="layer-name">L{info.gds}{info.datatype ? `/${info.datatype}` : ''}</span>
 								{/if}
 								<span class="layer-vis">{info.visible ? 'ON' : 'OFF'}</span>
 							</button>

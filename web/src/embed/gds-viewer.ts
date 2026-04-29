@@ -18,14 +18,16 @@
  *   phi         — initial camera phi in degrees (default: 45)
  *   config      — JSON string or URL for layer config:
  *                  { "layers": { "1": { "color": "#6bbf8a", "z": 0, "thickness": 0.5 }, ... } }
+ *                  Layer keys may be a bare layer number ("1", maps to datatype 0) or
+ *                  a "layer/datatype" composite ("1/0", "66/44") for multi-datatype PDKs.
  *                  Or shorthand colors-only: { "colors": ["#6bbf8a", "#d9513c", ...] }
  *                  Or per-layer with names: { "layers": { "1": { "color": "#f00", "name": "M1" }, ... } }
  */
 
 import { initGL, buildInstancedMeshes, render3D, fitCamera, disposeGL, createCamera, type Camera, type InstancedSceneData, type GdsLayerInfo } from '../lib/render/canvas3d';
-import { readGds, buildInstancedScene, sceneToInstancedData } from '../lib/gds/reader';
+import { readGds, buildInstancedScene, sceneToInstancedData, makeLayerKey, keyLayer, keyDatatype } from '../lib/gds/reader';
 import type { ProcessStack } from '../lib/stack/types';
-import { PDKS } from '../lib/stack/pdk';
+import { PDKS, type PdkLayer } from '../lib/stack/pdk';
 
 // Same palette as pdk.ts — bottom to top: purple, green, blue, green, blue, red, orange
 const DEFAULT_COLORS = ['#7b5e8a', '#6bbf8a', '#4a9ec2', '#5aad78', '#4a9ec2', '#5aad78', '#d9513c', '#e8944a'];
@@ -44,38 +46,37 @@ function assignLayerInfo(
 	presetId?: string,
 ): Map<number, GdsLayerInfo> {
 	const info = new Map<number, GdsLayerInfo>();
-	const layerNums = new Set<number>();
+	const layerKeys = new Set<number>();
 	for (const meshes of Object.values(scene.cellMeshes)) {
-		for (const key of Object.keys(meshes)) layerNums.add(parseInt(key));
+		for (const key of Object.keys(meshes)) layerKeys.add(parseInt(key));
 	}
-	const sorted = [...layerNums].sort((a, b) => a - b);
+	const sorted = [...layerKeys].sort((a, b) => keyLayer(a) - keyLayer(b) || keyDatatype(a) - keyDatatype(b));
 
 	// If a PDK preset is specified, use its layer data as defaults
 	const pdkLayers = presetId ? PDKS[presetId]?.layers : undefined;
-	// Build GDS→PDK lookup, preferring metals over vias when GDS numbers collide (SKY130)
-	let pdkByGds: Map<number, typeof pdkLayers extends (infer T)[] ? T : never> | undefined;
-	if (pdkLayers) {
-		pdkByGds = new Map();
-		for (const l of pdkLayers) {
-			const existing = pdkByGds.get(l.gds);
-			if (!existing || (existing.type === 'via' && l.type === 'metal')) {
-				pdkByGds.set(l.gds, l);
-			}
-		}
-	}
+	// Build composite-key (layer:datatype) → PDK lookup
+	const pdkByKey: Map<number, PdkLayer> | undefined =
+		pdkLayers ? new Map(pdkLayers.map(l => [makeLayerKey(l.gds, l.datatype), l])) : undefined;
 
-	// Parse config formats
+	// Parse config formats. Layer config keys may be either composite "layer/datatype"
+	// or just "layer" — the latter falls back to datatype 0 for backwards compatibility.
 	const layerConfig = config?.layers as Record<string, { color?: string; z?: number; thickness?: number }> | undefined;
 	const colorList = config?.colors as string[] | undefined;
+	function lookupCfg(layer: number, datatype: number) {
+		if (!layerConfig) return undefined;
+		return layerConfig[`${layer}/${datatype}`] ?? (datatype === 0 ? layerConfig[String(layer)] : undefined);
+	}
 
 	let z = 0.5;
 	const thickness = 0.5;
-	sorted.forEach((num, i) => {
-		const cfg = layerConfig?.[String(num)];
-		const pdkL = pdkByGds?.get(num);
+	sorted.forEach((key, i) => {
+		const layer = keyLayer(key);
+		const datatype = keyDatatype(key);
+		const cfg = lookupCfg(layer, datatype);
+		const pdkL = pdkByKey?.get(key);
 		const color = cfg?.color ?? pdkL?.color ?? colorList?.[i] ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length];
 		const th = cfg?.thickness ?? pdkL?.thickness ?? thickness;
-		info.set(num, {
+		info.set(key, {
 			z: cfg?.z ?? pdkL?.z ?? z,
 			thickness: th,
 			color,
@@ -107,7 +108,7 @@ class GdsViewerElement extends HTMLElement {
 	private mounted = false;
 	private scene: InstancedSceneData | null = null;
 	private gdsLayerInfo: Map<number, GdsLayerInfo> = new Map();
-	private layerNums: number[] = [];
+	private layerKeys: number[] = [];
 	private xyExtent: number = 1;
 	private isDragging = false;
 	private isRightDrag = false;
@@ -272,7 +273,7 @@ class GdsViewerElement extends HTMLElement {
 			}
 
 			this.gdsLayerInfo = assignLayerInfo(this.scene, config, this.getAttribute('preset') ?? undefined);
-			this.layerNums = [...this.gdsLayerInfo.keys()].sort((a, b) => a - b);
+			this.layerKeys = [...this.gdsLayerInfo.keys()].sort((a, b) => a - b);
 
 			const stack = createEmbedStack();
 			if (this.glState) {
@@ -327,10 +328,10 @@ class GdsViewerElement extends HTMLElement {
 		}
 
 		let layerZOffsets: Map<number, number> | null = null;
-		if (doExplode && this.layerNums.length > 1) {
+		if (doExplode && this.layerKeys.length > 1) {
 			layerZOffsets = new Map();
 			const t = time * 0.001 * speed;
-			const n = this.layerNums.length;
+			const n = this.layerKeys.length;
 			const gap = this.xyExtent / n * 2; // equal gap between layers
 			// Total cycle: assemble one layer at a time, hold, disassemble one at a time, hold
 			const layerDur = 0.3; // seconds per layer transition
@@ -361,7 +362,7 @@ class GdsViewerElement extends HTMLElement {
 						layerT = 1 - p * p * (3 - 2 * p); // reverse smoothstep
 					} else layerT = 0;
 				}
-				layerZOffsets.set(this.layerNums[i], i * gap * layerT);
+				layerZOffsets.set(this.layerKeys[i], i * gap * layerT);
 			}
 		}
 
