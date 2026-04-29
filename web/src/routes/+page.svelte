@@ -99,7 +99,7 @@
 	.hero p {
 		font-size: var(--fs-sm);
 		color: var(--text-muted);
-		max-width: 480px;
+		max-width: 640px;
 		font-family: var(--font-mono);
 		line-height: 1.5;
 	}
