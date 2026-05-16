@@ -61,9 +61,21 @@
 			<span class="embed-tag">&lt;gds-viewer&gt;</span>
 			<span>Embed 3D layouts on your website</span>
 		</a>
+		<section class="fem-section">
+			<h2 class="fem-title">Simulate with RapidFEM</h2>
+			<p class="fem-desc">
+				Open-source frequency-domain Maxwell FEM in Rust. Sweep
+				S-parameters, visualize 3D fields, scripted from Python.
+			</p>
+			<a class="fem-cta" href="https://fem.rapidpassives.org" target="_blank" rel="noopener">
+				Open RapidFEM
+			</a>
+		</section>
 	</div>
 	<footer class="landing-footer">
 		<a href="https://github.com/milanofthe/rapidpassives" target="_blank" rel="noopener">GitHub</a>
+		<span class="sep">/</span>
+		<a href="https://fem.rapidpassives.org" target="_blank" rel="noopener">RapidFEM</a>
 		<span class="sep">/</span>
 		<a href="https://milanrother.com" target="_blank" rel="noopener">Milan Rother</a>
 	</footer>
@@ -155,6 +167,54 @@
 	}
 	.card:hover .viewer-preview {
 		color: var(--accent);
+	}
+	/* Width pinned to one row of the cards grid: 4 × 240 + 3 × 16 = 1008. */
+	.fem-section {
+		width: 100%;
+		max-width: calc(4 * 240px + 3 * 16px);
+		background: var(--bg-surface);
+		border: 1px solid var(--border-subtle);
+		padding: 40px 32px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		gap: 14px;
+	}
+	.fem-title {
+		font-size: 22px;
+		font-weight: 700;
+		color: var(--accent);
+		font-family: var(--font-mono);
+		letter-spacing: 1.6px;
+		text-transform: uppercase;
+	}
+	.fem-desc {
+		font-size: var(--fs-sm);
+		color: var(--text-muted);
+		font-family: var(--font-mono);
+		line-height: 1.55;
+		max-width: 620px;
+	}
+	.fem-cta {
+		display: inline-flex;
+		align-items: center;
+		height: 34px;
+		padding: 0 18px;
+		margin-top: 10px;
+		background: var(--accent);
+		color: var(--bg);
+		font-family: var(--font-mono);
+		font-size: var(--fs-xs);
+		font-weight: 700;
+		letter-spacing: 0.6px;
+		text-decoration: none;
+		text-transform: uppercase;
+		transition: filter var(--transition), transform var(--transition);
+	}
+	.fem-cta:hover {
+		filter: brightness(1.1);
+		transform: translateY(-1px);
 	}
 	.embed-hint {
 		display: flex;

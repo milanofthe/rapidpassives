@@ -89,6 +89,7 @@
 			<span class="nav-sep"></span>
 			<a href="/viewer" class="tab" class:active={isViewer}>Viewer</a>
 		{/if}
+		<a class="tab fem-tab" href="https://fem.rapidpassives.org" target="_blank" rel="noopener">RapidFEM</a>
 	</header>
 	<main>
 		{@render children()}
@@ -147,6 +148,9 @@
 		height: 100%;
 		background: var(--border);
 		flex-shrink: 0;
+	}
+	.fem-tab {
+		margin-left: auto;
 	}
 	main {
 		flex: 1;
