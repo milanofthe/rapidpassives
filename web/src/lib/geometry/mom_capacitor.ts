@@ -152,10 +152,11 @@ export function buildMomCapacitor(params: MomCapacitorParams): GeometryResult {
 		}
 	}
 
-	// Network with port markers
+	// Network with port markers — layerId names the renderLayer (windings =
+	// top metal) so the FEM exporter can resolve it via layerNameToStackId.
 	const nodes: ConductorNode[] = [
-		{ id: 'p_plus', x: x0, y: y0 + busWidth / 2, layerId: 'm3' },
-		{ id: 'p_minus', x: x0 + totalWidth, y: y0 + busWidth + fingerLength + busWidth / 2, layerId: 'm3' },
+		{ id: 'p_plus', x: x0, y: y0 + busWidth / 2, layerId: 'windings' },
+		{ id: 'p_minus', x: x0 + totalWidth, y: y0 + busWidth + fingerLength + busWidth / 2, layerId: 'windings' },
 	];
 	const ports: Port[] = [
 		{ name: 'P+', node: 'p_plus' },

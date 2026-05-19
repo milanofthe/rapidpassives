@@ -10,6 +10,7 @@
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackPanel from '$lib/components/StackPanel.svelte';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
+	import { exportForFEM, downloadFemJson } from '$lib/solver/export_fem';
 	import { mergeLayers } from '$lib/geometry/merge';
 	import { extractPortMarkers } from '$lib/geometry/ports';
 
@@ -26,6 +27,15 @@
 		const gdsLayers = map ? pdkMapToGdsLayers(map) : undefined;
 		const data = exportGds(layers, { gdsLayers, cellName: 'RatraceCoupler' });
 		downloadGds(data, 'ratrace_coupler.gds');
+	}
+
+	function doExportJson() {
+		if (!result) return;
+		const json = exportForFEM(layers, result.network, stack, {
+			generator: 'ratrace_coupler',
+			params: { ...p },
+		});
+		downloadFemJson(json, 'ratrace_coupler.fem.json');
 	}
 
 	let p = $state<RatraceCouplerParams>({
@@ -56,7 +66,7 @@
 
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
-		<ParamSidebar onexport={doExport}>
+		<ParamSidebar onexport={doExport} onexportjson={doExportJson}>
 			<div class="param-section"><h4>Ring</h4>
 				<ParamField label="Radius" value={p.radius} unit="um" step={5} min={1} onchange={v => set('radius', v ?? 120)} />
 				<ParamField label="Width" value={p.ringWidth} unit="um" step={0.5} min={0.1} onchange={v => set('ringWidth', v ?? 8)} />

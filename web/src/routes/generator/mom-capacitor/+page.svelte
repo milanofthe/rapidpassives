@@ -10,6 +10,7 @@
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackPanel from '$lib/components/StackPanel.svelte';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
+	import { exportForFEM, downloadFemJson } from '$lib/solver/export_fem';
 	import { mergeLayers } from '$lib/geometry/merge';
 	import { extractPortMarkers } from '$lib/geometry/ports';
 
@@ -26,6 +27,15 @@
 		const gdsLayers = map ? pdkMapToGdsLayers(map) : undefined;
 		const data = exportGds(layers, { gdsLayers, cellName: 'MomCapacitor' });
 		downloadGds(data, 'mom_capacitor.gds');
+	}
+
+	function doExportJson() {
+		if (!result) return;
+		const json = exportForFEM(layers, result.network, stack, {
+			generator: 'mom_capacitor',
+			params: { ...p },
+		});
+		downloadFemJson(json, 'mom_capacitor.fem.json');
 	}
 
 	let p = $state<MomCapacitorParams>({
@@ -74,7 +84,7 @@
 
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
-		<ParamSidebar onexport={doExport}>
+		<ParamSidebar onexport={doExport} onexportjson={doExportJson}>
 			<div class="param-section"><h4>Fingers</h4>
 				<ParamField label="Count" value={p.nFingers} step={2} min={2} onchange={v => set('nFingers', v ?? 21)} />
 				<ParamField label="Length" value={p.fingerLength} unit="um" step={1} min={1} onchange={v => set('fingerLength', v ?? 40)} />

@@ -10,6 +10,7 @@
 	import ParamField from '$lib/components/ParamField.svelte';
 	import StackPanel from '$lib/components/StackPanel.svelte';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
+	import { exportForFEM, downloadFemJson } from '$lib/solver/export_fem';
 	import { mergeLayers } from '$lib/geometry/merge';
 	import { extractPortMarkers } from '$lib/geometry/ports';
 
@@ -26,6 +27,15 @@
 		const gdsLayers = map ? pdkMapToGdsLayers(map) : undefined;
 		const data = exportGds(layers, { gdsLayers, cellName: 'SpiralInductor' });
 		downloadGds(data, 'spiral_inductor.gds');
+	}
+
+	function doExportJson() {
+		if (!result) return;
+		const json = exportForFEM(layers, result.network, stack, {
+			generator: 'spiral',
+			params: { ...p },
+		});
+		downloadFemJson(json, 'spiral_inductor.fem.json');
 	}
 
 	let p = $state<SpiralInductorParams>({
@@ -66,7 +76,7 @@
 
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
-		<ParamSidebar onexport={doExport}>
+		<ParamSidebar onexport={doExport} onexportjson={doExportJson}>
 			<div class="param-section"><h4>Geometry</h4>
 				<ParamField label="Dout" value={p.Dout} unit="um" step={1} min={1} onchange={v => set('Dout', v ?? 130)} />
 				<ParamField label="N" value={p.N} unit="turns" step={1} min={1} max={20} onchange={v => set('N', v ?? 3)} />

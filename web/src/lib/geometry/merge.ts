@@ -53,6 +53,12 @@ export function mergePolygons(polys: Polygon[]): Polygon[] {
 		// touching edges overlap and get merged
 		const inflated = multiPoly.map(p => inflateRing(p, 0.001));
 		const merged = polygonClipping.union(...inflated as [any, ...any[]]);
+		// A merged polygon with more than one ring is a frame / annulus —
+		// outer + hole(s). Single-loop closed polygons can't represent a hole
+		// (the downstream FEM exporter and most consumers treat the loop as
+		// a filled region), so fall back to the un-merged input. Guard rings
+		// and similar frame shapes survive as separate strips.
+		if (merged.some(poly => poly.length > 1)) return polys;
 		return merged.map(poly => ringToPolygon(poly[0]));
 	} catch {
 		return polys;

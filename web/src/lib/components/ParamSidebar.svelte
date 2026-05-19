@@ -1,7 +1,15 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	let { children, onexport }: { children: Snippet; onexport?: () => void } = $props();
+	let {
+		children,
+		onexport,
+		onexportjson,
+	}: {
+		children: Snippet;
+		onexport?: () => void;
+		onexportjson?: () => void;
+	} = $props();
 </script>
 
 <div class="panel">
@@ -9,6 +17,9 @@
 	<div class="actions">
 		{#if onexport}
 			<button onclick={onexport}>Export GDS</button>
+		{/if}
+		{#if onexportjson}
+			<button onclick={onexportjson}>Export FEM JSON</button>
 		{/if}
 	</div>
 </div>

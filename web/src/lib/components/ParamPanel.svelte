@@ -5,10 +5,12 @@
 		geometryType = $bindable<GeometryType>('spiral'),
 		params = $bindable<GeometryParams>(),
 		onexport,
+		onexportjson,
 	}: {
 		geometryType: GeometryType;
 		params: GeometryParams;
 		onexport?: () => void;
+		onexportjson?: () => void;
 	} = $props();
 
 	function nudge(field: string, step: number, min?: number, max?: number) {
@@ -130,6 +132,9 @@
 		<button class="btn-secondary" onclick={onexport}>Reset</button>
 		{#if onexport}
 			<button onclick={onexport}>Export GDS</button>
+		{/if}
+		{#if onexportjson}
+			<button onclick={onexportjson}>Export FEM JSON</button>
 		{/if}
 	</div>
 </div>
