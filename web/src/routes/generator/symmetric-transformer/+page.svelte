@@ -10,6 +10,7 @@
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackPanel from '$lib/components/StackPanel.svelte';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
+	import { exportForFEM, downloadFemJson } from '$lib/solver/export_fem';
 	import { mergeLayers } from '$lib/geometry/merge';
 	import { extractPortMarkers } from '$lib/geometry/ports';
 
@@ -26,6 +27,15 @@
 		const gdsLayers = map ? pdkMapToGdsLayers(map) : undefined;
 		const data = exportGds(layers, { gdsLayers, cellName: 'SymmetricTransformer' });
 		downloadGds(data, 'symmetric_transformer.gds');
+	}
+
+	function doExportJson() {
+		if (!result) return;
+		const json = exportForFEM(layers, result.network, stack, {
+			generator: 'symmetric_transformer',
+			params: { ...p },
+		});
+		downloadFemJson(json, 'symmetric_transformer.fem.json');
 	}
 
 	let p = $state<SymmetricTransformerParams>({
@@ -70,7 +80,7 @@
 
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
-		<ParamSidebar onexport={doExport}>
+		<ParamSidebar onexport={doExport} onexportjson={doExportJson}>
 			<div class="param-section"><h4>Geometry</h4>
 				<ParamField label="Dout" value={p.Dout} unit="um" step={1} min={1} onchange={v => set('Dout', v ?? 250)} />
 				<ParamField label="Sides" value={p.sides} step={4} min={4} max={64} onchange={v => set('sides', v ?? 8)} />

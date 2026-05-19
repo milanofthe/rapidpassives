@@ -361,7 +361,10 @@ export function pdkMapToStack(pdkMap: GeneratorPdkMap, pdkName: string): Process
 
 	return {
 		name: pdkName, layers,
-		substrateThickness: sorted[0]?.pdk.z ?? 300,
+		// 300 µm is a standard CMOS wafer thickness — gives FEM-grade depth so
+		// the substrate isn't degenerate. The old "min metal z" formula
+		// collapsed to 0 whenever the bottom layer started at z=0.
+		substrateThickness: 300,
 		oxideEr: 4.0, substrateRho: 10, substrateEr: 11.7,
 	};
 }

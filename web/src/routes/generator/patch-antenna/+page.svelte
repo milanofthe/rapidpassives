@@ -9,6 +9,7 @@
 	import ParamSidebar from '$lib/components/ParamSidebar.svelte';
 	import StackPanel from '$lib/components/StackPanel.svelte';
 	import { exportGds, downloadGds } from '$lib/gds/writer';
+	import { exportForFEM, downloadFemJson } from '$lib/solver/export_fem';
 	import { mergeLayers } from '$lib/geometry/merge';
 	import { extractPortMarkers } from '$lib/geometry/ports';
 
@@ -25,6 +26,15 @@
 		const gdsLayers = map ? pdkMapToGdsLayers(map) : undefined;
 		const data = exportGds(layers, { gdsLayers, cellName: 'PatchAntenna' });
 		downloadGds(data, 'patch_antenna.gds');
+	}
+
+	function doExportJson() {
+		if (!result) return;
+		const json = exportForFEM(layers, result.network, stack, {
+			generator: 'patch_antenna',
+			params: { ...p },
+		});
+		downloadFemJson(json, 'patch_antenna.fem.json');
 	}
 
 	let p = $state<PatchAntennaParams>({
@@ -68,7 +78,7 @@
 
 <GeometryEditor {layers} {valid} {renderOpts} {stack}>
 	{#snippet sidebar()}
-		<ParamSidebar onexport={doExport}>
+		<ParamSidebar onexport={doExport} onexportjson={doExportJson}>
 			<div class="param-section"><h4>Design</h4>
 				<ParamField label="Frequency" value={designFreq} unit="GHz" step={0.1} min={0.1} onchange={v => { if (v && v > 0) { designFreq = v; autoDesign(); } }} />
 				<ParamField label="εr" value={designEr} step={0.1} min={1} onchange={v => { if (v && v >= 1) { designEr = v; autoDesign(); } }} />
