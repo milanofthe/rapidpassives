@@ -65,14 +65,18 @@ export interface FemStackLayer {
 
 /**
  * One conductor polygon. `polygon` is always a single closed loop (merged for
- * vias, the trace/winding outline for metals). For via layers, `polygon_cells`
- * additionally lists the per-cell squares — consumer picks via_mode = "merged"
- * (fast, default) or "cells" (high-fidelity, expensive).
+ * vias, the trace/winding outline for metals). `holes` lists optional inner
+ * closed loops that get subtracted from the outer outline — needed for
+ * annular shapes (rat-race ring, guard ring) so they stay topologically
+ * correct in the FEM mesh. For via layers, `polygon_cells` additionally
+ * lists the per-cell squares — consumer picks via_mode = "merged" (fast,
+ * default) or "cells" (high-fidelity, expensive).
  */
 export interface FemConductor {
 	layer: string;                      // refs FemStackLayer.id
 	name?: string;                      // optional human-readable tag
-	polygon: [number, number][];        // [[x_um, y_um], ...] (closed loop)
+	polygon: [number, number][];        // outer closed loop
+	holes?: [number, number][][];       // inner closed loops (subtracted)
 	polygon_cells?: [number, number][][]; // via layers only
 }
 
@@ -202,11 +206,18 @@ export function exportForFEM(
 		if (sl.type !== 'via') {
 			for (const p of polys) {
 				if (p.x.length < 3) continue;
-				conductors.push({
+				const entry: FemConductor = {
 					layer: stackId,
 					name: layerName,
 					polygon: p.x.map((x, i) => [x, p.y[i]] as [number, number]),
-				});
+				};
+				if (p.holes && p.holes.length > 0) {
+					entry.holes = p.holes
+						.filter(h => h.x.length >= 3)
+						.map(h => h.x.map((x, i) => [x, h.y[i]] as [number, number]));
+					if (entry.holes.length === 0) delete entry.holes;
+				}
+				conductors.push(entry);
 			}
 			continue;
 		}

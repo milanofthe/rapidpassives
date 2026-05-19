@@ -93,8 +93,10 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 			],
 		});
 
+		// layerId names the renderLayer so the FEM exporter resolves it via
+		// layerNameToStackId — no segments here to infer from.
 		const node: ConductorNode = {
-			id: `n${i}`, x: cos * endR, y: sin * endR, layerId: 'm3',
+			id: `n${i}`, x: cos * endR, y: sin * endR, layerId: 'windings',
 		};
 		nodes.push(node);
 		ports.push({ name: portNames[i], node: node.id });

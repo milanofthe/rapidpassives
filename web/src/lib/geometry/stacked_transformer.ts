@@ -266,21 +266,23 @@ function buildWindingPolygons(cfg: WindingConfig): { layers: LayerMap; network: 
 		layers[via2Layer] = polysVia2;
 	}
 
-	// Build minimal network for port markers
-	const metalId = windingLayer === 'windings_m4' ? 'm4' : 'm2';
+	// Build minimal network for port markers — layerId uses the renderLayer
+	// name (windingLayer) so the FEM exporter resolves it via
+	// layerNameToStackId without leaning on generator-internal labels.
 	const portXOffset = pxo;
 	const portMarkerY = portSide === 'bottom' ? -Dout / 2 - width : Dout / 2 + width;
+	const portIdPrefix = windingLayer === 'windings_m4' ? 'm4' : 'm2';
 	const nodes: ConductorNode[] = [
-		{ id: `${metalId}_pl`, x: -portXOffset, y: portMarkerY, layerId: metalId },
-		{ id: `${metalId}_pr`, x: portXOffset, y: portMarkerY, layerId: metalId },
+		{ id: `${portIdPrefix}_pl`, x: -portXOffset, y: portMarkerY, layerId: windingLayer },
+		{ id: `${portIdPrefix}_pr`, x: portXOffset, y: portMarkerY, layerId: windingLayer },
 	];
 	const ports: Port[] = [
-		{ name: 'P1', node: `${metalId}_pl` },
-		{ name: 'P2', node: `${metalId}_pr` },
+		{ name: 'P1', node: `${portIdPrefix}_pl` },
+		{ name: 'P2', node: `${portIdPrefix}_pr` },
 	];
 	if (center_tap) {
-		nodes.push({ id: `${metalId}_ct`, x: 0, y: portMarkerY, layerId: metalId });
-		ports.push({ name: 'CT', node: `${metalId}_ct` });
+		nodes.push({ id: `${portIdPrefix}_ct`, x: 0, y: portMarkerY, layerId: windingLayer });
+		ports.push({ name: 'CT', node: `${portIdPrefix}_ct` });
 	}
 
 	const network: ConductorNetwork = { nodes, segments: [], vias: [], ports };

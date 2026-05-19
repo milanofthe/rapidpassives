@@ -1,7 +1,16 @@
-/** A polygon defined as arrays of x and y coordinates */
+/** A polygon defined as arrays of x and y coordinates.
+ *
+ * `holes` (optional) lists inner closed loops that get subtracted from the
+ * outer outline — used to represent annuli (rat-race ring, guard ring,
+ * substrate cutouts). The renderer and GDS exporter treat polygons as
+ * filled outlines and ignore `holes`; the FEM JSON exporter passes the
+ * holes through so the rapidfem consumer can build a polygon-with-holes
+ * via gmsh's multi-curve-loop addPlaneSurface.
+ */
 export interface Polygon {
 	x: number[];
 	y: number[];
+	holes?: { x: number[]; y: number[] }[];
 }
 
 /** Layer names used in inductor/transformer layouts */

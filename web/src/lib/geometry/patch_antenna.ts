@@ -46,8 +46,9 @@ export function buildPatchAntenna(params: PatchAntennaParams): GeometryResult {
 		y: [feedEndY, feedEndY, -L / 2, -L / 2],
 	};
 
-	// Port node
-	const portNode: ConductorNode = { id: `n${nid++}`, x: 0, y: feedEndY, layerId: 'm3' };
+	// Port node — layerId names the renderLayer so the FEM exporter can
+	// resolve it via layerNameToStackId (no segments here to infer from).
+	const portNode: ConductorNode = { id: `n${nid++}`, x: 0, y: feedEndY, layerId: 'windings' };
 	nodes.push(portNode);
 	ports.push({ name: 'P1', node: portNode.id });
 
