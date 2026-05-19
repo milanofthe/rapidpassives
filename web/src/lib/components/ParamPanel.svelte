@@ -134,7 +134,7 @@
 			<button onclick={onexport}>Export GDS</button>
 		{/if}
 		{#if onexportjson}
-			<button onclick={onexportjson}>Export FEM JSON</button>
+			<button onclick={onexportjson}>Export JSON</button>
 		{/if}
 	</div>
 </div>

@@ -146,9 +146,12 @@ export function exportForFEM(
 	const conductors: FemConductor[] = [];
 
 	// Vias declared in network.vias get the rich treatment: merged bbox +
-	// per-cell array. Track which render-layer names we cover here so the
-	// fallback layer-map loop doesn't double-emit them.
-	const viasFromNetwork = new Set<string>();
+	// per-cell array. The layer-map sweep below will ALSO emit any via
+	// polygons that didn't come through the network (e.g. center-tap vias
+	// that the generator still places via the legacy renderer). After
+	// fragment on the FEM side, overlapping via volumes from both sources
+	// just merge into one — but skipping the layer-map entirely would drop
+	// renderer-only vias that no network.vias entry covers.
 	for (const via of network.vias) {
 		const stackId = layerNameToStackId[via.renderLayer];
 		if (!stackId) continue;
@@ -176,25 +179,98 @@ export function exportForFEM(
 			polygon: merged_bbox,
 			polygon_cells: cells,
 		});
-		viasFromNetwork.add(via.renderLayer);
 	}
 
 	// Layer-map sweep: emit metal polygons + via polygons not already covered
-	// by network.vias (mom_capacitor, guard rings etc. put vias on the layer
-	// map directly without a ConductorNetwork.vias entry).
+	// by network.vias (mom_capacitor, symmetric_transformer etc. put vias on
+	// the layer map directly).
+	//
+	// Metal polygons go straight through (one conductor per polygon).
+	// Via polygons get spatially clustered first — N small via squares in
+	// the same array would otherwise mean N separate 3-D extrusions on the
+	// FEM side, blowing up the mesh. We group polygons whose bboxes
+	// (lightly inflated) overlap into a single cluster, emit one
+	// merged-bbox conductor per cluster, and keep the original cells under
+	// polygon_cells for callers that want via-array fidelity.
 	for (const [layerName, polys] of Object.entries(merged)) {
 		if (!polys || polys.length === 0) continue;
 		const stackId = layerNameToStackId[layerName];
 		if (!stackId) continue;
 		const sl = stack.layers.find(l => l.id === stackId);
 		if (!sl) continue;
-		if (sl.type === 'via' && viasFromNetwork.has(layerName as string)) continue;
-		for (const p of polys) {
-			if (p.x.length < 3) continue;
+
+		if (sl.type !== 'via') {
+			for (const p of polys) {
+				if (p.x.length < 3) continue;
+				conductors.push({
+					layer: stackId,
+					name: layerName,
+					polygon: p.x.map((x, i) => [x, p.y[i]] as [number, number]),
+				});
+			}
+			continue;
+		}
+
+		// Cluster via polygons by bbox overlap (union-find).
+		const valid = polys.filter(p => p.x.length >= 3);
+		if (valid.length === 0) continue;
+		const bboxes = valid.map(p => {
+			let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+			for (let i = 0; i < p.x.length; i++) {
+				const x = p.x[i], y = p.y[i];
+				if (x < xmin) xmin = x;
+				if (x > xmax) xmax = x;
+				if (y < ymin) ymin = y;
+				if (y > ymax) ymax = y;
+			}
+			return { xmin, ymin, xmax, ymax };
+		});
+		// Inflate slightly to bridge edge-touching neighbours (via_spacing is
+		// usually ≤1 µm, so 1 µm slack is enough to fuse grid neighbours).
+		const slack = 1.0;
+		const parent = bboxes.map((_, i) => i);
+		const find = (i: number): number => {
+			while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+			return i;
+		};
+		const union = (i: number, j: number) => {
+			const ri = find(i), rj = find(j);
+			if (ri !== rj) parent[ri] = rj;
+		};
+		for (let i = 0; i < bboxes.length; i++) {
+			const a = bboxes[i];
+			for (let j = i + 1; j < bboxes.length; j++) {
+				const b = bboxes[j];
+				if (a.xmax + slack < b.xmin || b.xmax + slack < a.xmin) continue;
+				if (a.ymax + slack < b.ymin || b.ymax + slack < a.ymin) continue;
+				union(i, j);
+			}
+		}
+		const clusters = new Map<number, number[]>();
+		for (let i = 0; i < bboxes.length; i++) {
+			const r = find(i);
+			const arr = clusters.get(r);
+			if (arr) arr.push(i);
+			else clusters.set(r, [i]);
+		}
+
+		for (const members of clusters.values()) {
+			let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+			const cells: [number, number][][] = [];
+			for (const i of members) {
+				const b = bboxes[i];
+				if (b.xmin < xmin) xmin = b.xmin;
+				if (b.ymin < ymin) ymin = b.ymin;
+				if (b.xmax > xmax) xmax = b.xmax;
+				if (b.ymax > ymax) ymax = b.ymax;
+				const p = valid[i];
+				cells.push(p.x.map((x, k) => [x, p.y[k]] as [number, number]));
+			}
 			conductors.push({
 				layer: stackId,
 				name: layerName,
-				polygon: p.x.map((x, i) => [x, p.y[i]] as [number, number]),
+				polygon: [[xmin, ymin], [xmax, ymin], [xmax, ymax], [xmin, ymax]],
+				polygon_cells: cells,
 			});
 		}
 	}

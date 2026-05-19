@@ -88,6 +88,21 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 	const netVias: ViaConnection[] = [];
 	let _nid = 0, _sid = 0;
 
+	// Via grid at a crossing endpoint — formula matches generateLegacyPolygons
+	// so the via polygons sit exactly under the m2 crossing strip that the
+	// legacy renderer draws. `extend` is the crossing's outboard length;
+	// the via is recessed by via_in_metal from each metal edge.
+	function viaPolysAt(cx: number, cy: number): Polygon[] {
+		const dx = Math.sign(cx) * (extend - width) / 2;
+		const dy = Math.sign(cy) * (extend - width) / 2;
+		const w_in = extend - 2 * via_in_metal;
+		const h_in = width - 2 * via_in_metal;
+		if (Math.abs(cy) > Math.abs(cx)) {
+			return viaGrid(cx + dx, cy, w_in, h_in, via_spacing, via_width);
+		}
+		return viaGrid(cx, cy + dy, h_in, w_in, via_spacing, via_width);
+	}
+
 	const _nodeReg = new Map<string, ConductorNode>();
 	function addN(x: number, y: number, layerId: string): ConductorNode {
 		const sx = Math.round(x * 1000) / 1000;
@@ -144,16 +159,30 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 		// Connect quadrants: UL↔UR at top, LL↔LR at bottom, UL↔LL at left, UR↔LR at right
 		// Each connection is either a bridge (same metal) or crossing (lower metal + vias)
 
+		// Via centres mirror the legacy renderer's formulas so the via
+		// polygons land underneath the m2 crossing strips that the renderer
+		// draws (the network-node positions don't match the rendered metal,
+		// so we can't reuse those).
+		const hTop = R1 * Math.sin(PI * (0.5 - 1 / sides));
+		const hBot = (-R2 + s) * Math.sin(PI * (0.5 - 1 / sides));
+		const tcL: [number, number] = [-sepTotal / 2 - width / 2, hTop - 3 * width / 2 - spacing];
+		const tcR: [number, number] = [ sepTotal / 2 + width / 2, hTop - width / 2];
+		const bcL: [number, number] = [-sepTotal / 2 - width / 2, hBot - 3 * width / 2 - spacing];
+		const bcR: [number, number] = [ sepTotal / 2 + width / 2, hBot - width / 2];
+		const lcT: [number, number] = [hBot - 3 * width / 2 - spacing, -sepTotal / 2 - width / 2];
+		const lcB: [number, number] = [hBot - width / 2,              sepTotal / 2 + width / 2];
+		const rcT: [number, number] = [hTop - 3 * width / 2 - spacing, -sepTotal / 2 - width / 2];
+		const rcB: [number, number] = [hTop - width / 2,              sepTotal / 2 + width / 2];
+
 		// Top connection: UL.first ↔ UR.last (both at top y)
 		if (topBridge.includes(winding)) {
 			addS(qFirst[0], qLast[2], width, 'm3', `w${winding}_bridge_top`, 'windings');
 		} else if (topCrossing.includes(winding)) {
-			const h = R1 * Math.sin(PI * (0.5 - 1 / sides));
 			const cL = addN(qFirst[0].x, qFirst[0].y, 'm2');
 			const cR = addN(qLast[2].x, qLast[2].y, 'm2');
 			addS(cL, cR, width, 'm2', `w${winding}_cross_top`, 'crossings');
-			netVias.push({ id: `v_tc_l${winding}`, topNode: qFirst[0].id, bottomNode: cL.id, resistance: 0.05, polygons: [], renderLayer: 'vias1' });
-			netVias.push({ id: `v_tc_r${winding}`, topNode: qLast[2].id, bottomNode: cR.id, resistance: 0.05, polygons: [], renderLayer: 'vias1' });
+			netVias.push({ id: `v_tc_l${winding}`, topNode: qFirst[0].id, bottomNode: cL.id, resistance: 0.05, polygons: viaPolysAt(...tcL), renderLayer: 'vias1' });
+			netVias.push({ id: `v_tc_r${winding}`, topNode: qLast[2].id,  bottomNode: cR.id, resistance: 0.05, polygons: viaPolysAt(...tcR), renderLayer: 'vias1' });
 		} else {
 			// Direct connection (no crossing needed for this winding at top)
 			addS(qFirst[0], qLast[2], width, 'm3', `w${winding}_conn_top`, 'windings');
@@ -163,12 +192,11 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 		if (bottomBridge.includes(winding)) {
 			addS(qLast[1], qFirst[3], width, 'm3', `w${winding}_bridge_bot`, 'windings');
 		} else if (bottomCrossing.includes(winding)) {
-			const h = (-R2 + s) * Math.sin(PI * (0.5 - 1 / sides));
 			const cL = addN(qLast[1].x, qLast[1].y, 'm2');
 			const cR = addN(qFirst[3].x, qFirst[3].y, 'm2');
 			addS(cL, cR, width, 'm2', `w${winding}_cross_bot`, 'crossings');
-			netVias.push({ id: `v_bc_l${winding}`, topNode: qLast[1].id, bottomNode: cL.id, resistance: 0.05, polygons: [], renderLayer: 'vias1' });
-			netVias.push({ id: `v_bc_r${winding}`, topNode: qFirst[3].id, bottomNode: cR.id, resistance: 0.05, polygons: [], renderLayer: 'vias1' });
+			netVias.push({ id: `v_bc_l${winding}`, topNode: qLast[1].id,  bottomNode: cL.id, resistance: 0.05, polygons: viaPolysAt(...bcL), renderLayer: 'vias1' });
+			netVias.push({ id: `v_bc_r${winding}`, topNode: qFirst[3].id, bottomNode: cR.id, resistance: 0.05, polygons: viaPolysAt(...bcR), renderLayer: 'vias1' });
 		} else {
 			addS(qLast[1], qFirst[3], width, 'm3', `w${winding}_conn_bot`, 'windings');
 		}
@@ -180,8 +208,8 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 			const cT = addN(qLast[0].x, qLast[0].y, 'm2');
 			const cB = addN(qFirst[1].x, qFirst[1].y, 'm2');
 			addS(cT, cB, width, 'm2', `w${winding}_cross_l`, 'crossings');
-			netVias.push({ id: `v_lc_t${winding}`, topNode: qLast[0].id, bottomNode: cT.id, resistance: 0.05, polygons: [], renderLayer: 'vias1' });
-			netVias.push({ id: `v_lc_b${winding}`, topNode: qFirst[1].id, bottomNode: cB.id, resistance: 0.05, polygons: [], renderLayer: 'vias1' });
+			netVias.push({ id: `v_lc_t${winding}`, topNode: qLast[0].id,  bottomNode: cT.id, resistance: 0.05, polygons: viaPolysAt(...lcT), renderLayer: 'vias1' });
+			netVias.push({ id: `v_lc_b${winding}`, topNode: qFirst[1].id, bottomNode: cB.id, resistance: 0.05, polygons: viaPolysAt(...lcB), renderLayer: 'vias1' });
 		} else {
 			addS(qLast[0], qFirst[1], width, 'm3', `w${winding}_conn_l`, 'windings');
 		}
@@ -193,8 +221,8 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 			const cT = addN(qFirst[2].x, qFirst[2].y, 'm2');
 			const cB = addN(qLast[3].x, qLast[3].y, 'm2');
 			addS(cT, cB, width, 'm2', `w${winding}_cross_r`, 'crossings');
-			netVias.push({ id: `v_rc_t${winding}`, topNode: qFirst[2].id, bottomNode: cT.id, resistance: 0.05, polygons: [], renderLayer: 'vias1' });
-			netVias.push({ id: `v_rc_b${winding}`, topNode: qLast[3].id, bottomNode: cB.id, resistance: 0.05, polygons: [], renderLayer: 'vias1' });
+			netVias.push({ id: `v_rc_t${winding}`, topNode: qFirst[2].id, bottomNode: cT.id, resistance: 0.05, polygons: viaPolysAt(...rcT), renderLayer: 'vias1' });
+			netVias.push({ id: `v_rc_b${winding}`, topNode: qLast[3].id,  bottomNode: cB.id, resistance: 0.05, polygons: viaPolysAt(...rcB), renderLayer: 'vias1' });
 		} else {
 			addS(qFirst[2], qLast[3], width, 'm3', `w${winding}_conn_r`, 'windings');
 		}
@@ -293,7 +321,6 @@ function generateLegacyPolygons(
 
 	let R1 = R1_init, R2 = R1 - v;
 	const viaCentersTCT: [number, number][] = [];
-	const viaCentersTB: [number, number][] = [];
 
 	const polysWindings: Polygon[] = [];
 	const polysCrossings: Polygon[] = [];
@@ -324,11 +351,15 @@ function generateLegacyPolygons(
 			const hL = -R2*Math.sin(PI*(0.5-1/sides)); polysWindings.push({ x: [hL,hL,hL-width,hL-width], y: [-sepTotal/2,sepTotal/2,sepTotal/2,-sepTotal/2] });
 		}
 
-		if (topCrossing.includes(winding)) { const h = R1*Math.sin(PI*(0.5-1/sides)); polysCrossings.push(routingGeometric45(width,spacing,0,h-width-spacing/2,extend)); const ct=routingGeometric45(width,spacing,0,h-width-spacing/2,0); polysWindings.push({x:ct.x.map(v=>-v),y:ct.y}); viaCentersTB.push([-sepTotal/2-width/2,h-3*width/2-spacing],[sepTotal/2+width/2,h-width/2]); }
-		if (bottomCrossing.includes(winding)) { const h = (-R2+s)*Math.sin(PI*(0.5-1/sides)); polysCrossings.push(routingGeometric45(width,spacing,0,h-width-spacing/2,extend)); const ct=routingGeometric45(width,spacing,0,h-width-spacing/2,0); polysWindings.push({x:ct.x.map(v=>-v),y:ct.y}); viaCentersTB.push([-sepTotal/2-width/2,h-3*width/2-spacing],[sepTotal/2+width/2,h-width/2]); }
+		// Crossings get drawn here for the renderer; the via polygons that
+		// land on top of them are emitted via network.vias in the main build
+		// function, not here (so they participate in the proper conductor
+		// topology with topNode/bottomNode references).
+		if (topCrossing.includes(winding)) { const h = R1*Math.sin(PI*(0.5-1/sides)); polysCrossings.push(routingGeometric45(width,spacing,0,h-width-spacing/2,extend)); const ct=routingGeometric45(width,spacing,0,h-width-spacing/2,0); polysWindings.push({x:ct.x.map(v=>-v),y:ct.y}); }
+		if (bottomCrossing.includes(winding)) { const h = (-R2+s)*Math.sin(PI*(0.5-1/sides)); polysCrossings.push(routingGeometric45(width,spacing,0,h-width-spacing/2,extend)); const ct=routingGeometric45(width,spacing,0,h-width-spacing/2,0); polysWindings.push({x:ct.x.map(v=>-v),y:ct.y}); }
 		if (lrCrossing.includes(winding)) {
-			const hR = R1*Math.sin(PI*(0.5-1/sides)); let cr=routingGeometric45(width,spacing,0,hR-width-spacing/2,extend); polysCrossings.push({x:cr.y,y:cr.x}); cr=routingGeometric45(width,spacing,0,hR-width-spacing/2,0); polysWindings.push({x:cr.y.map(v=>-v),y:cr.x}); viaCentersTB.push([hR-3*width/2-spacing,-sepTotal/2-width/2],[hR-width/2,sepTotal/2+width/2]);
-			const hL = (-R2+s)*Math.sin(PI*(0.5-1/sides)); cr=routingGeometric45(width,spacing,0,hL-width-spacing/2,extend); polysCrossings.push({x:cr.y,y:cr.x}); cr=routingGeometric45(width,spacing,0,hL-width-spacing/2,0); polysWindings.push({x:cr.y.map(v=>-v),y:cr.x}); viaCentersTB.push([hL-3*width/2-spacing,-sepTotal/2-width/2],[hL-width/2,sepTotal/2+width/2]);
+			const hR = R1*Math.sin(PI*(0.5-1/sides)); let cr=routingGeometric45(width,spacing,0,hR-width-spacing/2,extend); polysCrossings.push({x:cr.y,y:cr.x}); cr=routingGeometric45(width,spacing,0,hR-width-spacing/2,0); polysWindings.push({x:cr.y.map(v=>-v),y:cr.x});
+			const hL = (-R2+s)*Math.sin(PI*(0.5-1/sides)); cr=routingGeometric45(width,spacing,0,hL-width-spacing/2,extend); polysCrossings.push({x:cr.y,y:cr.x}); cr=routingGeometric45(width,spacing,0,hL-width-spacing/2,0); polysWindings.push({x:cr.y.map(v=>-v),y:cr.x});
 		}
 
 		R1 -= s; R2 -= s;
@@ -396,10 +427,17 @@ function generateLegacyPolygons(
 	else { xPortT=[-sepTotal/2,-tpx+width/2,-tpx+width/2,-tpx-width/2,-tpx-width/2,-sepTotal/2]; yPortT=[-Dout/2+width,-Dout/2+width,-Dout/2-width,-Dout/2-width,-Dout/2,-Dout/2]; }
 	polysWindings.push({x:xPortT,y:yPortT.map(v=>-v)}); polysWindings.push({x:xPortT.map(v=>-v),y:yPortT.map(v=>-v)});
 
-	// Vias
+	// Center-tap vias: the renderer keeps drawing these for visual fidelity
+	// (each one lands at a centertap-to-winding handoff). Bridge/crossing
+	// vias on the other hand are emitted via network.vias from the main
+	// build function so the FEM topology stays consistent.
 	const _extCT = Math.min(width, extend);
-	for (const [cx,cy] of viaCentersTCT) { const vp=viaGrid(cx,cy,width-2*via_in_metal,_extCT-2*via_in_metal,via_spacing,via_width); polysVias2=polysVias2.concat(vp); polysVias1=polysVias1.concat(vp); }
-	for (const [cx,cy] of viaCentersTB) { const dx=Math.sign(cx)*(extend-width)/2; const dy=Math.sign(cy)*(extend-width)/2; if(Math.abs(cy)>Math.abs(cx)) polysVias1=polysVias1.concat(viaGrid(cx+dx,cy,extend-2*via_in_metal,width-2*via_in_metal,via_spacing,via_width)); else polysVias1=polysVias1.concat(viaGrid(cx,cy+dy,width-2*via_in_metal,extend-2*via_in_metal,via_spacing,via_width)); }
+	for (const [cx,cy] of viaCentersTCT) {
+		const vp = viaGrid(cx, cy, width - 2 * via_in_metal, _extCT - 2 * via_in_metal,
+			via_spacing, via_width);
+		polysVias2 = polysVias2.concat(vp);
+		polysVias1 = polysVias1.concat(vp);
+	}
 
 	return { windings: polysWindings, crossings: polysCrossings, vias1: polysVias1, centertap: polysCenterTap, vias2: polysVias2, pgs: [] };
 }
