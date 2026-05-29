@@ -161,10 +161,8 @@ function generateLegacyPolygons(
 			const hL = -R2*Math.sin(PI*(0.5-1/sides)); polysWindings.push({ x: [hL,hL,hL-width,hL-width], y: [-sepTotal/2,sepTotal/2,sepTotal/2,-sepTotal/2] });
 		}
 
-		// Crossings get drawn here for the renderer; the via polygons that
-		// land on top of them are emitted via network.vias in the main build
-		// function, not here (so they participate in the proper conductor
-		// topology with topNode/bottomNode references).
+		// Crossing strips on the lower metal; the vias that land on top of them
+		// are emitted just below in this same loop (polygon SoT).
 		if (topCrossing.includes(winding)) { const h = R1*Math.sin(PI*(0.5-1/sides)); polysCrossings.push(routingGeometric45(width,spacing,0,h-width-spacing/2,extend)); const ct=routingGeometric45(width,spacing,0,h-width-spacing/2,0); polysWindings.push({x:ct.x.map(v=>-v),y:ct.y}); }
 		if (bottomCrossing.includes(winding)) { const h = (-R2+s)*Math.sin(PI*(0.5-1/sides)); polysCrossings.push(routingGeometric45(width,spacing,0,h-width-spacing/2,extend)); const ct=routingGeometric45(width,spacing,0,h-width-spacing/2,0); polysWindings.push({x:ct.x.map(v=>-v),y:ct.y}); }
 		if (lrCrossing.includes(winding)) {
@@ -256,10 +254,8 @@ function generateLegacyPolygons(
 	else { xPortT=[-sepTotal/2,-tpx+width/2,-tpx+width/2,-tpx-width/2,-tpx-width/2,-sepTotal/2]; yPortT=[-Dout/2+width,-Dout/2+width,-Dout/2-width,-Dout/2-width,-Dout/2,-Dout/2]; }
 	polysWindings.push({x:xPortT,y:yPortT.map(v=>-v)}); polysWindings.push({x:xPortT.map(v=>-v),y:yPortT.map(v=>-v)});
 
-	// Center-tap vias: the renderer keeps drawing these for visual fidelity
-	// (each one lands at a centertap-to-winding handoff). Bridge/crossing
-	// vias on the other hand are emitted via network.vias from the main
-	// build function so the FEM topology stays consistent.
+	// Center-tap vias (each lands at a centertap-to-winding handoff). The
+	// bridge/crossing vias are emitted in the winding loop above.
 	const _extCT = Math.min(width, extend);
 	for (const [cx,cy] of viaCentersTCT) {
 		const vp = viaGrid(cx, cy, width - 2 * via_in_metal, _extCT - 2 * via_in_metal,
