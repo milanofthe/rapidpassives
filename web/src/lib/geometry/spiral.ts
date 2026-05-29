@@ -1,11 +1,8 @@
-import type { Polygon, LayerMap, SpiralInductorParams } from './types';
-import type { ConductorNetwork, ConductorNode, ConductorSegment, ViaConnection, Port, GeometryResult } from './network';
-import { networkToLayers } from './polygonize';
+import type { Polygon, LayerMap, Port, GeometryResult, SpiralInductorParams } from './types';
 import { viaGrid, pgs4 } from './utils';
-import { computeViaResistance } from './via_resistance';
-import { createDefaultStack } from '$lib/stack/types';
+import { makeAspectShiftY, mapY } from './primitives';
 
-/** Build spiral inductor geometry using network-first approach */
+/** Build spiral inductor geometry. Polygons are the single source of truth. */
 export function buildSpiralInductor(params: SpiralInductorParams): GeometryResult {
 	const { Dout, N, sides, width, spacing, via_spacing, via_width, via_in_metal } = params;
 	const ar = params.aspectRatio ?? 1;
@@ -115,122 +112,21 @@ export function buildSpiralInductor(params: SpiralInductorParams): GeometryResul
 		);
 	}
 
-	// --- Build conductor network ---
-	const nodes: ConductorNode[] = [];
-	const segments: ConductorSegment[] = [];
-	let nid = 0, sid = 0;
-
-	function addNode(x: number, y: number, layerId: string): ConductorNode {
-		const node: ConductorNode = { id: `n${nid++}`, x, y, layerId };
-		nodes.push(node);
-		return node;
-	}
-
-	// Port 1 node (start of winding, top metal)
-	const p1Node = addNode(Dout / 2 + width, entryYCenter, 'm3');
-
-	// Winding centerline nodes at each octagon vertex
-	let prevNode = p1Node;
-	r1 = R1; r2 = R2;
-	for (let section = 0; section < nSections; section++) {
-		for (const phi of angles) {
-			let cx: number, cy: number;
-			if (section % 2 === 0) {
-				cx = (r1 + r2) / 2 * Math.cos(phi);
-				cy = (r1 + r2) / 2 * Math.sin(phi);
-			} else {
-				cx = -(r1 + r2) / 2 * Math.cos(phi) + xShift;
-				cy = -(r1 + r2) / 2 * Math.sin(phi) + yShift;
-			}
-			const node = addNode(cx, cy, 'm3');
-			segments.push({
-				id: `s${sid++}`, fromNode: prevNode.id, toNode: node.id,
-				width, layerId: 'm3', pathId: 'winding', renderLayer: 'windings',
-				polygonOverride: undefined,
-			});
-			prevNode = node;
-		}
-		r1 -= s / 2;
-		r2 -= s / 2;
-	}
-
-	// Via top node (end of winding on top metal)
-	const viaTopNode = addNode(viaCenterX, viaCenterY, 'm3');
-	segments.push({
-		id: `s${sid++}`, fromNode: prevNode.id, toNode: viaTopNode.id,
-		width, layerId: 'm3', pathId: 'winding', renderLayer: 'windings',
-		polygonOverride: undefined,
-	});
-
-	// Via bottom node (start of underpass on lower metal)
-	const viaBotNode = addNode(viaCenterX, viaCenterY, 'm2');
-
-	// Via connection — compute actual resistance from via array geometry
-	const viaGridWidthX = width - 2 * via_in_metal;
-	const viaGridWidthY = extend > width
-		? extend - 2 * via_in_metal
-		: width - 2 * via_in_metal;
-	const defaultStack = createDefaultStack();
-	const viaR = computeViaResistance(viaGridWidthX, viaGridWidthY, via_spacing, via_width, defaultStack, 'm3', 'm2');
-
-	const viaConn: ViaConnection = {
-		id: 'via0',
-		topNode: viaTopNode.id,
-		bottomNode: viaBotNode.id,
-		resistance: viaR,
-		polygons: viaPolys,
-		renderLayer: 'vias',
+	// Apply aspect ratio — stretch the straight sides only (y=0 fixed).
+	const shiftY = makeAspectShiftY(Dout, ar);
+	const layers: LayerMap = {
+		windings: [mapY(windingPolygon, shiftY)],
+		crossings: [mapY(underpassPolygon, shiftY)],
+		vias: viaPolys.map(p => mapY(p, shiftY)),
+		pgs: [],
 	};
-
-	// Port 2 node (end of underpass, lower metal)
-	const p2Node = addNode(underpassEndX, exitYCenter, 'm2');
-	segments.push({
-		id: `s${sid++}`, fromNode: viaBotNode.id, toNode: p2Node.id,
-		width, layerId: 'm2', pathId: 'underpass', renderLayer: 'crossings',
-		polygonOverride: underpassPolygon,
-	});
 
 	const ports: Port[] = [
-		{ name: 'P1', node: p1Node.id },
-		{ name: 'P2', node: p2Node.id },
+		{ name: 'P1', x: Dout / 2 + width, y: shiftY(entryYCenter), layer: 'windings', role: 'signal' },
+		{ name: 'P2', x: underpassEndX, y: shiftY(exitYCenter), layer: 'crossings', role: 'signal' },
 	];
 
-	const network: ConductorNetwork = {
-		nodes, segments, vias: [viaConn], ports,
-	};
-
-	// --- Use legacy polygon for winding (exact match guaranteed) ---
-	const windingSegs = segments.filter(seg => seg.pathId === 'winding');
-	if (windingSegs.length > 0) {
-		windingSegs[0].polygonOverride = windingPolygon;
-		for (let i = 1; i < windingSegs.length; i++) {
-			windingSegs[i].pathId = 'winding_topology_only';
-			windingSegs[i].polygonOverride = { x: [], y: [] };
-		}
-	}
-
-	// Apply aspect ratio — extend straight side segments only
-	if (ar !== 1) {
-		const ext = Dout * (ar - 1);
-		const shiftY = (y: number) => y > 0 ? y + ext / 2 : y < 0 ? y - ext / 2 : y;
-		for (const node of nodes) node.y = shiftY(node.y);
-		for (const seg of segments) {
-			if (seg.polygonOverride) {
-				seg.polygonOverride.y = seg.polygonOverride.y.map(shiftY);
-			}
-		}
-		for (const via of network.vias) {
-			for (const poly of via.polygons) {
-				poly.y = poly.y.map(shiftY);
-			}
-		}
-	}
-
-	// Derive layers from network
-	const layers = networkToLayers(network);
-	if (!layers.pgs) layers.pgs = [];
-
-	return { network, layers };
+	return { layers, ports };
 }
 
 export function isSpiralValid(params: SpiralInductorParams): boolean {

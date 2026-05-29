@@ -1,5 +1,4 @@
-import type { Polygon, LayerMap } from './types';
-import type { ConductorNetwork, ConductorNode, Port, GeometryResult } from './network';
+import type { Polygon, LayerMap, Port, GeometryResult } from './types';
 
 export interface RatraceCouplerParams {
 	/** Mean ring radius (um) */
@@ -63,7 +62,6 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 	}
 
 	// Feed lines at enabled ports
-	const nodes: ConductorNode[] = [];
 	const ports: Port[] = [];
 
 	for (let i = 0; i < 4; i++) {
@@ -93,13 +91,8 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 			],
 		});
 
-		// layerId names the renderLayer so the FEM exporter resolves it via
-		// layerNameToStackId — no segments here to infer from.
-		const node: ConductorNode = {
-			id: `n${i}`, x: cos * endR, y: sin * endR, layerId: 'windings',
-		};
-		nodes.push(node);
-		ports.push({ name: portNames[i], node: node.id });
+		// Port marker at the feed-line tip, on the ring metal (windings).
+		ports.push({ name: portNames[i], x: cos * endR, y: sin * endR, layer: 'windings', role: 'signal' });
 	}
 
 	// Ground plane on lower metal
@@ -109,13 +102,12 @@ export function buildRatraceCoupler(params: RatraceCouplerParams): GeometryResul
 		y: [-gpSize, -gpSize, gpSize, gpSize],
 	};
 
-	const network: ConductorNetwork = { nodes, segments: [], vias: [], ports };
 	const layers: LayerMap = {
 		windings: polys,
 		crossings: [groundPoly],
 	};
 
-	return { network, layers };
+	return { layers, ports };
 }
 
 export function isRatraceCouplerValid(params: RatraceCouplerParams): boolean {
@@ -132,6 +124,7 @@ export function isRatraceCouplerValid(params: RatraceCouplerParams): boolean {
  *  Returns { radius, ringWidth, portWidth } in um.
  */
 export function designRatrace(freqGHz: number, er: number, h: number, Z0: number = 50): { radius: number; ringWidth: number; portWidth: number } {
+	const PI = Math.PI;
 	const c = 299792.458; // um * GHz
 	const erEff50 = (er + 1) / 2 + (er - 1) / 2 / Math.sqrt(1 + 12 * h / 100); // approximate for initial W
 	const lambda50 = c / (freqGHz * Math.sqrt(erEff50));

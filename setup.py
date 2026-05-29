@@ -7,16 +7,17 @@ setup(
     author_email="milan.rother@gmx.de",
     description="Automatic DRC-clean Layout Generation of Inductors and Transformers",
     url="https://github.com/milanofthe/rapidpassives",
-    packages=find_packages(),
+    packages=find_packages(include=["rapidpassives", "rapidpassives.*"],
+                           exclude=["rapidpassives.tests", "rapidpassives.examples"]),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.6",
+    python_requires=">=3.10",
     install_requires=[
         "numpy",
-        "matplotlib",
-        "gdstk"
+        "shapely>=2.0",
+        "gdstk",
     ],
 )

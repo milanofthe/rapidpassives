@@ -2,20 +2,16 @@
 	import type { LayerMap } from '$lib/geometry/types';
 	import type { RenderOptions } from '$lib/render/canvas2d';
 	import type { ProcessStack } from '$lib/stack/types';
-	import type { SimulationResult } from '$lib/solver/peec';
 	import type { InstancedSceneData } from '$lib/render/canvas3d';
 	import LayoutViewer3D from './LayoutViewer3D.svelte';
-	import ResultsPanel from './ResultsPanel.svelte';
 	import type { Snippet } from 'svelte';
 
-	let { layers, sidebar, stackPanel, simPanel, valid = true, renderOpts, simResult, stack, instancedScene, gdsLayerInfo, visibleGdsLayers, onFileDrop, dropLoading = false, dropPhase = '', dropPolyCount = 0, dropEmpty = false, dropAccept = '.gds,.gdsii,.gds2' }: {
+	let { layers, sidebar, stackPanel, valid = true, renderOpts, stack, instancedScene, gdsLayerInfo, visibleGdsLayers, onFileDrop, dropLoading = false, dropPhase = '', dropPolyCount = 0, dropEmpty = false, dropAccept = '.gds,.gdsii,.gds2' }: {
 		layers: LayerMap;
 		sidebar: Snippet;
 		stackPanel?: Snippet;
-		simPanel?: Snippet;
 		valid?: boolean;
 		renderOpts?: RenderOptions;
-		simResult?: SimulationResult | null;
 		stack?: ProcessStack;
 		instancedScene?: InstancedSceneData | null;
 		gdsLayerInfo?: Map<number, import('$lib/render/canvas3d').GdsLayerInfo>;
@@ -69,7 +65,7 @@
 		}
 	}
 
-	let activeTab = $state<'params' | 'stack' | 'sim'>('params');
+	let activeTab = $state<'params' | 'stack'>('params');
 	let viewMode = $state<'2d' | '3d'>('2d');
 	let viewer: LayoutViewer3D | undefined = $state();
 
@@ -124,40 +120,18 @@
 		draggingSidebar = false;
 	}
 
-	// Resizable results pane
-	let resultsHeight = $state(350);
-	let draggingResults = false;
 	let workspaceEl = $state<HTMLDivElement | null>(null);
-
-	function onResultsDragStart(e: PointerEvent) {
-		draggingResults = true;
-		(e.target as HTMLElement).setPointerCapture(e.pointerId);
-	}
-	function onResultsDrag(e: PointerEvent) {
-		if (!draggingResults || !workspaceEl) return;
-		const rect = workspaceEl.getBoundingClientRect();
-		resultsHeight = Math.max(100, Math.min(rect.height - 100, rect.bottom - e.clientY));
-	}
-	function onResultsDragEnd() {
-		draggingResults = false;
-	}
 </script>
 
 <svelte:window onkeydown={onKeyDown} />
 
 <div class="workspace" bind:this={workspaceEl}>
 	<aside class="sidebar" style="width: {sidebarWidth}px; min-width: {sidebarWidth}px;">
-		{#if stackPanel || simPanel}
+		{#if stackPanel}
 			<div class="sidebar-tabs">
 				<button class="stab" class:active={activeTab === 'params'} onclick={() => activeTab = 'params'}>Params</button>
-				{#if stackPanel}
-					<span class="stab-sep"></span>
-					<button class="stab" class:active={activeTab === 'stack'} onclick={() => activeTab = 'stack'}>Stack</button>
-				{/if}
-				{#if simPanel}
-					<span class="stab-sep"></span>
-					<button class="stab" class:active={activeTab === 'sim'} onclick={() => activeTab = 'sim'}>Sim</button>
-				{/if}
+				<span class="stab-sep"></span>
+				<button class="stab" class:active={activeTab === 'stack'} onclick={() => activeTab = 'stack'}>Stack</button>
 			</div>
 		{/if}
 		<div class="sidebar-content">
@@ -165,8 +139,6 @@
 				{@render sidebar()}
 			{:else if activeTab === 'stack' && stackPanel}
 				{@render stackPanel()}
-			{:else if activeTab === 'sim' && simPanel}
-				{@render simPanel()}
 			{/if}
 		</div>
 	</aside>
@@ -267,17 +239,6 @@
 				{/if}
 			</div>
 		</div>
-		{#if simResult}
-			<div
-				class="resize-handle-h"
-				onpointerdown={onResultsDragStart}
-				onpointermove={onResultsDrag}
-				onpointerup={onResultsDragEnd}
-			></div>
-			<div class="results-pane" style="height: {resultsHeight}px;">
-				<ResultsPanel result={simResult} />
-			</div>
-		{/if}
 	</div>
 </div>
 
@@ -301,16 +262,6 @@
 		transition: background var(--transition);
 	}
 	.resize-handle-v:hover, .resize-handle-v:active {
-		background: var(--accent);
-	}
-	.resize-handle-h {
-		height: 2px;
-		cursor: row-resize;
-		background: var(--border);
-		flex-shrink: 0;
-		transition: background var(--transition);
-	}
-	.resize-handle-h:hover, .resize-handle-h:active {
 		background: var(--accent);
 	}
 	.sidebar-tabs {
@@ -506,9 +457,5 @@
 		font-weight: 700;
 		width: 32px;
 		letter-spacing: 0.5px;
-	}
-	.results-pane {
-		flex-shrink: 0;
-		overflow: hidden;
 	}
 </style>
