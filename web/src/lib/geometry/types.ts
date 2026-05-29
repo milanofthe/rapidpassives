@@ -137,4 +137,19 @@ export type GeometryParams = SpiralInductorParams | SymmetricInductorParams | Sy
 
 export type GeometryType = 'spiral' | 'symmetric_inductor' | 'symmetric_transformer' | 'stacked_transformer' | 'mom_capacitor' | 'patch_antenna';
 
-export type { ConductorNetwork, ConductorNode, ConductorSegment, ViaConnection, Port, GeometryResult } from './network';
+/** A port terminal. `layer` is always a LayerName (the metal the port sits on),
+ *  resolved by the generator — never an internal stack id. */
+export interface Port {
+	name: string;
+	x: number;
+	y: number;
+	layer: LayerName;
+	role?: 'signal' | 'ground' | 'centertap';
+}
+
+/** Combined output from geometry builders: polygons are the single source of
+ *  truth, ports carry their own coordinate + metal layer. */
+export interface GeometryResult {
+	layers: LayerMap;
+	ports: Port[];
+}
