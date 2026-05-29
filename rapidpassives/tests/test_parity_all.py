@@ -12,7 +12,7 @@ import os
 
 import pytest
 
-import rapidpassives_sweep as rps
+import rapidpassives as rps
 
 _DIR = os.path.join(os.path.dirname(__file__), "golden")
 
