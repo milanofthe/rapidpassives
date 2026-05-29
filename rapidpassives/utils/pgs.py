@@ -161,11 +161,11 @@ def pgs4(D, w, s):
         w : conductor width
         s : conductor spacing
 
-    A central vertical spine carries horizontal fingers on both sides. The
-    topology is a tree (no closed conductive loops), so induced eddy currents
-    are still broken, while every corner is a right angle. This avoids the
-    acute (45-degree) and degenerate intersections of the radial pattern that
-    fail foundry DRC (e.g. IHP SG13G2 / SG13CMOS5L).
+    A central vertical spine carries horizontal fingers on both sides, filling
+    a square of side D. The topology is a tree (no closed conductive loops), so
+    induced eddy currents are still broken, while every corner is a right angle.
+    This avoids the acute (45-degree) and degenerate intersections of the radial
+    pattern that fail foundry DRC (e.g. IHP SG13G2 / SG13CMOS5L).
     """
 
     R = D / 2
@@ -173,19 +173,14 @@ def pgs4(D, w, s):
 
     sections = []
 
-    # central vertical spine, kept inside the radius R
-    y_spine = np.sqrt(max(R**2 - (w/2)**2, 0.0))
-    sections.append( ( [-w/2, -w/2, w/2, w/2], [-y_spine, y_spine, y_spine, -y_spine] ) )
+    # central vertical spine, spanning the full square height
+    sections.append( ( [-w/2, -w/2, w/2, w/2], [-R, R, R, -R] ) )
 
-    # horizontal fingers, centered on multiples of the pitch, length clipped to R
+    # horizontal fingers, centered on multiples of the pitch, spanning the full width
     k_max = int(np.floor((R - w/2) / pitch))
     for k in range(-k_max, k_max + 1):
         y_c = k * pitch
         y_b, y_t = y_c - w/2, y_c + w/2
-        y_lim = max(abs(y_b), abs(y_t))
-        x_max = np.sqrt(max(R**2 - y_lim**2, 0.0))
-        if x_max <= w/2:
-            continue
-        sections.append( ( [-x_max, -x_max, x_max, x_max], [y_b, y_t, y_t, y_b] ) )
+        sections.append( ( [-R, -R, R, R], [y_b, y_t, y_t, y_b] ) )
 
     return sections

@@ -36,11 +36,11 @@ export function viaGrid(
 /**
  * Patterned ground shield, Manhattan (90-degree-only) fishbone variant.
  *
- * A central vertical spine carries horizontal fingers on both sides. The
- * topology is a tree (no closed conductive loops), so induced eddy currents
- * are still broken, while every corner is a right angle. This avoids the
- * acute (45-degree) and degenerate intersections of the old radial pattern
- * that failed foundry DRC (e.g. IHP SG13G2 / SG13CMOS5L).
+ * A central vertical spine carries horizontal fingers on both sides, filling a
+ * square of side D. The topology is a tree (no closed conductive loops), so
+ * induced eddy currents are still broken, while every corner is a right angle.
+ * This avoids the acute (45-degree) and degenerate intersections of the old
+ * radial pattern that failed foundry DRC (e.g. IHP SG13G2 / SG13CMOS5L).
  */
 export function pgs4(D: number, w: number, s: number): Polygon[] {
 	const R = D / 2;
@@ -48,19 +48,15 @@ export function pgs4(D: number, w: number, s: number): Polygon[] {
 
 	const sections: Polygon[] = [];
 
-	// Central vertical spine, kept inside the radius R
-	const ySpine = Math.sqrt(Math.max(R * R - (w / 2) ** 2, 0));
-	sections.push({ x: [-w / 2, -w / 2, w / 2, w / 2], y: [-ySpine, ySpine, ySpine, -ySpine] });
+	// Central vertical spine, spanning the full square height
+	sections.push({ x: [-w / 2, -w / 2, w / 2, w / 2], y: [-R, R, R, -R] });
 
-	// Horizontal fingers, centered on multiples of the pitch, length clipped to R
+	// Horizontal fingers, centered on multiples of the pitch, spanning the full width
 	const kMax = Math.floor((R - w / 2) / pitch);
 	for (let k = -kMax; k <= kMax; k++) {
 		const yc = k * pitch;
 		const yb = yc - w / 2, yt = yc + w / 2;
-		const yLim = Math.max(Math.abs(yb), Math.abs(yt));
-		const xMax = Math.sqrt(Math.max(R * R - yLim * yLim, 0));
-		if (xMax <= w / 2) continue;
-		sections.push({ x: [-xMax, -xMax, xMax, xMax], y: [yb, yt, yt, yb] });
+		sections.push({ x: [-R, -R, R, R], y: [yb, yt, yt, yb] });
 	}
 
 	return sections;
