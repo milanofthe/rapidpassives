@@ -33,45 +33,35 @@ export function viaGrid(
 	return polys;
 }
 
-/** Patterned ground shield (pgs4 variant) */
+/**
+ * Patterned ground shield, Manhattan (90-degree-only) fishbone variant.
+ *
+ * A central vertical spine carries horizontal fingers on both sides. The
+ * topology is a tree (no closed conductive loops), so induced eddy currents
+ * are still broken, while every corner is a right angle. This avoids the
+ * acute (45-degree) and degenerate intersections of the old radial pattern
+ * that failed foundry DRC (e.g. IHP SG13G2 / SG13CMOS5L).
+ */
 export function pgs4(D: number, w: number, s: number): Polygon[] {
-	const xLeft = arange(s / 2, D / 2, w + s);
-	const xRight = arange(w + s / 2, D / 2, w + s);
-
-	const yLeft = xLeft.map(xl => -xl - Math.SQRT2 / 2 * w);
-	const yRight = xRight.map(xr => -xr - Math.SQRT2 / 2 * w);
+	const R = D / 2;
+	const pitch = w + s;
 
 	const sections: Polygon[] = [];
 
-	for (let i = 0; i < Math.min(xLeft.length, xRight.length); i++) {
-		const xl = xLeft[i], xr = xRight[i], yl = yLeft[i], yr = yRight[i];
+	// Central vertical spine, kept inside the radius R
+	const ySpine = Math.sqrt(Math.max(R * R - (w / 2) ** 2, 0));
+	sections.push({ x: [-w / 2, -w / 2, w / 2, w / 2], y: [-ySpine, ySpine, ySpine, -ySpine] });
 
-		if (xl > D / 2 || xr > D / 2 || yl < -D / 2 || yr < -D / 2) continue;
-
-		const xx = [xl, xl, xr, xr];
-		const yy = [yl, -D / 2, -D / 2, yr];
-		const xxM = [-xl, -xl, -xr, -xr];
-		const yyM = [-yl, D / 2, D / 2, -yr];
-
-		sections.push({ x: yy, y: xx });
-		sections.push({ x: yyM, y: xx });
-		sections.push({ x: yy, y: xxM });
-		sections.push({ x: yyM, y: xxM });
-
-		sections.push({ x: xx, y: yy });
-		sections.push({ x: xxM, y: yy });
-		sections.push({ x: xx, y: yyM });
-		sections.push({ x: xxM, y: yyM });
+	// Horizontal fingers, centered on multiples of the pitch, length clipped to R
+	const kMax = Math.floor((R - w / 2) / pitch);
+	for (let k = -kMax; k <= kMax; k++) {
+		const yc = k * pitch;
+		const yb = yc - w / 2, yt = yc + w / 2;
+		const yLim = Math.max(Math.abs(yb), Math.abs(yt));
+		const xMax = Math.sqrt(Math.max(R * R - yLim * yLim, 0));
+		if (xMax <= w / 2) continue;
+		sections.push({ x: [-xMax, -xMax, xMax, xMax], y: [yb, yt, yt, yb] });
 	}
-
-	// Shorts
-	const sX = [D / 2, D / 2 - w / Math.SQRT2, 0, 0, w / Math.SQRT2, D / 2];
-	const sY = [D / 2, D / 2, w / Math.SQRT2, 0, 0, D / 2 - w / Math.SQRT2];
-
-	sections.push({ x: sX, y: sY });
-	sections.push({ x: sX.map(v => -v), y: sY });
-	sections.push({ x: sX.map(v => -v), y: sY.map(v => -v) });
-	sections.push({ x: sX, y: sY.map(v => -v) });
 
 	return sections;
 }
@@ -167,11 +157,4 @@ export function routingGeometric45(
 		x: [...xUpper, ...xLower.reverse()].map(v => v + x0),
 		y: [...yUpper, ...yLower.reverse()].map(v => v + y0),
 	};
-}
-
-/** numpy-like arange */
-function arange(start: number, stop: number, step: number): number[] {
-	const result: number[] = [];
-	for (let v = start; v < stop; v += step) result.push(v);
-	return result;
 }
