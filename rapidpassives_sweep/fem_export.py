@@ -18,14 +18,46 @@ VIA_CLUSTER_SLACK_UM = 1.0
 FEM_SIM_DEFAULTS = {"f_min_hz": 1e9, "f_max_hz": 50e9, "n_points": 25, "z0_ohm": 50.0}
 
 
+_SNAP = 10 ** 6
+
+
+def _snap(v: float) -> float:
+    return round(v * _SNAP) / _SNAP
+
+
+def _inflate(coords: list[tuple], amount: float = 0.001) -> list[tuple]:
+    """Push each vertex away from the centroid (mirror of merge.ts::inflateRing)
+    so touching edges overlap and merge under union."""
+    if len(coords) < 3:
+        return coords
+    cx = sum(c[0] for c in coords) / len(coords)
+    cy = sum(c[1] for c in coords) / len(coords)
+    out = []
+    for x, y in coords:
+        dx, dy = x - cx, y - cy
+        dist = (dx * dx + dy * dy) ** 0.5
+        if dist < 1e-10:
+            out.append((x, y))
+        else:
+            out.append((_snap(x + dx / dist * amount), _snap(y + dy / dist * amount)))
+    return out
+
+
 def _merge_polys(polys: list[Poly]):
-    """Union overlapping polygons in a layer (mirror of merge.ts::mergeLayers).
-    Returns a list of (exterior, holes) coordinate rings."""
+    """Union overlapping polygons in a layer (mirror of merge.ts::mergePolygons).
+    Returns a list of (exterior, holes) coordinate rings.
+
+    Mirrors the TS fast path (single polygon -> returned as-is, no inflation) and
+    the centroid-inflate-then-union behaviour for multiple polygons."""
+    valid = [p for p in polys if len(p) >= 3]
+    if not valid:
+        return []
+    if len(valid) == 1:
+        return [(list(valid[0]), [])]
+
     shapes = []
-    for p in polys:
-        if len(p) < 3:
-            continue
-        sp = ShPoly(p)
+    for p in valid:
+        sp = ShPoly(_inflate([(_snap(x), _snap(y)) for x, y in p]))
         if not sp.is_valid:
             sp = sp.buffer(0)
         if not sp.is_empty:

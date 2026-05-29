@@ -8,12 +8,22 @@ tests comparing the two exports for identical parameters.
 from __future__ import annotations
 
 from .fem_export import build_fem_json, validate_fem_json
-from .geometry import GeometryResult, Port, add_pgs, build_spiral_inductor
+from .geometry import (
+    GeometryResult, Port, add_pgs,
+    build_spiral_inductor, build_symmetric_inductor, build_symmetric_transformer,
+    build_stacked_transformer, build_mom_capacitor, build_patch_antenna, build_ratrace_coupler,
+)
 from .stack import ProcessStack, sky130_stack
 from .sweep import sweep
 
 __all__ = [
     "build_spiral_inductor",
+    "build_symmetric_inductor",
+    "build_symmetric_transformer",
+    "build_stacked_transformer",
+    "build_mom_capacitor",
+    "build_patch_antenna",
+    "build_ratrace_coupler",
     "add_pgs",
     "build_fem_json",
     "validate_fem_json",

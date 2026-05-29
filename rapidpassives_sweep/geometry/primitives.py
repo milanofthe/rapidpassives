@@ -63,6 +63,26 @@ def via_grid(x0: float, y0: float, width_x: float, width_y: float,
     return polys
 
 
+def routing_geometric_45(w: float, s: float, x0: float, y0: float, extend: float = 0.0) -> Poly:
+    """45-degree crossing routing — ported from utils.ts::routingGeometric45."""
+    SQRT2 = math.sqrt(2)
+    g = (SQRT2 - 1) * s
+    d = (SQRT2 - 1) * w
+    h = w + s + (SQRT2 - 1) * (2 * s + w)
+    x_upper = [-h / 2, -h / 2 + g, h / 2 - g - d, h / 2]
+    y_upper = [-s / 2, -s / 2, s / 2 + w, s / 2 + w]
+    x_lower = [-h / 2, -h / 2 + g + d, h / 2 - g, h / 2]
+    y_lower = [-s / 2 - w, -s / 2 - w, s / 2, s / 2]
+    if extend > 0:
+        x_upper = [-h / 2 - extend] + x_upper + [h / 2 + extend]
+        y_upper = [-s / 2] + y_upper + [s / 2 + w]
+        x_lower = [-h / 2 - extend] + x_lower + [h / 2 + extend]
+        y_lower = [-s / 2 - w] + y_lower + [s / 2]
+    xs = [v + x0 for v in x_upper] + [v + x0 for v in reversed(x_lower)]
+    ys = [v + y0 for v in y_upper] + [v + y0 for v in reversed(y_lower)]
+    return list(zip(xs, ys))
+
+
 def pgs4(D: float, w: float, s: float) -> list[Poly]:
     """Manhattan fishbone patterned ground shield filling a DxD square.
 

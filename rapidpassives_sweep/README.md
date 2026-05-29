@@ -54,12 +54,14 @@ cd ../web && npx tsx --tsconfig ./tsconfig.json _export_golden.ts
 
 ## Status
 
-- **spiral** generator: ported and parity-verified against TS; full FEM sweep
-  proven end-to-end (rapidfem PARDISO solve, L/Q extraction).
-- Remaining generators (symmetric_inductor, symmetric_transformer,
-  stacked_transformer, mom_capacitor, patch_antenna, ratrace_coupler): to port,
-  each with its own parity golden. The `GeometryResult{layers, ports}` contract
-  and `build_fem_json` are generator-agnostic and ready for them.
+- **All 7 generators ported** and parity-verified against the TS web export
+  (spiral, symmetric_inductor, symmetric_transformer, stacked_transformer,
+  mom_capacitor, patch_antenna, ratrace_coupler) — see `tests/test_parity_all.py`
+  (8 golden cases). Parity compares ports (name/layer/coords), per-layer metal
+  area + bbox, and via-cell counts.
+- Full FEM sweep proven end-to-end on spiral (rapidfem PARDISO solve, L/Q
+  extraction). The same path works for the other generators.
+- The parity tests guard against the Python and TS geometry drifting apart.
 
 ## Install
 
