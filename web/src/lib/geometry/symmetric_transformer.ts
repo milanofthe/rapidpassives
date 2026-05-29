@@ -1,5 +1,4 @@
-import type { Polygon, LayerMap, SymmetricTransformerParams } from './types';
-import type { ConductorNetwork, ConductorNode, ConductorSegment, ViaConnection, Port, GeometryResult } from './network';
+import type { Polygon, LayerMap, Port, GeometryResult, SymmetricTransformerParams } from './types';
 import { viaGrid, routingGeometric45 } from './utils';
 
 export function buildSymmetricTransformer(params: SymmetricTransformerParams): GeometryResult {
@@ -82,226 +81,26 @@ export function buildSymmetricTransformer(params: SymmetricTransformerParams): G
 		upperLeftAngles, lowerLeftAngles, upperRightAngles, lowerRightAngles,
 		sepTotal, extend, topBridge, bottomBridge, topCrossing, bottomCrossing, lrBridge, lrCrossing);
 
-	// --- Build centerline network ---
-	const netNodes: ConductorNode[] = [];
-	const netSegments: ConductorSegment[] = [];
-	const netVias: ViaConnection[] = [];
-	let _nid = 0, _sid = 0;
-
-	// Via grid at a crossing endpoint — formula matches generateLegacyPolygons
-	// so the via polygons sit exactly under the m2 crossing strip that the
-	// legacy renderer draws. `extend` is the crossing's outboard length;
-	// the via is recessed by via_in_metal from each metal edge.
-	function viaPolysAt(cx: number, cy: number): Polygon[] {
-		const dx = Math.sign(cx) * (extend - width) / 2;
-		const dy = Math.sign(cy) * (extend - width) / 2;
-		const w_in = extend - 2 * via_in_metal;
-		const h_in = width - 2 * via_in_metal;
-		if (Math.abs(cy) > Math.abs(cx)) {
-			return viaGrid(cx + dx, cy, w_in, h_in, via_spacing, via_width);
-		}
-		return viaGrid(cx, cy + dy, h_in, w_in, via_spacing, via_width);
-	}
-
-	const _nodeReg = new Map<string, ConductorNode>();
-	function addN(x: number, y: number, layerId: string): ConductorNode {
-		const sx = Math.round(x * 1000) / 1000;
-		const sy = Math.round(y * 1000) / 1000;
-		const key = `${sx},${sy},${layerId}`;
-		const existing = _nodeReg.get(key);
-		if (existing) return existing;
-		const node: ConductorNode = { id: `n${_nid++}`, x: sx, y: sy, layerId };
-		netNodes.push(node);
-		_nodeReg.set(key, node);
-		return node;
-	}
-	function addS(from: ConductorNode, to: ConductorNode, w: number, lid: string, pid: string, rl: 'windings' | 'crossings'): void {
-		if (from.id === to.id) return;
-		netSegments.push({ id: `s${_sid++}`, fromNode: from.id, toNode: to.id, width: w, layerId: lid, pathId: pid, renderLayer: rl });
-	}
-
-	// Build centerline for each winding's 4 quadrant arcs + connections
-	let R1 = R1_init, R2 = R1 - v;
-
-	// Track last nodes of each quadrant for inter-winding connections
-	let prevWindingQuadLast: ConductorNode[] = [];
-
-	// Track winding entry/exit points for port assignment
-	// Winding 0 bottom-left is the first port entry
-	// The interleaving determines which windings are primary/secondary
-	const windingBottomLeft: ConductorNode[] = [];  // LL.last per winding
-	const windingBottomRight: ConductorNode[] = []; // LR.first per winding
-	const windingTopLeft: ConductorNode[] = [];     // UL.first per winding
-	const windingTopRight: ConductorNode[] = [];    // UR.last per winding
-
-	for (let winding = 0; winding < N; winding++) {
-		const rc = (R1 + R2) / 2;
-		const quadAngles = [upperLeftAngles, lowerLeftAngles, upperRightAngles, lowerRightAngles];
-		const quadLabels = ['ul', 'll', 'ur', 'lr'];
-
-		// Build 4 quadrant arcs, track first/last node of each
-		const qFirst: ConductorNode[] = [];
-		const qLast: ConductorNode[] = [];
-
-		for (let qi = 0; qi < 4; qi++) {
-			let prev: ConductorNode | null = null;
-			let first: ConductorNode | null = null;
-			for (const phi of quadAngles[qi]) {
-				const node = addN(rc * Math.cos(phi), rc * Math.sin(phi), 'm3');
-				if (!first) first = node;
-				if (prev) addS(prev, node, width, 'm3', `w${winding}_${quadLabels[qi]}`, 'windings');
-				prev = node;
-			}
-			qFirst.push(first!);
-			qLast.push(prev!);
-		}
-
-		// Connect quadrants: UL↔UR at top, LL↔LR at bottom, UL↔LL at left, UR↔LR at right
-		// Each connection is either a bridge (same metal) or crossing (lower metal + vias)
-
-		// Via centres mirror the legacy renderer's formulas so the via
-		// polygons land underneath the m2 crossing strips that the renderer
-		// draws (the network-node positions don't match the rendered metal,
-		// so we can't reuse those).
-		const hTop = R1 * Math.sin(PI * (0.5 - 1 / sides));
-		const hBot = (-R2 + s) * Math.sin(PI * (0.5 - 1 / sides));
-		const tcL: [number, number] = [-sepTotal / 2 - width / 2, hTop - 3 * width / 2 - spacing];
-		const tcR: [number, number] = [ sepTotal / 2 + width / 2, hTop - width / 2];
-		const bcL: [number, number] = [-sepTotal / 2 - width / 2, hBot - 3 * width / 2 - spacing];
-		const bcR: [number, number] = [ sepTotal / 2 + width / 2, hBot - width / 2];
-		const lcT: [number, number] = [hBot - 3 * width / 2 - spacing, -sepTotal / 2 - width / 2];
-		const lcB: [number, number] = [hBot - width / 2,              sepTotal / 2 + width / 2];
-		const rcT: [number, number] = [hTop - 3 * width / 2 - spacing, -sepTotal / 2 - width / 2];
-		const rcB: [number, number] = [hTop - width / 2,              sepTotal / 2 + width / 2];
-
-		// Top connection: UL.first ↔ UR.last (both at top y)
-		if (topBridge.includes(winding)) {
-			addS(qFirst[0], qLast[2], width, 'm3', `w${winding}_bridge_top`, 'windings');
-		} else if (topCrossing.includes(winding)) {
-			const cL = addN(qFirst[0].x, qFirst[0].y, 'm2');
-			const cR = addN(qLast[2].x, qLast[2].y, 'm2');
-			addS(cL, cR, width, 'm2', `w${winding}_cross_top`, 'crossings');
-			netVias.push({ id: `v_tc_l${winding}`, topNode: qFirst[0].id, bottomNode: cL.id, resistance: 0.05, polygons: viaPolysAt(...tcL), renderLayer: 'vias1' });
-			netVias.push({ id: `v_tc_r${winding}`, topNode: qLast[2].id,  bottomNode: cR.id, resistance: 0.05, polygons: viaPolysAt(...tcR), renderLayer: 'vias1' });
-		} else {
-			// Direct connection (no crossing needed for this winding at top)
-			addS(qFirst[0], qLast[2], width, 'm3', `w${winding}_conn_top`, 'windings');
-		}
-
-		// Bottom connection: LL.last ↔ LR.first (both at bottom y)
-		if (bottomBridge.includes(winding)) {
-			addS(qLast[1], qFirst[3], width, 'm3', `w${winding}_bridge_bot`, 'windings');
-		} else if (bottomCrossing.includes(winding)) {
-			const cL = addN(qLast[1].x, qLast[1].y, 'm2');
-			const cR = addN(qFirst[3].x, qFirst[3].y, 'm2');
-			addS(cL, cR, width, 'm2', `w${winding}_cross_bot`, 'crossings');
-			netVias.push({ id: `v_bc_l${winding}`, topNode: qLast[1].id,  bottomNode: cL.id, resistance: 0.05, polygons: viaPolysAt(...bcL), renderLayer: 'vias1' });
-			netVias.push({ id: `v_bc_r${winding}`, topNode: qFirst[3].id, bottomNode: cR.id, resistance: 0.05, polygons: viaPolysAt(...bcR), renderLayer: 'vias1' });
-		} else {
-			addS(qLast[1], qFirst[3], width, 'm3', `w${winding}_conn_bot`, 'windings');
-		}
-
-		// Left connection: UL.last ↔ LL.first
-		if (lrBridge.includes(winding)) {
-			addS(qLast[0], qFirst[1], width, 'm3', `w${winding}_bridge_l`, 'windings');
-		} else if (lrCrossing.includes(winding)) {
-			const cT = addN(qLast[0].x, qLast[0].y, 'm2');
-			const cB = addN(qFirst[1].x, qFirst[1].y, 'm2');
-			addS(cT, cB, width, 'm2', `w${winding}_cross_l`, 'crossings');
-			netVias.push({ id: `v_lc_t${winding}`, topNode: qLast[0].id,  bottomNode: cT.id, resistance: 0.05, polygons: viaPolysAt(...lcT), renderLayer: 'vias1' });
-			netVias.push({ id: `v_lc_b${winding}`, topNode: qFirst[1].id, bottomNode: cB.id, resistance: 0.05, polygons: viaPolysAt(...lcB), renderLayer: 'vias1' });
-		} else {
-			addS(qLast[0], qFirst[1], width, 'm3', `w${winding}_conn_l`, 'windings');
-		}
-
-		// Right connection: UR.first ↔ LR.last
-		if (lrBridge.includes(winding)) {
-			addS(qFirst[2], qLast[3], width, 'm3', `w${winding}_bridge_r`, 'windings');
-		} else if (lrCrossing.includes(winding)) {
-			const cT = addN(qFirst[2].x, qFirst[2].y, 'm2');
-			const cB = addN(qLast[3].x, qLast[3].y, 'm2');
-			addS(cT, cB, width, 'm2', `w${winding}_cross_r`, 'crossings');
-			netVias.push({ id: `v_rc_t${winding}`, topNode: qFirst[2].id, bottomNode: cT.id, resistance: 0.05, polygons: viaPolysAt(...rcT), renderLayer: 'vias1' });
-			netVias.push({ id: `v_rc_b${winding}`, topNode: qLast[3].id,  bottomNode: cB.id, resistance: 0.05, polygons: viaPolysAt(...rcB), renderLayer: 'vias1' });
-		} else {
-			addS(qFirst[2], qLast[3], width, 'm3', `w${winding}_conn_r`, 'windings');
-		}
-
-		// Inter-winding connections at the 4 junction points
-		if (prevWindingQuadLast.length > 0) {
-			const prev = prevWindingQuadLast;
-			// UL: prev[0].first connects to this[0].first (top of UL)
-			// Actually, consecutive windings share the crossing/bridge zone.
-			// The junction between winding W and W+1 is at the sepTotal boundary.
-			// Connect prev winding's quadrant endpoints to this winding's quadrant endpoints
-			// at the same angular positions.
-
-			// Connect at the 4 quadrant boundaries (where arcs start/end)
-			// These are at the sepTotal positions — consecutive windings at different radii
-			addS(prev[0], qFirst[0], width, 'm3', `inter_w${winding}_ul`, 'windings');
-			addS(prev[1], qLast[1], width, 'm3', `inter_w${winding}_ll`, 'windings');
-			addS(prev[2], qLast[2], width, 'm3', `inter_w${winding}_ur`, 'windings');
-			addS(prev[3], qFirst[3], width, 'm3', `inter_w${winding}_lr`, 'windings');
-		}
-
-		// Track for next winding's inter-connection
-		prevWindingQuadLast = [qFirst[0], qLast[1], qLast[2], qFirst[3]];
-
-		// Track port connection points per winding
-		// Bottom: LL.last (left) and LR.first (right) — these are the bottom-most nodes
-		windingBottomLeft.push(qLast[1]);
-		windingBottomRight.push(qFirst[3]);
-		// Top: UL.first (left) and UR.last (right) — these are the top-most nodes
-		windingTopLeft.push(qFirst[0]);
-		windingTopRight.push(qLast[2]);
-
-		R1 -= s;
-		R2 -= s;
-	}
-
-	// Port nodes
+	// Ports — outermost winding endpoints at the bottom (P1) and top (P2) edges.
 	const hasBotCTPort = (center_tap_primary && N1 % 2 === 0) || (center_tap_secondary && N2 % 2 !== 0);
 	const hasTopCTPort = (center_tap_primary && N1 % 2 !== 0) || (center_tap_secondary && N2 % 2 === 0);
 	const ps = params.portSpacing ?? spacing;
 	const botPortX = hasBotCTPort ? ps + width : (ps + width) / 2;
 	const topPortX = hasTopCTPort ? ps + width : (ps + width) / 2;
+	const botY = -Dout / 2 - width;
+	const topY = Dout / 2 + width;
 
-	const p1Plus = addN(-botPortX, -Dout / 2 - width, 'm3');
-	const p1Minus = addN(botPortX, -Dout / 2 - width, 'm3');
-	const p2Plus = addN(-topPortX, Dout / 2 + width, 'm3');
-	const p2Minus = addN(topPortX, Dout / 2 + width, 'm3');
-
-	// Connect ports to outermost winding (0) quadrant endpoints
-	// P1+ → LL bottom-left (winding 0), P1- → LR bottom-right (winding 0)
-	// P2+ → UL top-left (winding 0), P2- → UR top-right (winding 0)
-	addS(p1Plus, windingBottomLeft[0], width, 'm3', 'port_p1p', 'windings');
-	addS(p1Minus, windingBottomRight[0], width, 'm3', 'port_p1m', 'windings');
-	addS(p2Plus, windingTopLeft[0], width, 'm3', 'port_p2p', 'windings');
-	addS(p2Minus, windingTopRight[0], width, 'm3', 'port_p2m', 'windings');
-
-	const netPorts: Port[] = [
-		{ name: 'P1+', node: p1Plus.id },
-		{ name: 'P1-', node: p1Minus.id },
-		{ name: 'P2+', node: p2Plus.id },
-		{ name: 'P2-', node: p2Minus.id },
+	const ports: Port[] = [
+		{ name: 'P1+', x: -botPortX, y: botY, layer: 'windings', role: 'signal' },
+		{ name: 'P1-', x: botPortX, y: botY, layer: 'windings', role: 'signal' },
+		{ name: 'P2+', x: -topPortX, y: topY, layer: 'windings', role: 'signal' },
+		{ name: 'P2-', x: topPortX, y: topY, layer: 'windings', role: 'signal' },
 	];
-	if (hasBotCTPort) {
-		const ct = addN(0, -Dout / 2 - width, 'm3');
-		// Connect CT to the bottom of the innermost winding
-		const innerBot = windingBottomLeft.length > 0 ? windingBottomLeft[windingBottomLeft.length - 1] : null;
-		if (innerBot) addS(ct, innerBot, width, 'm3', 'ct', 'windings');
-		netPorts.push({ name: 'CT1', node: ct.id });
-	}
-	if (hasTopCTPort) {
-		const ct = addN(0, Dout / 2 + width, 'm3');
-		const innerTop = windingTopLeft.length > 0 ? windingTopLeft[windingTopLeft.length - 1] : null;
-		if (innerTop) addS(ct, innerTop, width, 'm3', 'ct', 'windings');
-		netPorts.push({ name: 'CT2', node: ct.id });
-	}
+	// CT terminals tap the winding metal (matches the legacy CT-segment layer).
+	if (hasBotCTPort) ports.push({ name: 'CT1', x: 0, y: botY, layer: 'windings', role: 'centertap' });
+	if (hasTopCTPort) ports.push({ name: 'CT2', x: 0, y: topY, layer: 'windings', role: 'centertap' });
 
-	const network: ConductorNetwork = { nodes: netNodes, segments: netSegments, vias: netVias, ports: netPorts };
-
-	return { network, layers };
+	return { layers, ports };
 }
 
 // --- Legacy polygon generation (unchanged, for rendering/GDS) ---
@@ -327,6 +126,17 @@ function generateLegacyPolygons(
 	const polysCenterTap: Polygon[] = [];
 	let polysVias1: Polygon[] = [];
 	let polysVias2: Polygon[] = [];
+
+	// Via grid at a crossing endpoint — recessed by via_in_metal from each metal
+	// edge so it sits exactly under the m2 crossing strip drawn below.
+	function viaPolysAt(cx: number, cy: number): Polygon[] {
+		const dx = Math.sign(cx) * (extend - width) / 2;
+		const dy = Math.sign(cy) * (extend - width) / 2;
+		const w_in = extend - 2 * via_in_metal;
+		const h_in = width - 2 * via_in_metal;
+		if (Math.abs(cy) > Math.abs(cx)) return viaGrid(cx + dx, cy, w_in, h_in, via_spacing, via_width);
+		return viaGrid(cx, cy + dy, h_in, w_in, via_spacing, via_width);
+	}
 
 	for (let winding = 0; winding < N; winding++) {
 		const allAngles = [upperLeftAngles, lowerLeftAngles, upperRightAngles, lowerRightAngles];
@@ -360,6 +170,25 @@ function generateLegacyPolygons(
 		if (lrCrossing.includes(winding)) {
 			const hR = R1*Math.sin(PI*(0.5-1/sides)); let cr=routingGeometric45(width,spacing,0,hR-width-spacing/2,extend); polysCrossings.push({x:cr.y,y:cr.x}); cr=routingGeometric45(width,spacing,0,hR-width-spacing/2,0); polysWindings.push({x:cr.y.map(v=>-v),y:cr.x});
 			const hL = (-R2+s)*Math.sin(PI*(0.5-1/sides)); cr=routingGeometric45(width,spacing,0,hL-width-spacing/2,extend); polysCrossings.push({x:cr.y,y:cr.x}); cr=routingGeometric45(width,spacing,0,hL-width-spacing/2,0); polysWindings.push({x:cr.y.map(v=>-v),y:cr.x});
+		}
+
+		// Crossing vias — recessed under the m2 crossing strips drawn above.
+		// (Previously emitted via network.vias; now part of the polygon SoT.)
+		const hTopV = R1 * Math.sin(PI * (0.5 - 1 / sides));
+		const hBotV = (-R2 + s) * Math.sin(PI * (0.5 - 1 / sides));
+		if (topCrossing.includes(winding)) {
+			polysVias1.push(...viaPolysAt(-sepTotal / 2 - width / 2, hTopV - 3 * width / 2 - spacing));
+			polysVias1.push(...viaPolysAt(sepTotal / 2 + width / 2, hTopV - width / 2));
+		}
+		if (bottomCrossing.includes(winding)) {
+			polysVias1.push(...viaPolysAt(-sepTotal / 2 - width / 2, hBotV - 3 * width / 2 - spacing));
+			polysVias1.push(...viaPolysAt(sepTotal / 2 + width / 2, hBotV - width / 2));
+		}
+		if (lrCrossing.includes(winding)) {
+			polysVias1.push(...viaPolysAt(hBotV - 3 * width / 2 - spacing, -sepTotal / 2 - width / 2));
+			polysVias1.push(...viaPolysAt(hBotV - width / 2, sepTotal / 2 + width / 2));
+			polysVias1.push(...viaPolysAt(hTopV - 3 * width / 2 - spacing, -sepTotal / 2 - width / 2));
+			polysVias1.push(...viaPolysAt(hTopV - width / 2, sepTotal / 2 + width / 2));
 		}
 
 		R1 -= s; R2 -= s;

@@ -1,4 +1,4 @@
-import type { GeometryResult } from './network';
+import type { GeometryResult } from './types';
 
 export interface PortMarker {
 	name: string;
@@ -6,12 +6,8 @@ export interface PortMarker {
 	y: number;
 }
 
-/** Extract port markers from a geometry result's conductor network */
+/** Extract render markers (name + position) from a geometry result's ports. */
 export function extractPortMarkers(result: GeometryResult | null): PortMarker[] {
 	if (!result) return [];
-	const nodeMap = new Map(result.network.nodes.map(n => [n.id, n]));
-	return result.network.ports.map(port => {
-		const node = nodeMap.get(port.node);
-		return node ? { name: port.name, x: node.x, y: node.y } : null;
-	}).filter((p): p is PortMarker => p !== null);
+	return result.ports.map(p => ({ name: p.name, x: p.x, y: p.y }));
 }

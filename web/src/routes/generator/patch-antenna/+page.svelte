@@ -30,7 +30,7 @@
 
 	function doExportJson() {
 		if (!result) return;
-		const json = exportForFEM(layers, result.network, stack, {
+		const json = exportForFEM(layers, result.ports, stack, {
 			generator: 'patch_antenna',
 			params: { ...p },
 		});

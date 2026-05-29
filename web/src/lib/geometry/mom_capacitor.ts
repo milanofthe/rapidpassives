@@ -1,5 +1,4 @@
-import type { Polygon, LayerMap, LayerName, MomCapacitorParams } from './types';
-import type { ConductorNetwork, ConductorNode, Port, GeometryResult } from './network';
+import type { Polygon, LayerMap, LayerName, Port, GeometryResult, MomCapacitorParams } from './types';
 import { viaGrid } from './utils';
 
 /**
@@ -152,20 +151,13 @@ export function buildMomCapacitor(params: MomCapacitorParams): GeometryResult {
 		}
 	}
 
-	// Network with port markers — layerId names the renderLayer (windings =
-	// top metal) so the FEM exporter can resolve it via layerNameToStackId.
-	const nodes: ConductorNode[] = [
-		{ id: 'p_plus', x: x0, y: y0 + busWidth / 2, layerId: 'windings' },
-		{ id: 'p_minus', x: x0 + totalWidth, y: y0 + busWidth + fingerLength + busWidth / 2, layerId: 'windings' },
-	];
+	// Port markers on the top metal (windings).
 	const ports: Port[] = [
-		{ name: 'P+', node: 'p_plus' },
-		{ name: 'P-', node: 'p_minus' },
+		{ name: 'P+', x: x0, y: y0 + busWidth / 2, layer: 'windings', role: 'signal' },
+		{ name: 'P-', x: x0 + totalWidth, y: y0 + busWidth + fingerLength + busWidth / 2, layer: 'windings', role: 'signal' },
 	];
 
-	const network: ConductorNetwork = { nodes, segments: [], vias: [], ports };
-
-	return { network, layers };
+	return { layers, ports };
 }
 
 export function isMomCapacitorValid(params: MomCapacitorParams): boolean {

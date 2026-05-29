@@ -31,7 +31,7 @@
 
 	function doExportJson() {
 		if (!result) return;
-		const json = exportForFEM(layers, result.network, stack, {
+		const json = exportForFEM(layers, result.ports, stack, {
 			generator: 'mom_capacitor',
 			params: { ...p },
 		});

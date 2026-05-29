@@ -1,13 +1,8 @@
-import type { Polygon, LayerMap, PatchAntennaParams } from './types';
-import type { ConductorNetwork, ConductorNode, Port, GeometryResult } from './network';
+import type { Polygon, LayerMap, Port, GeometryResult, PatchAntennaParams } from './types';
 
 /** Build a microstrip patch antenna layout */
 export function buildPatchAntenna(params: PatchAntennaParams): GeometryResult {
 	const { W, L, feedType, feedWidth, feedLength, insetDepth, insetGap, groundMargin } = params;
-
-	const nodes: ConductorNode[] = [];
-	const ports: Port[] = [];
-	let nid = 0;
 
 	// Ground plane
 	const Wg = W + 2 * groundMargin;
@@ -46,19 +41,16 @@ export function buildPatchAntenna(params: PatchAntennaParams): GeometryResult {
 		y: [feedEndY, feedEndY, -L / 2, -L / 2],
 	};
 
-	// Port node — layerId names the renderLayer so the FEM exporter can
-	// resolve it via layerNameToStackId (no segments here to infer from).
-	const portNode: ConductorNode = { id: `n${nid++}`, x: 0, y: feedEndY, layerId: 'windings' };
-	nodes.push(portNode);
-	ports.push({ name: 'P1', node: portNode.id });
-
-	const network: ConductorNetwork = { nodes, segments: [], vias: [], ports };
+	// Port marker at the feed-line far end, on the patch metal (windings).
+	const ports: Port[] = [
+		{ name: 'P1', x: 0, y: feedEndY, layer: 'windings', role: 'signal' },
+	];
 	const layers: LayerMap = {
 		crossings: [groundPoly],
 		windings: [...patchPolys, feedPoly],
 	};
 
-	return { network, layers };
+	return { layers, ports };
 }
 
 /** Compute patch dimensions from target frequency and substrate parameters */

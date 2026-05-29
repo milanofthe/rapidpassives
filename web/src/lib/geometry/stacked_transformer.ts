@@ -1,5 +1,4 @@
-import type { Polygon, LayerMap, LayerName, StackedTransformerParams } from './types';
-import type { ConductorNetwork, ConductorNode, ConductorSegment, ViaConnection, Port, GeometryResult } from './network';
+import type { Polygon, LayerMap, LayerName, Port, GeometryResult, StackedTransformerParams } from './types';
 import { viaGrid, routingGeometric45 } from './utils';
 
 /**
@@ -55,24 +54,19 @@ export function buildStackedTransformer(params: StackedTransformerParams): Geome
 		layers[k] = [...(layers[k] || []), ...polys];
 	}
 
-	// Merge networks
-	const network: ConductorNetwork = {
-		nodes: [...primaryPolys.network.nodes, ...secondaryPolys.network.nodes],
-		segments: [...primaryPolys.network.segments, ...secondaryPolys.network.segments],
-		vias: [...primaryPolys.network.vias, ...secondaryPolys.network.vias],
-		ports: [
-			...primaryPolys.network.ports.map(p => ({
-				...p,
-				name: p.name === 'P1' ? 'P+' : p.name === 'P2' ? 'P-' : 'CT_P',
-			})),
-			...secondaryPolys.network.ports.map(p => ({
-				...p,
-				name: p.name === 'P1' ? 'S+' : p.name === 'P2' ? 'S-' : 'CT_S',
-			})),
-		],
-	};
+	// Merge ports, renaming to primary (P) / secondary (S) terminals.
+	const ports: Port[] = [
+		...primaryPolys.ports.map(p => ({
+			...p,
+			name: p.name === 'P1' ? 'P+' : p.name === 'P2' ? 'P-' : 'CT_P',
+		})),
+		...secondaryPolys.ports.map(p => ({
+			...p,
+			name: p.name === 'P1' ? 'S+' : p.name === 'P2' ? 'S-' : 'CT_S',
+		})),
+	];
 
-	return { network, layers };
+	return { layers, ports };
 }
 
 interface WindingConfig {
@@ -98,7 +92,7 @@ interface WindingConfig {
  * Build a single symmetric winding (half of a stacked transformer).
  * Adapted from the symmetric inductor legacy polygon generation.
  */
-function buildWindingPolygons(cfg: WindingConfig): { layers: LayerMap; network: ConductorNetwork } {
+function buildWindingPolygons(cfg: WindingConfig): { layers: LayerMap; ports: Port[] } {
 	const { N, sides, width, spacing, Dout, R1_start,
 		center_tap, via_extent, via_spacing, via_width, via_in_metal,
 		windingLayer, crossingLayer, viaLayer, portSide } = cfg;
@@ -266,28 +260,18 @@ function buildWindingPolygons(cfg: WindingConfig): { layers: LayerMap; network: 
 		layers[via2Layer] = polysVia2;
 	}
 
-	// Build minimal network for port markers — layerId uses the renderLayer
-	// name (windingLayer) so the FEM exporter resolves it via
-	// layerNameToStackId without leaning on generator-internal labels.
+	// Ports sit on the winding metal (windingLayer is already a LayerName).
 	const portXOffset = pxo;
 	const portMarkerY = portSide === 'bottom' ? -Dout / 2 - width : Dout / 2 + width;
-	const portIdPrefix = windingLayer === 'windings_m4' ? 'm4' : 'm2';
-	const nodes: ConductorNode[] = [
-		{ id: `${portIdPrefix}_pl`, x: -portXOffset, y: portMarkerY, layerId: windingLayer },
-		{ id: `${portIdPrefix}_pr`, x: portXOffset, y: portMarkerY, layerId: windingLayer },
-	];
 	const ports: Port[] = [
-		{ name: 'P1', node: `${portIdPrefix}_pl` },
-		{ name: 'P2', node: `${portIdPrefix}_pr` },
+		{ name: 'P1', x: -portXOffset, y: portMarkerY, layer: windingLayer, role: 'signal' },
+		{ name: 'P2', x: portXOffset, y: portMarkerY, layer: windingLayer, role: 'signal' },
 	];
 	if (center_tap) {
-		nodes.push({ id: `${portIdPrefix}_ct`, x: 0, y: portMarkerY, layerId: windingLayer });
-		ports.push({ name: 'CT', node: `${portIdPrefix}_ct` });
+		ports.push({ name: 'CT', x: 0, y: portMarkerY, layer: windingLayer, role: 'centertap' });
 	}
 
-	const network: ConductorNetwork = { nodes, segments: [], vias: [], ports };
-
-	return { layers, network };
+	return { layers, ports };
 }
 
 export function isStackedTransformerValid(params: StackedTransformerParams): boolean {
